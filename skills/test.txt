@@ -1,124 +1,154 @@
-You are inspecting the HCA HCP Credentialing repository.
-
-ROLE:
-Act as a senior engineer. Discovery only. Do not modify any files. Do not implement ADD NPP.
-
-TASK:
-Find the existing "PAF Action & Facilities" / Practitioner Action radio list so tickets 132255–132259 can reuse it. Cursor will use your RETURN block to write the 132256 implementation prompt. Incomplete paths = not ready to code.
-
-BUSINESS REQUIREMENT (do not implement now):
-Feature 132255: add a Practitioner Action radio labeled exactly "ADD NPP to Facility".
-132256: visible only if user has MSP role; last in the list; if role cannot be retrieved, hide and log.
-132257: show only for Net New OR existing practitioner inactive with the entity; hide if active with the entity or otherwise ineligible.
-132259: keep single-select radios including the new option; client + server must reject multiple selections and log.
-132258: on submit of ADD NPP to Facility, reuse existing New Practitioner vs Existing Practitioner PAF task determination. No new NPP determination engine.
-
-SCOPE:
-Read-only search. No code changes. No new files. No TaskType.Npp wiring. No new PafType.
-
-SEARCH FOR (literal strings):
-"PAF Action & Facilities"
-"Practitioner Action"
-"Add Practitioner to Facility"
-"ADD NPP to Facility"
-"Add Privilege MSS-18"
-"Off-Cycle RRFC"
-"Off-Cycle PSV"
-"Request Processing Change"
-"Practitioner Personal Info"
-PafTaskSelection
-TaskType
-GetAvailableTaskListAsync
-TaskListParameters
-TaskAllowedListMode
-AddPractitionerToFacility
-IsMspOnlyUser
-IsMspUser
-IsInRole
-
-INVESTIGATION STARTING POINTS (confirm or say Not found):
-- Client/Pages/Paf/Components/PafTaskSelection.razor
-- Client/Pages/Paf/Components/PafTaskSelection.razor.cs
-- Shared/Data/Model/Paf/TaskType.cs
-- Hca.Credentialing.Paf.Api/Controllers/TaskController.cs
-- Hca.Credentialing.Paf.Api/Services/TaskDeterminationService.cs (or wherever ITaskDeterminationService is implemented)
-- How facilities are listed beside the action radios (Filter Facilities / Select All Facilities)
-
-DO NOT:
-- Invent file paths.
-- Implement the new radio.
-- Treat 136883 dashboard/NPP search URL auth as this dialog’s MSP check unless you open both and prove they share a helper.
-- Collapse 132257 eligibility into TaskDeterminationService unless the same method already hides actions by active/inactive entity.
-- Propose a new dialog or a new determination engine.
-
-BEFORE RESPONDING:
-1. Search the repo with the strings above.
-2. Open matching files and read markup, visibility, submit, and determination calls.
-3. Quote real paths, types, and methods.
-
-RETURN exactly this structure:
-
 ## Discovery result — 132255 PAF Action
 
 ### A. Dialog / page
-File (.razor and .cs):
-Class/Component:
-Dialog title in UI (exact):
-When it is shown (caller page + method):
-Tests:
-Current behavior:
-Is this "PAF Action & Facilities"? (yes/no + proof)
+**File (.razor and .cs):**
+- Client/Pages/Paf/Components/PafTaskSelection.razor
+- Client/Pages/Paf/Components/PafTaskSelection.razor.cs
+
+**Class/Component:** `PafTaskSelection` (partial class, `Hca.Credentialing.Client.Pages.Paf.Components` namespace), rendered inside an `<EnhancedDrawer>`.
+
+**Dialog title in UI (exact):** Computed by `GetTitle()` (`PafTaskSelection.razor.cs` line ~148):
+- `"PAF Action & Group"` (PSG user)
+- `"PAF Action & Service Line"` (Recruitment user)
+- `"PAF Action & Facilities"` (everyone else, including MSP) — confirmed via literal grep match at line 154.
+
+**When it is shown (caller page + method):** Client/Pages/Paf/Components/PafFormComponent.razor line 20: `<PafTaskSelection Visible="_isFacilitySelectionVisible" Events="@HandleTaskSelectionEvent" IsExistingPaf="IsExistingPaf"></PafTaskSelection>`. `_isFacilitySelectionVisible` is set true in `HandlePractitionerPanelEvents` on `PractitionerPanelEventEventType.ShowFacilities` (`PafFormComponent.razor.cs`).
+
+**Tests:** Not found. No Blazor client test project exists in this repository (confirmed no results for `PafTaskSelection`/`TaskDetermination` under any `*Tests*` project).
+
+**Current behavior:** Drawer shows a `Practitioner Action` radio list on the left (`aside class="practitioner-action-wrapper"`) and a facility/group/service-line picker on the right, sourced from `_currentAvailableTasks` (populated by `LoadAvailableTasks()` → `PafClient.GetAvailableTaskListAsync(...)`).
+
+**Is this "PAF Action & Facilities"? (yes/no + proof):** **Yes** — `GetTitle()` returns exactly `"PAF Action & Facilities"` for the non-PSG, non-Recruitment case (which includes MSP), confirmed by direct grep of the literal string at `PafTaskSelection.razor.cs:154`.
+
+---
 
 ### B. Practitioner Action radio list (132256 / 132259)
-File where radios are rendered:
-How options are sourced (enum / API / hardcoded):
-Exact current option labels in order (last existing option name):
-Radio group mechanism (same name / component):
-Client selection handler:
-What is posted on Next/submit (single value vs list + property names):
-Server endpoint that receives the selected action:
-Existing server check that only one action is selected (file/method or Not found):
-Where a validation error would be logged (file/method or Not found):
-Tests:
-Current behavior:
-Smallest extension point to add "ADD NPP to Facility" as last radio:
-Files that must not change:
+
+**File where radios are rendered:** `PafTaskSelection.razor`, inside `<aside class="practitioner-action-wrapper">`:
+```razor
+<RadioGroup ButtonStyle="@RadioButtonStyle.Solid" @bind-Value="@_selectedTask" TValue="TaskType" OnChange="OnTaskChange">
+    @foreach (var task in _currentAvailableTasks)
+    {
+        <Radio Disabled="_shouldDisableActionRadios" Value="@task.Type">@task.Name ...</Radio>
+    }
+</RadioGroup>
+```
+
+**How options are sourced (enum / API / hardcoded):** API — `PafTaskSelection.LoadAvailableTasks()` calls `PafClient.GetAvailableTaskListAsync(new TaskListParameters { Mode, PractitionerId, IsPsgUserMode, IsRecruitmentUserMode })`, which hits `Hca.Credentialing.Paf.Api/Controllers/TaskController.cs` → `ITaskDeterminationService.GetAvailableTaskListAsync` (implemented in `Hca.Credentialing.Paf.Api/Services/TaskDeterminationService.cs`). Labels come from `TaskType.GetDescription()` (the `[Description]` attributes on the `TaskType` enum, `Shared/Data/Model/Paf/TaskType.cs`).
+
+**Exact current option labels in order (MSP/existing-practitioner mode, non-PSG, non-Recruitment):**
+1. "Practitioner Personal Info" (`ManagePersonalInfo`)
+2. "Add Practitioner to Facility" (`AddPractitionerToFacility`)
+3. "Request Processing Change" (`RequestProcessingChange`)
+4. "Manage / Add Coll.Prac." (`ManageCollaboratingPractitioners`) — only if `!practitioner.IsPhysician`
+5. "Off-Cycle RRFC" (`OffCycleRrfc`)
+6. "Off-Cycle PSV" (`OffCyclePsv`)
+7. **"Add Privilege MSS-18" (`AddPrivilegesMss18`) — last existing option** for MSP/existing-practitioner mode.
+
+For MSP/**new**-practitioner mode, the list contains only "Add Practitioner to Facility" (the only, and therefore last, option) — confirmed in `TaskDeterminationService.GetAvailableTaskListAsync` (verified directly in a prior session's read; not re-quoted verbatim here since it was not re-opened in this pass, flagged as carried-forward evidence).
+
+**Radio group mechanism (same name / component):** Single AntDesign `<RadioGroup @bind-Value="@_selectedTask" TValue="TaskType">` — one bound `TaskType _selectedTask` field; structurally single-select (a `RadioGroup` bound to one scalar value cannot represent multiple selections client-side).
+
+**Client selection handler:** `OnTaskChange(TaskType newTask)` (`PafTaskSelection.razor.cs`) — sets `StateContainer.PafState.TaskSelected = newTask; _selectedTask = newTask;` and resets facility/service-line selection state.
+
+**What is posted on Next/submit (single value vs list + property names):** `OnSaveClicked()` raises `Events.InvokeAsync(new TaskSelectionEvent { ..., PafType = _selectedTask, ... })`. `TaskSelectionEvent.PafType` is declared as `TaskType?` — a single nullable scalar, not a collection.
+
+**Server endpoint that receives the selected action:** `PafFormComponent.HandleTaskSelectionEvent(TaskSelectionEvent eventArgs)` (`PafFormComponent.razor.cs` line 759) calls, for a new PAF: `PafClient.AddTaskToPafAsync(eventArgs.PafType.Value, PafData)` → `[HttpPut("AddTaskToPaf")] AddTaskToPafAsync([FromQuery] TaskType task, PractitionerActionFormData formData)` (`Hca.Credentialing.Paf.Api/Controllers/PafController.cs` line 79) → `_pafProcessingStrategyContext.CreateAddTaskStrategy(task)`. For an existing PAF, it instead posts `PafClient.UpdateTaskAndSavePafAsync(pafState.TaskSelected, false, PafData)`.
+
+**Existing server check that only one action is selected (file/method or Not found):** **Not found.** The controller parameter is `[FromQuery] TaskType task` — a single scalar enum value by type signature; there is no explicit "reject if multiple" validation because the wire format structurally cannot carry more than one value. No defensive multi-select rejection logic exists.
+
+**Where a validation error would be logged (file/method or Not found):** **Not found** specific to task-selection validation. `PafTaskSelection` injects `ILogger<PafTaskSelection> Logger` and uses it only for `LogDebug` trace lines (component lifecycle, e.g. `OnInitializedAsync`, `LoadData`) — no error/warning-level logging exists for selection validation failures.
+
+**Tests:** Not found (see §A).
+
+**Current behavior:** Single-select radio list is populated per role/mode; selecting a radio updates `StateContainer.PafState.TaskSelected` and drives which facility/group/service-line picker renders on the right; Save posts the single selected `TaskType` to the server.
+
+**Smallest extension point to add "ADD NPP to Facility" as last radio:** `TaskDeterminationService.GetAvailableTaskListAsync` (`Hca.Credentialing.Paf.Api/Services/TaskDeterminationService.cs`) — add a conditional `list.Add(new TaskDto { Name = TaskType.Npp.GetDescription(), Type = TaskType.Npp })` at the end of the relevant `Mode`/role branch(es), after the existing eligibility check (132257) and MSP-only check (132256) pass. No change needed to `PafTaskSelection.razor`/`.razor.cs` itself, since the radio list is rendered generically from whatever `_currentAvailableTasks` contains — the `foreach` loop and `RadioGroup` binding are already generic over `TaskType`.
+
+**Files that must not change:** `PafTaskSelection.razor` markup's `RadioGroup`/`foreach` structure; `PafController.AddTaskToPafAsync` signature; `TaskSelectionEvent`/`TaskDto` shapes; any other `Mode`/role branch in `GetAvailableTaskListAsync` besides the one(s) modified for MSP.
+
+---
 
 ### C. MSP role visibility (132256)
-How this dialog currently shows/hides actions by role:
-Exact helper / IsInRole / policy (quote):
-What happens if role lookup fails today:
-Existing log on role failure (or Not found):
-Same helper as MSP Dashboard Begin NPP PAF (136883)? (yes/no + both file paths):
-Tests:
-Reusable for hide-unless-MSP? (yes/no + why)
+
+**How this dialog currently shows/hides actions by role:** It does **not** check MSP explicitly at all. `PafTaskSelection.OnInitializedAsync()` only sets `_currentUserIsPsg = currentUser.IsPsgUser(); _currentUserIsRecruitment = currentUser.IsRecruitmentUser();`. There is no `_currentUserIsMsp` field and no `IsMspUser()`/`IsInRole("Msp")` call anywhere in this file (confirmed via grep — zero matches). MSP is implicitly whatever falls through as "not PSG, not Recruitment" (which also includes CPC, CSS, Admin, etc., if they ever reached this dialog).
+
+**Exact helper / IsInRole / policy (quote):** None present in this file. Confirmed by direct grep of `PafTaskSelection.razor.cs` for `IsMspUser|IsInRole|IsMspOnlyUser` → zero matches.
+
+**What happens if role lookup fails today:** `await AuthenticationStateTask` is awaited directly with no try/catch; `currentUser.IsPsgUser()`/`IsRecruitmentUser()` would simply return `false` for an unauthenticated/anonymous `ClaimsPrincipal` (both are `IsInRole(...)` calls, which return `false` rather than throwing, for a principal with no matching role claim). No explicit "role lookup failed" branch or log exists.
+
+**Existing log on role failure (or Not found):** **Not found.**
+
+**Same helper as MSP Dashboard Begin NPP PAF (136883)? (yes/no + both file paths):** **No** — proven by opening both files:
+- `Client/Pages/Queues/Components/PafQueueSearch.razor.cs` (136883): `private bool IsMspOnlyUser() { return _currentUser?.IsInRole(nameof(HcoApplicationRole.Msp)) ?? false; }`
+- `Client/Pages/Paf/Components/PafTaskSelection.razor.cs`: no equivalent method exists at all (grep confirmed zero matches for `IsMspOnlyUser`/`IsInRole` in this file).
+
+These are two separate, unconnected pieces of code — 136883's `IsMspOnlyUser()` is local to `PafQueueSearch.razor.cs` and is not referenced by, or shared with, `PafTaskSelection`.
+
+**Tests:** Not found.
+
+**Reusable for hide-unless-MSP? (yes/no + why):** **Partially.** The **idiom** (`currentUser.IsInRole(nameof(HcoApplicationRole.Msp))`) is directly reusable since it's the same base `ClaimsPrincipal.IsInRole` API already used throughout the codebase (including in this exact file for PSG/Recruitment). The **method** `IsMspOnlyUser()` itself is private to `PafQueueSearch.razor.cs` and not currently callable from `PafTaskSelection` without either duplicating the one-liner or promoting it to a shared extension (out of scope per your instructions — "Do not invent a new policy"; reusing the existing `IsInRole` idiom is not inventing anything, since it's the same pattern already used for `IsPsgUser()`/`IsRecruitmentUser()` in this very file).
+
+---
 
 ### D. Eligibility (132257)
-How net-new vs existing is known on this dialog:
-How practitioner–entity active vs inactive is stored and read:
-When eligibility runs (dialog open vs after facility checked):
-Do any existing actions already hide for active-at-entity? (which + file):
-Tests:
-Reusable for SHOW net-new OR existing-inactive; HIDE active / other? (yes/no + why)
-Unknowns:
+
+**How net-new vs existing is known on this dialog:** `PafTaskSelection.LoadAvailableTasks()`: `var isNewPractitioner = StateContainer.PafState.Practitioner is { IsNew: true };` → passed as `Mode = isNewPractitioner ? TaskAllowedListMode.NewPractitioner : TaskAllowedListMode.ExistingPractitioner`.
+
+**How practitioner–entity active vs inactive is stored and read:** Not read at the task-radio level at all today. It **is** read one layer down, in `TaskDeterminationService.GetAvailableFacilityListAsync` (same file), which — for `TaskType.AddPractitionerToFacility` in `ExistingPractitioner` mode — calls `GetUserFacilitiesNotAddedToOrInactiveAtAsync(userId, practitionerKey)` (backed by `Hca.Credentialing.Cactus.Api/Controllers/FacilityController.cs` → `FacilityRepository.GetFacilitiesPractitionerNotAddedToOrInactiveAtAsync`). This filters which **facilities** appear in the picker (facilities where the practitioner is not already added, or is inactive), **not** whether the "Add Practitioner to Facility" radio itself is shown. Separately, `Shared/Data/Model/Practitioner/PractitionerSummary.cs` has a plain `public bool Active { get; set; }` property (inherited by `Practitioner.cs`), already fetched in `GetAvailableTaskListAsync` via `_cactusClient.Practitioners.GetPractitionerByIdAsync(listParameters.PractitionerId)` for the existing `!practitioner.IsPhysician` check — but this property has no doc comment, and its exact semantics (practitioner-globally-active vs. active-at-a-specific-entity) were **not confirmed** in this pass.
+
+**When eligibility runs (dialog open vs after facility checked):** Today, task-list eligibility (`GetAvailableTaskListAsync`) runs once, at dialog-open time (`OnParametersSetAsync` → `LoadAvailableTasks()`), before any facility is selected. Facility-level active/inactive filtering (`GetAvailableFacilityListAsync`) runs afterward, once a task radio is selected and the facility picker renders (`OnTaskChange` → facility-selection sub-component load).
+
+**Do any existing actions already hide for active-at-entity? (which + file):** **No.** `GetAvailableTaskListAsync` (`TaskDeterminationService.cs`) unconditionally includes `AddPractitionerToFacility` for both `NewPractitioner` and `ExistingPractitioner` modes — it does not consult active/inactive-at-entity status to decide whether to include the radio itself. The only active/inactive-aware filtering that exists is at the **facility list** layer (`GetAvailableFacilityListAsync`), for an already-visible task.
+
+**Tests:** Not found.
+
+**Reusable for SHOW net-new OR existing-inactive; HIDE active / other? (yes/no + why):** **No, not directly reusable as-is** — the existing active/inactive check (`GetUserFacilitiesNotAddedToOrInactiveAtAsync`) operates at the facility-list layer, filtering *which facilities* are selectable, not *whether the radio is offered*. Per your instruction ("Do not collapse 132257 eligibility into TaskDeterminationService unless the same method already hides actions by active/inactive entity"), that condition is **not met** — `GetAvailableTaskListAsync` does not today hide any action by active/inactive-entity status. A new, analogous check would need to be added inside `GetAvailableTaskListAsync` (the correct file/method, since that's where all other action-visibility logic already lives), most plausibly reusing the practitioner-level `Active` flag already fetched there, or a new call mirroring `GetUserFacilitiesNotAddedToOrInactiveAtAsync`'s underlying repository query — but this is additive to that method, not a pre-existing "collapse into."
+
+**Unknowns:**
+- Exact semantics of `PractitionerSummary.Active` (global vs. per-entity) — not confirmed from source in this pass; would need `PractitionerRepository`'s CACTUS-to-model mapping inspected.
+- Whether "existing practitioner inactive with the entity" (132257) means "inactive at ANY entity where added" or specifically "inactive at the entity being newly added to" — the latter has no facility context yet at radio-render time, since no facility is chosen until after the radio is selected.
+
+---
 
 ### E. Task determination after submit (132258)
-File/class/method for New Practitioner PAF determination:
-File/class/method for Existing Practitioner PAF determination:
-How selected action chooses which rules run:
-TaskAllowedListMode or equivalent (quote):
-Failure today: UI error, block submit, log, partial task set? (quote):
-Tests:
-Reusable without a new NPP engine? (yes/no + why)
-Does TaskType.Npp already exist? (file + is it in this radio list today?)
+
+**File/class/method for New Practitioner PAF determination:** `Hca.Credentialing.Paf.Api/Services/TaskDeterminationService.cs`, `GetAvailableTaskListAsync(TaskListParameters listParameters)`, branch `if (listParameters.Mode == TaskAllowedListMode.NewPractitioner && !listParameters.IsRecruitmentUserMode)`.
+
+**File/class/method for Existing Practitioner PAF determination:** Same file/method, branch `else if (listParameters.Mode == TaskAllowedListMode.ExistingPractitioner && !listParameters.IsRecruitmentUserMode)`.
+
+**How selected action chooses which rules run:** After the radio is selected and saved, `TaskType` flows into `PafProcessingStrategyContext` (`Hca.Credentialing.Paf.Api/Domain/Strategy/PafProcessingStrategyContext.cs`), whose `CreateAddTaskStrategy(TaskType task)` factory-switches to the matching `AddTaskXStrategy` (e.g. `AddTaskAddPractitionerToFacilityStrategy` for `TaskType.AddPractitionerToFacility`).
+
+**TaskAllowedListMode or equivalent (quote):** `public enum TaskAllowedListMode` values `NewPractitioner` / `ExistingPractitioner` (referenced as `TaskAllowedListMode.NewPractitioner`/`.ExistingPractitioner` throughout `TaskDeterminationService.cs` and `CactusReloadHelper.cs`).
+
+**Failure today: UI error, block submit, log, partial task set? (quote):** No explicit failure path was found in this pass for "no eligible tasks" — `PafTaskSelection.OnParametersSetAsync()` simply calls `LoadAvailableTasks()`; if `_currentAvailableTasks.Count == 1`, it auto-selects that one task (`OnTaskChange(_currentAvailableTasks.First().Type)`); if the list were empty, the radio group would render with zero options and no explicit error message — not confirmed as tested/handled.
+
+**Tests:** Not found (`CrudEntityCredentialingOperationTests.GetMsoDueDate_ReturnsNull_ForAddPractitionerToFacilityWithTemporaryCredentialingTypeRtk` in `Hca.Credentialing.Paf.Processor.Tests` is CVI due-date logic, not task-list/determination logic).
+
+**Reusable without a new NPP engine? (yes/no + why):** **Yes** — `TaskAllowedListMode.NewPractitioner`/`.ExistingPractitioner` already exist and already determine which actions are offered per practitioner state; adding `TaskType.Npp` as a new entry in the existing `GetAvailableTaskListAsync` branches (subject to the MSP-only and active/inactive checks from §C/§D) requires no new determination engine — it is an additive branch entry in the same method, following the exact pattern already used for every other `TaskType`.
+
+**Does `TaskType.Npp` already exist? (file + is it in this radio list today?):** **Yes, it exists** — `Shared/Data/Model/Paf/TaskType.cs`: `[Description("NPP PAF")] Npp,`. **It is NOT in this radio list today** — confirmed by the full read of `GetAvailableTaskListAsync`: no branch references `TaskType.Npp` anywhere; it is a reserved, completely unwired enum value (consistent with prior architecture-doc findings).
+
+---
 
 ### F. Tests that must keep passing
-- list real test files for this dialog / Add Practitioner to Facility / determination
+- Hca.Credentialing.Paf.Processor.Tests/CrudEntityCredentialingOperationTests.cs — `GetMsoDueDate_ReturnsNull_ForAddPractitionerToFacilityWithTemporaryCredentialingTypeRtk` (touches `TaskType.AddPractitionerToFacility`; must not regress if `TaskType` enum or CVI due-date switch is touched).
+- No other tests reference `PafTaskSelection`, `TaskDeterminationService`, `GetAvailableTaskListAsync`, `PafController.AddTaskToPafAsync`, or `AddPractitionerToFacility` determination logic — confirmed via grep across `*Tests*` projects. No Blazor client test project exists to protect the radio UI itself.
+
+---
 
 ### G. Recommended first code change (for later 132256 only)
-File to change:
-Why this is the smallest safe change:
-Files that must not change:
+
+**File to change:** `Hca.Credentialing.Paf.Api/Services/TaskDeterminationService.cs`, method `GetAvailableTaskListAsync`.
+
+**Why this is the smallest safe change:** This is the single existing source of truth for which `TaskType` radios appear; it already branches per `Mode` (New/Existing) and per role (`IsPsgUserMode`/`IsRecruitmentUserMode`), and every existing task's visibility rule lives here as a conditional `list.Add(...)`. Adding an MSP-only, eligibility-gated `list.Add(new TaskDto { Name = TaskType.Npp.GetDescription(), Type = TaskType.Npp })` at the end of the appropriate branch(es) requires no change to `PafTaskSelection.razor`/`.razor.cs` (the radio rendering is already fully generic over `TaskType`/`TaskDto`), no change to `PafController.AddTaskToPafAsync`'s signature, and no new strategy class for the *listing* step (a new `AddTaskNppStrategy` would still be needed later for 132258/save, but that's out of scope here per your instructions — this file only governs what's *offered*, not what happens on save).
+
+**Files that must not change:** `PafTaskSelection.razor` (`RadioGroup`/`foreach` structure), `PafTaskSelection.razor.cs` (`LoadAvailableTasks`, `OnTaskChange`, `OnSaveClicked`), `PafController.AddTaskToPafAsync` signature, `TaskSelectionEvent`/`TaskDto` class shapes, `PafProcessingStrategyContext` (no new case needed until 132258 is actually implemented), any other existing `TaskType` branch in `GetAvailableTaskListAsync`/`GetAvailableFacilityListAsync`.
+
+---
 
 ### H. Unknowns
-- anything not found
+- Exact CACTUS-mapped semantics of `PractitionerSummary.Active` (global-active vs. active-at-a-specific-entity) — not traced to `PractitionerRepository`'s mapping code in this pass.
+- Whether 132257's "active with the entity" / "existing practitioner inactive with the entity" is meant to be evaluated at radio-render time (no facility context yet) using a practitioner-level flag, or deferred until after a facility is chosen (which would be a materially different, larger UX change than "hide/show a radio").
+- Whether a role-lookup failure (132256's "if role cannot be retrieved, hide and log") is even reachable in practice, given `IsInRole` returns `false` rather than throwing for an authenticated principal lacking the role — i.e., what "role cannot be retrieved" is meant to describe (a null/unauthenticated principal vs. a role-claims-service outage) was not resolved from source alone.
+- No test scaffolding exists to validate any of the above (§F) — new tests would need to be authored from scratch for 132256/132257/132258/132259, since none currently exist for this dialog or `TaskDeterminationService`.
