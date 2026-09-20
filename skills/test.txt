@@ -1,64 +1,65 @@
-4 files changed for this feature, exactly as intended; the rest are pre-existing unrelated local changes.
+You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
 
-## RETURN
+ROLE:
+Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not ask for a follow-up inspect chat.
 
-**1. Files changed**
-- `Shared/Clients/Paf/TaskListParameters.cs`
-- `Hca.Credentialing.Paf.Api/Controllers/TaskController.cs`
-- `Hca.Credentialing.Paf.Api/Services/TaskDeterminationService.cs`
-- `Hca.Credentialing.Paf.Api/Domain/Strategy/PafProcessingStrategyContext.cs`
+TASK:
+Map the existing Add New Practitioner card and Verify Practitioner Information card, and how Begin PAF vs Begin NPP PAF (/Practitioner/Search vs /Practitioner/Search/Npp) reach them. Answer A–L with file/class/method quotes. Then STOP.
 
-**2. Classes/methods changed**
-- `TaskListParameters` — added `IsMspUserMode` (bool) and `UserId` (string), both documented as server-computed-only.
-- `TaskController.GetAvailableTaskListAsync` — resolves `IsMspUserMode`/`UserId` from `_httpContextAccessor.HttpContext.User` inside a try/catch; fails closed (`IsMspUserMode = false`) and logs via existing `_logger.LogWarning` on any failure.
-- `TaskController.GetAvailableFacilityListAsync` — added `TaskType.Npp` to the allowed-task whitelist.
-- `TaskDeterminationService.GetAvailableTaskListAsync` — appends the `Npp` `TaskDto` last in the NewPractitioner branch (MSP-only) and last in the ExistingPractitioner branch (MSP-only **and** eligible).
-- `TaskDeterminationService.GetAvailableFacilityListAsync` — the existing `AddPractitionerToFacility` branch condition now also matches `TaskType.Npp` (`||`), reusing the identical facility filter.
-- `PafProcessingStrategyContext.CreateAddTaskStrategy` — added `TaskType.Npp => new AddTaskAddPractitionerToFacilityStrategy(this)`.
+KNOWN STARTING POINTS (confirm or correct — do not glob the whole repo):
+- NPP search page: Client Practitioner Search with @page /Practitioner/Search/Npp and ForceNpiSearchMode (136878). Begin PAF uses /Practitioner/Search.
+- Add New: Client/Pages/PractitionerSearch/Components/ConfirmationWizard/AddNewPractitionerForm.razor + .razor.cs; ConfirmationWizardModal; NewPractitionerModel (or current names).
+- Results / Start / Add New button: PractitionerSearchTable (or current).
+- If a path is wrong, search only under Client/Pages/PractitionerSearch/ then quote the real files.
 
-**3. Quote — `CreateAddTaskStrategy` and Npp save mapping**
-```csharp
-return task switch
-{
-    TaskType.AddPractitionerToFacility => new AddTaskAddPractitionerToFacilityStrategy(this),
-    // ADD NPP to Facility (132258) reuses the existing Add-Practitioner-to-Facility add-task workflow
-    // as-is, so New vs Existing Practitioner mode already on the PAF continues to apply unchanged.
-    TaskType.Npp => new AddTaskAddPractitionerToFacilityStrategy(this),
-    TaskType.AddPrivilegesMss18 => new AddTaskAddPrivilegesMss18Strategy(this),
-    ...
-    _ => throw new ArgumentException($"Task \"{task}\" does not have an add strategy")
-};
-```
-No new strategy class was created — `TaskType.Npp` maps to the exact same `AddTaskAddPractitionerToFacilityStrategy` instance construction as `AddPractitionerToFacility`, so the existing New-vs-Existing-practitioner initialization logic (`AddPractitionerToFacilitiesTask`, `SpecialtyTask`, PSG/`PerfTask` handling) applies unchanged.
+TICKETS (context only — do not implement):
+131794/131795 — On Begin NPP PAF Add New only: Required First Name, Last Name, Degree, Provider Category, Individual NPI. Optional Email, Cell, DOB, SSN, Gender, Suffix. Character limits / Category lookup / NPI validate / duplicate NPI = reuse existing. Begin PAF Add New must stay unchanged.
+132247/132250/132252/132248/132253 — On Begin NPP PAF Verify existing only: if email exists → show read-only, no edit. If blank → editable optional, Start PAF allowed. Validate format only when a value is entered. Begin PAF Verify and Add New (131794) unchanged.
 
-**4. How MSP is evaluated (client/server)**
-Server-only. `PafTaskSelection.razor.cs` is unchanged and never sets `IsMspUserMode` — it defaults to `false` client-side. `TaskController.GetAvailableTaskListAsync` overwrites it unconditionally from `_httpContextAccessor.HttpContext.User.IsInRole(nameof(HcoApplicationRole.Msp))` (the identical `IsInRole(Msp)` idiom already used for PSG/Recruitment in this same dialog and for 136883). A client-supplied value is never trusted. On any exception (null user, etc.) it fails closed to `false` and logs `_logger.LogWarning(ex, "Unable to determine Msp role for {Action}; ADD NPP to Facility will be hidden.", ...)`.
+STOP AND REPORT (do not invent):
+- If there is no existing flag/route/mode to isolate NPP vs Begin PAF on these forms (do not invent a feature flag or auth policy).
+- If completing 131795 requires NPI N/A / exception UI (that is 131785 — report only).
+- If Add New and Verify share requiredness with no branch for "NPP existing email" vs "NPP new required set".
 
-**5. Exact `TaskDto.Name`**
-`"ADD NPP to Facility"` — a literal string, not `TaskType.Npp.GetDescription()` (which remains `"NPP PAF"` and was not changed).
+ANSWER (quote path + symbol + relevant lines):
 
-**6. Eligibility query for 132257 + load-time interpretation**
-Reused verbatim: `TaskDeterminationService`'s existing private `GetUserFacilitiesNotAddedToOrInactiveAtAsync(userId, practitionerKey)` (the same method `GetAvailableFacilityListAsync` already calls for `AddPractitionerToFacility`). For the ExistingPractitioner branch, called as `GetUserFacilitiesNotAddedToOrInactiveAtAsync(listParameters.UserId, practitioner.Key)` using the `practitioner` object already fetched in that branch. If the returned list is non-empty, Npp is shown; if empty, it's hidden (treated as active/ineligible everywhere). **Interpretation documented per your instruction:** since no facility is selected yet at Practitioner-Action-radio load time, "existing practitioner inactive with the entity" is evaluated as "has at least one facility where the practitioner is not-added-to-or-inactive" — the same interpretation already embodied by this exact query for the existing `AddPractitionerToFacility` action. NewPractitioner mode is always eligible (no facility context exists yet, mirrors `AddPractitionerToFacility`'s NewPractitioner branch).
+A. Add New component files. Required vs optional today for: First Name, Last Name, DOB, Gender, SSN, Email, Cell, Degree, Provider Category, Individual NPI, Suffix, Middle Name.
 
-**7. Facility list handling for Npp**
-`GetAvailableFacilityListAsync`'s branch condition changed from `listParameters.Task == TaskType.AddPractitionerToFacility` to `listParameters.Task == TaskType.AddPractitionerToFacility || listParameters.Task == TaskType.Npp` — identical `GetUserFacilitiesAsync`/`GetUserFacilitiesNotAddedToOrInactiveAtAsync` filtering is reused for both. Also added `TaskType.Npp` to `TaskController.GetAvailableFacilityListAsync`'s allowed-task whitelist (previously would have 400'd).
+B. How requiredness is applied (DataAnnotations, FluentValidation, AntDesign Form, custom). Quote the attributes/rules.
 
-**8. 132259 — extra server check or "already scalar"**
-**Already scalar — no additional check added.** `PafTaskSelection.razor`'s `RadioGroup`/`foreach` markup was **not touched**; `TaskType.Npp` simply becomes another entry in the same data-driven, single-bound-value radio group. `TaskSelectionEvent.PafType` (`TaskType?`) and `PafController.AddTaskToPafAsync([FromQuery] TaskType task, ...)` were **not changed** — both are structurally single-valued types that cannot carry multiple selections. Per your instruction, since a realistic multi-select path is structurally impossible, no dummy validator was invented.
+C. How the form knows Begin PAF vs NPP (route, ForceNpiSearchMode, SearchMode, cascade, parameter). Quote the branch. If there is NO branch yet, say that and name the smallest existing signal the form can read (e.g. parent ForceNpiSearchMode / URI).
 
-**9. Tests / build results**
-- No `Hca.Credentialing.Paf.Api.Tests` project exists — confirmed (not created, per instructions).
-- `dotnet build` on `Hca.Credentialing.Paf.Api`: **succeeded**, no warnings/errors.
-- `dotnet build` on `Hca.Credentialing.Client`: **succeeded**, no warnings/errors (no client files were changed).
-- `CrudEntityCredentialingOperationTests.GetMsoDueDate_ReturnsNull_ForAddPractitionerToFacilityWithTemporaryCredentialingTypeRtk`: **passed** (1/1), unaffected.
-- One incidental environment issue encountered and resolved: a stale, previously-running `Hca.Credentialing.Paf.Api` process (PID 34148) was locking its own build output DLLs, causing transient MSB3026 copy-retry build failures unrelated to this code change; it was a leftover local dev process, stopped, and the build then succeeded cleanly.
+D. Provider Category lookup: where values come from (do not invent an RTK name if not in code).
 
-**10. Remaining gaps (especially 132275)**
-- **Task-card lifecycle (132275, explicitly out of scope):** `PafFormComponent.HandleTaskSelectionEvent`'s existing-PAF branch and `PafProcessingStrategyContext.CreateUpdateTaskStrategy` only special-case `TaskType.AddPractitionerToFacility` (and a few others) for task-status refresh / update-strategy resolution. If a PAF with `TaskSelected == TaskType.Npp` is later re-opened for editing, `CreateUpdateTaskStrategy`'s `default` case will throw `ArgumentException("Task \"Npp\" does not have an update strategy")`. Not fixed here — genuinely belongs to task-card/edit-flow work (132275), not the "Add" step this ticket covers.
-- **Downstream PAF submission / CACTUS sync (out of scope, different project):** `Hca.Credentialing.Paf.Processor`'s `PafExtensions.GetCredentialingTypeRtk()` has no `TaskType.Npp` case and would throw `ArgumentOutOfRangeException` if a PAF with `TaskSelected == TaskType.Npp` is fully submitted. Confirmed via grep that `GetCredentialingTypeRtk()` is **never invoked** on the `AddTaskToPafAsync` path in `Hca.Credentialing.Paf.Api` (only in `Paf.Processor`, post-submission) — so this is not a STOP condition for 132255–132259 as scoped, but is a known follow-on blocker for whenever ADD NPP submission/CACTUS-sync work (132258's later phase / 132600) begins.
-- VA/PA, PSV, Delegate/FSQ suppression, CVI, auto-acceptance: not touched, per explicit scope boundary.
+E. Individual NPI validation + duplicate NPI check: method names. Any existing NPI N/A / exception on this form? (Expect none.)
 
-**11. Assumptions**
-- MSP-only visibility intentionally uses the raw `IsInRole(nameof(HcoApplicationRole.Msp))` idiom (not `IsMspUser()`, which also matches Psg) — consistent with your instruction and with 136883's precedent, on the assumption that MSP and PSG roles are not simultaneously assigned to the same user in practice (the same assumption 136883 already relies on).
-- "Existing practitioner inactive with the entity" is interpreted at Practitioner-Action-radio load time as "has at least one not-added-or-inactive facility," per your explicit permission to use that interpretation given no facility is selected yet.
-- `PractitionerSummary.Active` was **not** used anywhere in this implementation (per your explicit instruction not to guess its semantics).
+F. Verify Practitioner Information component files (opened by Start on an existing row). Quote title "Verify Practitioner Information" / "Update Email Address" if present.
+
+G. How existing email is loaded onto Verify. Is the Email field required today (Email*)? Is it bound read-only anywhere?
+
+H. Email format validator: class/method. Does blank trigger a required error today?
+
+I. Existing read-only field pattern on this wizard or nearby forms (reuse target for 132250). Quote one.
+
+J. Tests that lock Begin PAF Add New or Verify requiredness. List project + test names. If none, say none.
+
+K. Smallest safe extension point for 131794/131795 (NPP-only optional demographics + NPI still required). Files that would change. Files that must not change.
+
+L. Smallest safe extension point for 132247 (NPP-only existing email rules). Files that would change. Files that must not change.
+
+DO NOT:
+- Implement or edit.
+- Open PafTaskSelection, TaskDeterminationService, CACTUS CRUD, CPC, CVI.
+- Change or propose NPI search / No-NPI exception.
+- Invent authorization policies, AuditAction, feature flags, or V5 "NPI starts with 1 or 20" unless already in code.
+- Browse outside PractitionerSearch + tests that reference these types.
+
+RETURN (use these headings only):
+1. Files/classes confirmed (Add New + Verify)
+2. Begin PAF vs NPP isolation signal (quote)
+3. A–L answers (short quotes)
+4. STOP conditions hit? (yes/no + which)
+5. Ready to implement 131794+131795? (yes/no + blocker)
+6. Ready to implement 132247 family? (yes/no + blocker)
+7. Must-not-change file list
+8. Assumptions
