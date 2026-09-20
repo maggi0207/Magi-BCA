@@ -1,80 +1,27 @@
-# Repository Evidence — Ticket 136873
+You are implementing a change in the HCA HCP Credentialing repository.
 
-**Title:** NPP: Add Begin NPP PAF action to MSP Dashboard
-**Status:** Read-only repository evidence. No application code was modified. No implementation performed. No Copilot prompt produced.
+ROLE:
+Act as a senior engineer familiar with the existing HCP Blazor Client patterns.
 
----
+TASK:
+Implement Azure DevOps user story 136873 only — NPP: Add Begin NPP PAF action to MSP Dashboard.
 
-## 1. Exact File Paths Found
+This is a markup-only UI change. Stop when 136873 is complete. Do not start 136876, 136878, 136882, or 136883.
 
-| Symbol | File(s) |
-|---|---|
-| `PafQueueSearchCriteria` | [Client/Pages/Queues/Components/PafQueueSearchCriteria.razor](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Queues/Components/PafQueueSearchCriteria.razor), [PafQueueSearchCriteria.razor.cs](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Queues/Components/PafQueueSearchCriteria.razor.cs) |
-| `SharedPafQueue` | [Client/Pages/Queues/SharedPafQueue.razor](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Queues/SharedPafQueue.razor), [SharedPafQueue.razor.cs](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Queues/SharedPafQueue.razor.cs) |
-| `MspDashboardPage` | [Client/Pages/Dashboards/MspDashboardPage.razor](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Dashboards/MspDashboardPage.razor), [MspDashboardPage.razor.cs](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Dashboards/MspDashboardPage.razor.cs) |
-| `PafQueueSearch` (intermediate component — not in the original search list, but is the actual caller of `PafQueueSearchCriteria`) | [Client/Pages/Queues/Components/PafQueueSearch.razor](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Queues/Components/PafQueueSearch.razor), [PafQueueSearch.razor.cs](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Queues/Components/PafQueueSearch.razor.cs) |
-| `NavigateToStartPaf` | Defined in `PafQueueSearchCriteria.razor.cs` (line 509); invoked from `PafQueueSearchCriteria.razor` |
-| `CanBeginPaf` | Parameter defined in `PafQueueSearchCriteria.razor.cs` (line 28); value supplied by `PafQueueSearch.razor` (line 13) |
-| `PrincipalExtensions` (role checks used by `CanBeginPAF()`) | [Shared/Extensions/PrincipalExtensions.cs](../../../../Hca.Credentialing/Hca.Credentialing/Shared/Extensions/PrincipalExtensions.cs) |
+BUSINESS REQUIREMENT:
+As an MSP user, I want a dedicated Begin NPP PAF option so that I can initiate requests for Non-Privileged Practitioners.
 
-## 2. Relevant Classes/Components
+Acceptance criteria:
+- Given the user is on the MSP Dashboard, when the page loads, both Begin PAF and Begin NPP PAF are displayed.
+- Begin NPP PAF appears immediately adjacent to Begin PAF.
+- The new button is keyboard accessible, screen-reader compatible, and styled consistently with existing application controls.
 
-- `PafQueueSearchCriteria` — partial class, `Hca.Credentialing.Client.Pages.Queues.Components` namespace
-- `PafQueueSearch` — partial class, same namespace
-- `SharedPafQueue` — partial class, `Hca.Credentialing.Client.Pages.Queues` namespace
-- `MspDashboardPage` — partial class, `Hca.Credentialing.Client.Pages.Dashboards` namespace
+This story does not define click routing (136878), tooltip (136876), or authorization (136883).
 
-## 3. `PafQueueSearchCriteria` Details
+REPOSITORY EVIDENCE:
+File: Client/Pages/Queues/Components/PafQueueSearchCriteria.razor
+Existing Extra-template rendering:
 
-### Parameters/properties (`PafQueueSearchCriteria.razor.cs`)
-
-```csharp
-[Parameter] public bool CanBeginPaf { get; set; }
-[Parameter] public ICollection<FieldOption<object>> SortOptions { get; set; }
-[Parameter] public ICollection<PafStatusFieldOption> StatusFilterOptions { get; set; }
-[Parameter] public IEnumerable<FacilityValue> Facilities { get; set; }
-[Parameter] public IEnumerable<ServiceLineValue> ServiceLines { get; set; }
-[Parameter] public PafQueueSearchCriteriaModel InitialSearchCriteria { get; set; }
-[Parameter] public EventCallback<PafQueueSearchCriteriaEventArgs> OnCriteriaChange { get; set; }
-[Parameter] public EventCallback<QueueMode> OnModeChange { get; set; }
-[Parameter] public int OpenPafCount { get; set; }
-[Parameter] public int CompletedPafCount { get; set; }
-[Parameter] public bool IsRecruitmentUser { get; set; }
-[Parameter] public bool IsCpcUser { get; set; }
-[Parameter] public bool IsAdminUser { get; set; }
-```
-
-Also injects `IPafClient`, `IStateContainer`, `NavigationManager`, and a `[CascadingParameter] Task<AuthenticationState> AuthenticationState`.
-
-### Where `CanBeginPaf` comes from
-
-Not computed inside `PafQueueSearchCriteria` — it is a passed-in parameter. Supplied by the parent, `PafQueueSearch.razor` (line 13):
-
-```razor
-CanBeginPaf="@CanBeginPAF()"
-```
-
-`PafQueueSearch.razor.cs` (line 129):
-
-```csharp
-private bool CanBeginPAF()
-{
-    if (IsMspUser() || IsRecruitmentUser())
-        return true;
-    else return false;
-}
-```
-
-`IsMspUser()`/`IsRecruitmentUser()` delegate to `_currentUser` (a `ClaimsPrincipal`), via extension methods in `Shared/Extensions/PrincipalExtensions.cs`:
-
-- `IsMspUser()` → `IsInRole("Msp") || IsInRole("Psg")`
-- `IsRecruitmentUser()` → `IsInRole("Recruiter") || IsInRole("RecruiterManager")`
-
-### Where it is rendered
-
-`PafQueueSearchCriteria.razor`, inside the `<Extra>` template of the `<Card>`:
-
-```razor
 @if (CanBeginPaf)
 {
     @if (IsRecruitmentUser)
@@ -86,53 +33,120 @@ private bool CanBeginPAF()
         <Button HtmlType="button" Type="@ButtonType.Primary" OnClick="@NavigateToStartPaf">Begin PAF</Button>
     }
 }
-```
 
-### Existing Begin PAF action / click handler / navigation
+CanBeginPaf is a [Parameter] supplied by PafQueueSearch as CanBeginPaf="@CanBeginPAF()".
+CanBeginPAF() returns true for IsMspUser() or IsRecruitmentUser().
+IsMspUser() = roles Msp or Psg.
+IsRecruitmentUser() = roles Recruiter or RecruiterManager.
+NavigateToStartPaf() calls NavigationManager.NavigateTo(PageUri.PractitionerSearchUri) with no extra context.
 
-`NavigateToStartPaf()` (`PafQueueSearchCriteria.razor.cs` line 509):
+PafQueueSearchCriteria is reached via:
+MspDashboardPage | CpcDashboardPage | CssDashboardPage | RecruitmentDashboardPage | Admin/HomePage
+→ SharedPafQueue
+→ PafQueueSearch
+→ PafQueueSearchCriteria
 
-```csharp
-private void NavigateToStartPaf()
+EXISTING PATTERN TO REUSE:
+The existing Ant Design Button in PafQueueSearchCriteria.razor Extra template:
+HtmlType="button", Type="@ButtonType.Primary".
+Reuse that exact control. Put the new button in the existing non-Recruitment else branch, immediately adjacent to Begin PAF.
+
+SCOPE:
+Change this file only:
+- Client/Pages/Queues/Components/PafQueueSearchCriteria.razor
+
+If and only if the markup cannot compile without it, a click stub in:
+- Client/Pages/Queues/Components/PafQueueSearchCriteria.razor.cs
+Prefer no .cs change. Prefer no OnClick on the new button (136878 owns navigation). Do not add a new handler that calls NavigateToStartPaf.
+
+DO NOT CHANGE:
+- CanBeginPAF()
+- CanBeginPaf
+- IsRecruitmentUser behavior
+- Begin PAF button
+- Begin Request button
+- NavigateToStartPaf()
+- PageUri.PractitionerSearchUri
+- PafQueueSearch.razor / PafQueueSearch.razor.cs
+- SharedPafQueue.razor / SharedPafQueue.razor.cs
+- Any dashboard page
+- PageUri.cs
+- Practitioner search
+- authorization / policies / roles
+- tooltip
+- APIs / services / models
+
+Do not implement:
+- NPP navigation
+- Enforce NPI Search
+- SearchMode
+- query parameters
+- NPP PAF creation
+
+IMPLEMENTATION REQUIREMENTS:
+1. Read PafQueueSearchCriteria.razor first. Confirm the CanBeginPaf / IsRecruitmentUser Extra-template block before editing.
+2. Make the smallest possible markup-only change.
+3. Do not refactor, rename, restyle, or reformat unrelated markup.
+4. Do not modify unrelated files.
+5. Do not invent business rules.
+6. The new button must NOT appear in the Recruitment branch.
+
+BEFORE CODING:
+1. Inspect the existing Begin PAF / Begin Request markup.
+2. Confirm the extension point is the non-Recruitment else branch.
+3. State the planned one-line/adjacent-button change briefly.
+4. Then implement.
+
+IMPLEMENTATION:
+In the existing non-Recruitment branch where Begin PAF is rendered, add a second button labeled exactly:
+
+Begin NPP PAF
+
+Required:
+- immediately adjacent to Begin PAF
+- same Button component
+- same HtmlType="button"
+- same Type="@ButtonType.Primary"
+- same accessibility/keyboard/screen-reader pattern as Begin PAF
+- visible only when CanBeginPaf is true AND IsRecruitmentUser is false
+
+Target structure:
+
+@if (CanBeginPaf)
 {
-    NavigationManager.NavigateTo(PageUri.PractitionerSearchUri);
+    @if (IsRecruitmentUser)
+    {
+        Begin Request
+    }
+    else
+    {
+        Begin PAF
+        Begin NPP PAF
+    }
 }
-```
 
-No PAF type, mode, or NPP context is passed — this is a bare navigation to the practitioner search route.
+Do not wire NPP navigation. Ticket 136878 owns click/navigation. Ticket 136876 owns tooltip. Ticket 136883 owns security.
 
-## 4. Callers
+TESTS:
+No Blazor client test project covers this component. Do not create a new test project.
 
-**Callers of `PafQueueSearchCriteria`:** Only one — `PafQueueSearch.razor` (line 7), which renders it and supplies all its parameters, including `CanBeginPaf`.
+Manual verification after the change:
+- MSP Dashboard: Begin PAF and Begin NPP PAF both visible, adjacent
+- Begin PAF unchanged
+- Recruitment: Begin Request only; Begin NPP PAF not shown
+- Keyboard focus can reach the new button
+- Accessible name is Begin NPP PAF
 
-**Callers of `PafQueueSearch`:** Only one — `SharedPafQueue.razor`:
+VALIDATION:
+1. Build the affected Client project (Hca.Credentialing.Client / the project that compiles PafQueueSearchCriteria.razor).
+2. Review git diff. It should contain only the intended markup (and .cs only if a compile stub was unavoidable).
+3. Confirm Begin Request and Begin PAF markup/handlers are unchanged.
 
-```razor
-<PafQueueSearch Mode="@_mode" OpenPafCount="@OpenPafCount" CompletedPafCount="@CompletedPafCount"></PafQueueSearch>
-```
-
-**Callers of `SharedPafQueue`** (5 found):
-
-- [Client/Pages/Dashboards/MspDashboardPage.razor](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Dashboards/MspDashboardPage.razor) (line 24)
-- [Client/Pages/Dashboards/CpcDashboardPage.razor](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Dashboards/CpcDashboardPage.razor) (line 25)
-- [Client/Pages/Dashboards/CssDashboardPage.razor](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Dashboards/CssDashboardPage.razor) (line 18)
-- [Client/Pages/Dashboards/RecruitmentDashboardPage.razor](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Dashboards/RecruitmentDashboardPage.razor) (line 23)
-- [Client/Pages/Admin/HomePage.razor](../../../../Hca.Credentialing/Hca.Credentialing/Client/Pages/Admin/HomePage.razor) (line 25)
-
-Note: `SharedPafQueue` itself takes no `CanBeginPaf`/role parameters — all 5 pages share the same `PafQueueSearch.CanBeginPAF()` logic (Msp-or-Recruitment-role check), since that logic lives inside `PafQueueSearch`, not passed down from the dashboard page.
-
-## 5. `MspDashboardPage` Relationship to MSP/PSG
-
-- Routes: `@page "/Msp/Dashboard/{NavigateTab?}/{QueueType?}"` and `@page "/Psg/Dashboard/{NavigateTab?}/{QueueType?}"` (same component serves both routes).
-- `@attribute [Authorize(Roles = "Msp, Psg")]`.
-- In `OnInitializedAsync()`: `_pageTitle` is set to `"PSG Dashboard"` if `_currentUser.IsPsgUser()`, else `"MSP Dashboard"` if `IsMspUser()`, else `"Dashboard"`. Since `IsMspUser()` itself returns true for either the `Msp` or `Psg` role, PSG users are treated as a variant of MSP for this page, distinguished only by title text.
-
-## 6. Existing Relevant Tests
-
-No test project or test file references `PafQueueSearchCriteria`, `CanBeginPaf`, `NavigateToStartPaf`, `SharedPafQueue`, `PafQueueSearch`, or `MspDashboardPage` anywhere in the repository — no Blazor client test project exists at all (confirmed by file search for `*Tests*/**/*Paf*Queue*`, zero results).
-
-## 7. Uncertainty / Repository Evidence Gaps
-
-- `PageUri.PractitionerSearchUri` (the navigation target) was not opened in this pass — only its usage was confirmed.
-- Whether the existing `Card`/`Button`/tooltip framework used elsewhere in the app (for a future "Begin NPP PAF" tooltip per ticket 136876) has a reusable pattern was not investigated here — out of scope for 136873 specifically.
-- `IsRecruitmentUser` on `PafQueueSearchCriteria` is a **separate parameter** (not the same as the `IsRecruitmentUser()` method on `PafQueueSearch`) — both exist and are correctly connected, but this dual naming (parameter vs. method) could cause confusion during implementation and is worth flagging.
+RETURN:
+1. Files changed
+2. Implementation summary
+3. Git diff summary
+4. Build result
+5. Warnings/errors
+6. Remaining gaps (click/navigation still owned by 136878)
+7. Stop. Do not continue to other tickets.
