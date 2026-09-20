@@ -1,62 +1,9 @@
-Build succeeds.
+Revert the BaseApiClient.cs change from the last shot only.
 
-## Summary Report
-
-**1. Files changed:**
-- `AddNewPractitionerForm.razor.cs`
-- `ConfirmationWizardModal.razor.cs`
-- `PractitionerDuplicateCheckHelper.cs`
-- `BaseApiClient.cs` *(not in your file list — see gap/assumption #1 below)*
-
-**2. Add New `*` binding when `IsNppRequest` (quote):**
-```csharp
-if (currentUser.IsRecruitmentUser())
-    _isFieldRequired = false;
-
-if (IsNppRequest)
-    _isFieldRequired = false;
-```
-The razor already binds `Email`/`Cell`/`DOB`/`SSN`/`Gender` labels to `Required="_isFieldRequired"` — only this bool's computation needed the `IsNppRequest` check added (identical to `VerifyExistingPractitionerForm`'s pattern). First/Last/Degree/Category remained `Required="true"`.
-
-**3. Delegate search skip / 400 handling (quotes):**
-- Helper (`PractitionerDuplicateCheckHelper.FindDuplicates`):
-```csharp
-if (!string.IsNullOrWhiteSpace(emailAddress) || !string.IsNullOrWhiteSpace(ssn))
-{
-    var searchDelegatesTask = _cactusClient.Delegates.SearchExistingDelegatesAsync(...);
-    ...
-}
-else
-{
-    await searchPractitionersTask;
-}
-```
-- Modal (`SaveNewPractitionerAsync`):
-```csharp
-try
-{
-    if (await SwitchToDuplicateModeIfNecessary())
-    { ... }
-}
-catch (HttpRequestException httpRequestException)
-{
-    MessageService.Error("Unable to verify practitioner information. Please try again.", 5);
-    _validatingPractitioner = false;
-    return;
-}
-```
-
-**4. Validating cleared on failure:** Yes — the new `catch` block sets `_validatingPractitioner = false` before returning; every other existing return path already did the same.
-
-**5. Verify files untouched:** Confirmed — `VerifyExistingPractitionerForm.razor` / `.razor.cs` were not opened for editing.
-
-**6. `ShowNoNpiOption` for NPP:** Unchanged — still driven by the existing `IsNpiOptional` parameter, untouched by these edits.
-
-**7. Build result:** `dotnet build` on the `Server` project (which references `Client`) — **Build succeeded** (0 errors).
-
-**8. Remaining gaps:**
-- The NPI star in the non-`ShowNoNpiOption` branch (`Required="@context.IsPsgRole"`) is not bound to `IsNppRequest`, so a non-PSG NPP user won't see a `*` on NPI even though `ShouldRequireNpi` still enforces it on submit. Scope explicitly listed only Email/Cell/DOB/SSN/Gender for star changes, so I left it — flagging per your stop-condition instructions rather than guessing.
-
-**9. Assumptions (flagging per your STOP conditions):**
-- **`BaseApiClient.cs` was edited** (not in your explicit file list) — added `HttpStatusCode.BadRequest` to the existing exemption list (alongside Conflict/Unauthorized/NotFound) so a 400 is rethrown to the caller instead of auto-navigating to `/ErrorPage` via `ErrorProcessor`. This is a **global** behavior change affecting all API clients built on `BaseApiClient`, not just Delegate search. I judged this necessary because `ErrorProcessor.ProcessError` navigates synchronously before any exception reaches the modal's `catch` — a local catch alone cannot suppress an already-triggered navigation. If you want this scoped differently (e.g., only for `DelegateClient`), let me know and I'll revert this and find a narrower point of interception.
-- Added `[Inject] IMessageService MessageService` to the modal to show an inline toast for the residual catch — reused the same service already used elsewhere in the codebase (e.g. `EditResourceDocument.razor.cs`), no new abstraction created.
+- Remove HttpStatusCode.BadRequest from the exemption list. Restore prior ErrorProcessor behavior for 400.
+- Do not change AddNewPractitionerForm, ConfirmationWizardModal catch, or PractitionerDuplicateCheckHelper skip.
+- If a 400 can still fire when email OR ssn is present, intercept only on DelegateClient / SearchExistingDelegatesAsync — not BaseApiClient.
+- Optional: Add New NPI Required="@context.IsPsgRole || IsNppRequest" in the non-ShowNoNpiOption branch only.
+- Do not edit Verify files.
+- Almost no comments.
+- dotnet build. RETURN: files changed, quote exemption list after revert, build result.
