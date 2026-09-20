@@ -1,34 +1,124 @@
-All confirmed — no modifications made, inspection only.
+You are inspecting the HCA HCP Credentialing repository.
 
-## Report — 136883 Inspection (current repository state)
+ROLE:
+Act as a senior engineer. Discovery only. Do not modify any files. Do not implement ADD NPP.
 
-### 1. `PrincipalExtensions.cs` (`Shared/Extensions/PrincipalExtensions.cs`)
-- `IsMspUser(ClaimsPrincipal)` → `IsInRole("Msp") || IsInRole("Psg")` — confirmed, includes PSG.
-- `IsPsgUser(ClaimsPrincipal)` → `IsInRole("Psg")` only.
-- `IsInRole("Msp")` as a bare, direct call — **not** wrapped in a dedicated `PrincipalExtensions` helper (e.g., no `IsMspOnlyUser` extension method exists here); it's called directly via the base `ClaimsPrincipal.IsInRole(nameof(HcoApplicationRole.Msp))` API, which is already an established pattern elsewhere in this codebase (e.g., `PafQueueSearch.razor.cs` already does `_currentUser.IsInRole(nameof(HcoApplicationRole.CpcReviewer))`, `IsInRole(nameof(HcoApplicationRole.Recruiter))`, etc.).
+TASK:
+Find the existing "PAF Action & Facilities" / Practitioner Action radio list so tickets 132255–132259 can reuse it. Cursor will use your RETURN block to write the 132256 implementation prompt. Incomplete paths = not ready to code.
 
-### 2. `PafQueueSearchCriteria` — who sees "Begin NPP PAF"
-- `PafQueueSearchCriteria.razor.cs`: `[Parameter] public bool IsMspOnlyUser { get; set; }` (line ~54, next to `IsRecruitmentUser`).
-- `PafQueueSearchCriteria.razor`: the button is nested inside the existing non-Recruitment `else` branch, further gated by `@if (IsMspOnlyUser)`. So: **Recruitment** → never sees it (separate branch, `Begin Request` only). **Msp** → sees it (`IsMspOnlyUser` true). **Psg** → does **not** see it (`IsMspOnlyUser` false, since it checks `IsInRole("Msp")` only, not `IsMspUser()`). **Cpc/Css/Admin** → never reach this branch at all (`CanBeginPaf` is false for them upstream in `PafQueueSearch.CanBeginPAF()`).
-- Source of `IsMspOnlyUser`: `PafQueueSearch.razor.cs` line 142 — `private bool IsMspOnlyUser() { return _currentUser?.IsInRole(nameof(HcoApplicationRole.Msp)) ?? false; }` — passed down as `IsMspOnlyUser="IsMspOnlyUser()"` from `PafQueueSearch.razor`.
+BUSINESS REQUIREMENT (do not implement now):
+Feature 132255: add a Practitioner Action radio labeled exactly "ADD NPP to Facility".
+132256: visible only if user has MSP role; last in the list; if role cannot be retrieved, hide and log.
+132257: show only for Net New OR existing practitioner inactive with the entity; hide if active with the entity or otherwise ineligible.
+132259: keep single-select radios including the new option; client + server must reject multiple selections and log.
+132258: on submit of ADD NPP to Facility, reuse existing New Practitioner vs Existing Practitioner PAF task determination. No new NPP determination engine.
 
-### 3. `PractitionerSearchPage` — `_isNppEntry` / role check on NPP route
-- `_isNppEntry` (line ~29): `NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Equals(PageUri.PractitionerNppSearchUri.TrimStart('/'), OrdinalIgnoreCase)` — true only when the matched route is `/Practitioner/Search/Npp`.
-- Role check (`OnInitializedAsync()`, ~line 41): `if (_isNppEntry && !_currentUser.IsInRole(nameof(HcoApplicationRole.Msp))) { NavigationManager.NavigateTo(PageUri.RootUri); return; }` — placed immediately after `_currentUser` is set, before any other page-state logic runs.
-- `@attribute [Authorize(Roles = "Msp, Psg, Recruiter, RecruiterManager")]` — **unchanged**, confirmed still present verbatim on the component (applies to both `@page` routes since Blazor authorization is per-component, not per-route).
+SCOPE:
+Read-only search. No code changes. No new files. No TaskType.Npp wiring. No new PafType.
 
-### 4. Existing unauthorized/direct-URL deny mechanism reused
-- **`NavigationManager.NavigateTo(PageUri.RootUri)`** — this is the mechanism actually used (`PractitionerSearchPage.razor.cs`, in `OnInitializedAsync()`). This exact call/constant pair is an established, pre-existing pattern in this codebase, e.g. `Client/Pages/Tools/Components/Recredentialing/CommitteeData.razor.cs` (`NavigationManager.NavigateTo(PageUri.RootUri)`), `Client/Pages/User/UserAccountPage.razor.cs` (same). No new redirect target or mechanism was introduced.
-- `AuthorizeView`/`NotAuthorized`/`RedirectToLogin` markup pattern (used elsewhere in `PafLayout.razor`/`PacketLayout.razor`) was evaluated but is **not** what's currently implemented — an earlier attempt to use it in this file caused a Razor parser fault (cascading `RZ1025`/tag-balance errors) in this specific nested-markup context, so it was intentionally not used; the simpler code-behind redirect was used instead.
+SEARCH FOR (literal strings):
+"PAF Action & Facilities"
+"Practitioner Action"
+"Add Practitioner to Facility"
+"ADD NPP to Facility"
+"Add Privilege MSS-18"
+"Off-Cycle RRFC"
+"Off-Cycle PSV"
+"Request Processing Change"
+"Practitioner Personal Info"
+PafTaskSelection
+TaskType
+GetAvailableTaskListAsync
+TaskListParameters
+TaskAllowedListMode
+AddPractitionerToFacility
+IsMspOnlyUser
+IsMspUser
+IsInRole
 
-### 5. Existing "Msp only, not Psg" check elsewhere
-- No dedicated named helper (e.g., `IsMspOnlyUser()` as a shared `PrincipalExtensions` method) existed **before** this work — it was added locally in `PafQueueSearch.razor.cs` for this purpose, following the exact same inline `IsInRole(nameof(HcoApplicationRole.X))` idiom already used in that same file for `CpcReviewer`/`CpcManager`/`Recruiter`/`RecruiterManager`. No pre-existing "Msp-only" page/policy was found anywhere else in the repository prior to this change.
+INVESTIGATION STARTING POINTS (confirm or say Not found):
+- Client/Pages/Paf/Components/PafTaskSelection.razor
+- Client/Pages/Paf/Components/PafTaskSelection.razor.cs
+- Shared/Data/Model/Paf/TaskType.cs
+- Hca.Credentialing.Paf.Api/Controllers/TaskController.cs
+- Hca.Credentialing.Paf.Api/Services/TaskDeterminationService.cs (or wherever ITaskDeterminationService is implemented)
+- How facilities are listed beside the action radios (Filter Facilities / Select All Facilities)
 
-### Summary table
+DO NOT:
+- Invent file paths.
+- Implement the new radio.
+- Treat 136883 dashboard/NPP search URL auth as this dialog’s MSP check unless you open both and prove they share a helper.
+- Collapse 132257 eligibility into TaskDeterminationService unless the same method already hides actions by active/inactive entity.
+- Propose a new dialog or a new determination engine.
 
-| Surface | File/Class/Method | Current behavior | Deny mechanism reused | `IsInRole("Msp")` pattern pre-existing? | Code change required? |
-|---|---|---|---|---|---|
-| UI hide (dashboard button) | `PafQueueSearchCriteria.razor` + `.razor.cs`; `PafQueueSearch.razor.cs.IsMspOnlyUser()` | Button shown only when `IsMspOnlyUser` true (Msp, not Psg/Recruitment/Cpc/Css/Admin) | N/A (visibility only, not a security boundary by itself) | Yes — as a bare `IsInRole()` call idiom, not as a named helper | Already done (present in code) |
-| Direct URL `/Practitioner/Search/Npp` | `PractitionerSearchPage.razor.cs.OnInitializedAsync()` | Non-Msp roles (including Psg) are redirected to `PageUri.RootUri` before any content renders | `NavigationManager.NavigateTo(PageUri.RootUri)` — pre-existing convention | Yes (same idiom) | Already done (present in code) |
+BEFORE RESPONDING:
+1. Search the repo with the strings above.
+2. Open matching files and read markup, visibility, submit, and determination calls.
+3. Quote real paths, types, and methods.
 
-No STOP condition applies — an existing deny mechanism (`NavigateTo(PageUri.RootUri)`) and an existing role-check idiom (`IsInRole(nameof(HcoApplicationRole.Msp))`) were both found and are already in use; no new policy or `AuditAction` was invented. No files were modified during this inspection.
+RETURN exactly this structure:
+
+## Discovery result — 132255 PAF Action
+
+### A. Dialog / page
+File (.razor and .cs):
+Class/Component:
+Dialog title in UI (exact):
+When it is shown (caller page + method):
+Tests:
+Current behavior:
+Is this "PAF Action & Facilities"? (yes/no + proof)
+
+### B. Practitioner Action radio list (132256 / 132259)
+File where radios are rendered:
+How options are sourced (enum / API / hardcoded):
+Exact current option labels in order (last existing option name):
+Radio group mechanism (same name / component):
+Client selection handler:
+What is posted on Next/submit (single value vs list + property names):
+Server endpoint that receives the selected action:
+Existing server check that only one action is selected (file/method or Not found):
+Where a validation error would be logged (file/method or Not found):
+Tests:
+Current behavior:
+Smallest extension point to add "ADD NPP to Facility" as last radio:
+Files that must not change:
+
+### C. MSP role visibility (132256)
+How this dialog currently shows/hides actions by role:
+Exact helper / IsInRole / policy (quote):
+What happens if role lookup fails today:
+Existing log on role failure (or Not found):
+Same helper as MSP Dashboard Begin NPP PAF (136883)? (yes/no + both file paths):
+Tests:
+Reusable for hide-unless-MSP? (yes/no + why)
+
+### D. Eligibility (132257)
+How net-new vs existing is known on this dialog:
+How practitioner–entity active vs inactive is stored and read:
+When eligibility runs (dialog open vs after facility checked):
+Do any existing actions already hide for active-at-entity? (which + file):
+Tests:
+Reusable for SHOW net-new OR existing-inactive; HIDE active / other? (yes/no + why)
+Unknowns:
+
+### E. Task determination after submit (132258)
+File/class/method for New Practitioner PAF determination:
+File/class/method for Existing Practitioner PAF determination:
+How selected action chooses which rules run:
+TaskAllowedListMode or equivalent (quote):
+Failure today: UI error, block submit, log, partial task set? (quote):
+Tests:
+Reusable without a new NPP engine? (yes/no + why)
+Does TaskType.Npp already exist? (file + is it in this radio list today?)
+
+### F. Tests that must keep passing
+- list real test files for this dialog / Add Practitioner to Facility / determination
+
+### G. Recommended first code change (for later 132256 only)
+File to change:
+Why this is the smallest safe change:
+Files that must not change:
+
+### H. Unknowns
+- anything not found
