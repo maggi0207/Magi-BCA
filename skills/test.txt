@@ -1,50 +1,56 @@
-Inspect only. 53658/127104. Do NOT modify files, implement, commit, or create a PR.
+Read-only inspection complete. No files modified.
 
-136871 is DONE. Do not redo it.
-Begin NPP PAF → /Practitioner/Search/Npp → PractitionerSearchPage → PractitionerSearchForm → NpiSearch (ForceNpiSearchMode).
-Begin PAF → /Practitioner/Search → MSP ExceptionSearch. Leave that path unchanged.
+## Report — 53658 / 127104 Inspection
 
-Inspect ONLY these files/symbols. Stop after the report.
+### 1. Exception Search — `PractitionerSearchForm.razor` + `.razor.cs`
 
-1. EXCEPTION SEARCH
-PractitionerSearchForm.razor + .cs
-- ExceptionSearch fields
-- minimum criteria
-- what blocks exception search
-- SwitchToExceptionSearch() body
-- whether "No NPI available? Search without NPI" still works after /Practitioner/Search/Npp
-- whether ForceNpiSearchMode is init-only or blocks later SwitchToExceptionSearch
-Do NOT change exception fields. Do NOT propose V5 Reason/license/state.
+**A — VERIFIED — ALREADY SATISFIED.**
+- **Exception fields (MSP, non-flexible):** NPI (optional), SSN, First Name, Last Name only — no Reason/DOB/Email (those render only `if (IsFlexiblePafUser())`). Unchanged by the NPP route.
+- **Minimum criteria / what blocks submit:** `IsExceptionButtonEnabled()` (`PractitionerSearchForm.razor.cs`) — for non-flexible users: `HasAnyNpi() || HasAnySsn() || (FirstName && LastName)`. Same method used regardless of entry route (NPP or Begin PAF); not modified by `ForceNpiSearchMode`.
+- **`SwitchToExceptionSearch()` body:** unconditionally sets `_currentSearchMode = SearchMode.ExceptionSearch`, clears NPI/validation state, calls `OnResetCallback`. Not aware of `ForceNpiSearchMode` — untouched.
+- **"No NPI available? Search without NPI" link:** rendered whenever `_currentSearchMode == SearchMode.NpiSearch` (razor condition has no `IsFlexiblePafUser()` guard on the link itself) — confirmed it **still renders and works** for an MSP user who lands in NpiSearch via `/Practitioner/Search/Npp`.
+- **`ForceNpiSearchMode` scope:** read **once**, only inside `OnInitializedAsync()` (`if (!_isRecruitmentUser && !_isPsgUser && !ForceNpiSearchMode) SwitchToExceptionSearch();`). It is **not** a persistent lock — it does not block a later manual `SwitchToExceptionSearch()` call (e.g., via the "No NPI available?" link). It only affects the initial mode selected at load.
 
-2. EXCEPTION AUDIT
-Grep practitioner-search files for QueueAuditLogEntry, ICredentialingAuditLogger, AuditAction.
-Trace exception-search submit.
-- Is an audit event already created?
-- If yes: exact pipeline/type
-- If no: exact EXISTING audit helper that could be reused
-Do NOT invent AuditAction/schema.
+**Noted nuance (not a required fix, flagging for awareness only):** For an MSP user who reaches NpiSearch via the NPP route, then clicks "No NPI available?" (→ ExceptionSearch), then clicks "Cancel" — `SwitchToNpiSearch()`'s `else` branch (non-flexible users) calls `JsRuntime.InvokeVoidAsync("history.back")`, not a mode toggle back to NpiSearch. This is pre-existing, unchanged code (identical for today's Begin PAF flow), simply reachable via a path that didn't previously exist for MSP. No AC in 53658/127104 addresses this; not classified as a gap against those tickets.
 
-3. NPI EMPTY RESULTS
-PractitionerSearchTable.razor + .cs
-- zero results after valid NPI search
-- is Add New Practitioner shown, including in NpiSearch?
-- method that opens Add New Practitioner
-- does NPP route use the same table/empty-state?
+### 2. Exception Audit
 
-4. ADD NEW PRACTITIONER
-Confirm ConfirmationWizardModal / AddNewPractitionerForm / StartPafFrom is reused after NPP NPI search.
-Do NOT change AddNewPractitionerForm or required fields (131794).
+**B — VERIFIED GAP — CODE CHANGE REQUIRED** (existing reusable helper found).
 
-5. NPI VALIDATION
-Confirm DoNpiValidation, NpiAttribute, OnNpiFieldChanged. Do NOT change them.
+- Grep of `Client/Pages/PractitionerSearch/**` for `QueueAuditLogEntry`, `ICredentialingAuditLogger`, `AuditAction` → **zero matches**. No client-side audit call exists in the search form/table.
+- Traced the actual search execution server-side: `Hca.Credentialing.Cactus.Api/Controllers/PractitionerController.cs` → `SearchExistingPractitionersAsync` → `Hca.Credentialing.Cactus.Api/Data/Repositories/Practitioner/PractitionerRepository.cs` → `SearchPractitionersAsync(searchParameters, userId)`.
+- Inside that exact method, for `searchParameters.SearchType == PractitionerSearchType.AffiliationVerification`, an audit call **already exists**:
+  ```csharp
+  await _serviceBusService.QueueAuditLogEntry(
+      _auditLogger.GetAffVerifyPractitionerSearchAuditLog(
+          searchParams.PractitionerId, searchParams.FirstName, searchParams.LastName,
+          searchParams.Npi, searchParams.Ssn, searchParams.DateOfBirth));
+  ```
+- For `searchParameters.SearchType == PractitionerSearchType.Recruitment` (this is the exact `SearchType` the exception-search UI sets — see `PractitionerSearchForm.OnFinish()`: `searchParams.SearchType = PractitionerSearchType.Recruitment;`), **no audit call exists** in that branch.
+- **Conclusion:** No audit event is currently created for exception practitioner searches. The exact existing, reusable mechanism is `Shared/Helpers/CredentialingAuditLogger.cs` (`ICredentialingAuditLogger`) + `IServiceBusService.QueueAuditLogEntry(AuditLog)`, already proven in this same method/file for a sibling search type. `GetAffVerifyPractitionerSearchAuditLog(practitionerId, firstName, lastName, npi, ssnLast4, dateOfBirth)` has a parameter shape that already matches the exception-search fields (minus Reason). No new `AuditAction`/schema is proposed here — that decision is left to implementation, not this inspection.
 
-OUT OF SCOPE: 131785, 131794, PafType, TaskType.Npp, CACTUS, tasks, PSV, CVI, auto-accept, eligibility, demographics.
+### 3. NPI Empty Results — `PractitionerSearchTable.razor` + `.razor.cs`
 
-REPORT ONLY. For each item use:
-A. VERIFIED — ALREADY SATISFIED
-B. VERIFIED GAP — CODE CHANGE REQUIRED
-C. NOT PART OF 53658/127104
-D. EVIDENCE NOT FOUND
-Include: exact file, class/method, current behavior, evidence, whether code change is required.
+**A — VERIFIED — ALREADY SATISFIED.**
+- Zero-result state: `HasNoResults()` → `!_tableLoading && _hasSearched && (_dataSource == null || !_dataSource.Any())`; card title becomes "No Results Found" and a message renders.
+- "Add New Practitioner" button visibility: `ShouldShowAddButton()` → if `UseFormInputForAddButton` (true only for Recruitment/PSG) return `FormHasValidInput`; else return `_hasSearched`. **This method does not itself check `HasNoResults()`** — the button shows whenever a search has run (MSP) or the form has valid input (Recruitment/PSG), independent of whether results were returned. This is pre-existing behavior, unaffected by `ForceNpiSearchMode`.
+- `UseFormInputForAddButton` is computed once in `PractitionerSearchPage.razor.cs` as `_currentUser.IsRecruitmentUser() || _currentUser.IsPsgUser()` — **not aware of `_isNppEntry`/`ForceNpiSearchMode` at all**. An MSP user on `/Practitioner/Search/Npp` therefore gets `UseFormInputForAddButton == false`, identical to MSP on `/Practitioner/Search` today — same `_hasSearched`-gated behavior, table component fully reused, untouched.
+- Method that opens the modal: `ShowNewPractitionerPafModal()` (sets `_targetPractitioner = null; _showConfirmationModal = true;`) — same method, same component, reused unconditionally for the NPP route.
 
-End with one line: 53658/127104 needs (no code | audit hook only | empty-state reuse only | inspect incomplete).
+### 4. Add New Practitioner reuse
+
+**A — VERIFIED — ALREADY SATISFIED.**
+- `ConfirmationWizardModal` (`Client/Pages/PractitionerSearch/Components/ConfirmationWizard/ConfirmationWizardModal.razor.cs`) and `AddNewPractitionerForm` are rendered by the same `PractitionerSearchTable` regardless of route; no NPP-specific branching exists in either file (confirmed no `ForceNpiSearchMode`/`_isNppEntry` reference in `ConfirmationWizardModal.razor.cs` or `AddNewPractitionerForm.razor.cs`).
+- `OnNewPractitionerModalComplete()` → `StartPafFrom(e.Practitioner, e.UpdatedEmailAddress)` (`PractitionerSearchTable.razor.cs`) — identical code path for New and Existing statuses, unconditional on route.
+- No changes proposed to `AddNewPractitionerForm` or its required fields (131794 out of scope, untouched).
+
+### 5. NPI Validation
+
+**A — VERIFIED — ALREADY SATISFIED.**
+- `ValidationRoutines.DoNpiValidation` called from `OnNpiFieldChanged()` — same method used in both `SearchMode.NpiSearch` (`_npiInputMask`) and non-flexible exception mode's NPI field (`_npiInputMaskNonRecruitment`).
+- `NpiAttribute` (`[Npi]` on `SearchModel.PractitionerNpi`) and `NpiAttribute.Mask` sentinel — unchanged, referenced identically regardless of route.
+- No `ForceNpiSearchMode`-conditional logic exists anywhere in the validation path.
+
+---
+
+**53658/127104 needs: audit hook only.**
