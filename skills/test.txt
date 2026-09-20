@@ -1,45 +1,194 @@
-Confirmed: only `PafQueueSearchCriteria.razor` and `PafQueueSearchCriteria.razor.cs` changed for this task (the other listed files are pre-existing local/session artifacts unrelated to this work).
+Implement the remaining 136871 child work for:
 
-## Summary
+136878 — Launch existing Enforce NPI Search workflow
+136883 — Validate security and authorization
 
-**1. 136871 status: PARTIALLY COMPLETE**
+136873 and 136876 are already COMPLETE.
+136882 is a mandatory regression constraint.
 
-**2. Each child**
+IMPORTANT:
+Do not redo broad repository discovery.
+Use the existing source and inspect ONLY the exact files/symbols needed below.
+If you need to verify a detail, inspect the actual source directly rather than guessing.
 
-| Ticket | Status | Files | Validation |
-|---|---|---|---|
-| 136873 | **DONE** (confirmed intact, not modified) | `PafQueueSearchCriteria.razor` | Reconfirmed markup: "Begin NPP PAF" button still present, adjacent to "Begin PAF", non-Recruitment branch only |
-| 136876 | **DONE** | `PafQueueSearchCriteria.razor`, `PafQueueSearchCriteria.razor.cs` | Wrapped the new button in `<Tooltip Trigger="_nppTooltipTriggerTypes" Title="Use this option only when submitting a request for a Non-Privileged Practitioner (NPP).">`. `_nppTooltipTriggerTypes = { Trigger.Hover, Trigger.Focus }` — reused verbatim from the existing `_triggerTypes` pattern in `PafQueueSearch.razor.cs` (line 75). Approved text used exactly; no mockup-only sentence added. Applies only to the NPP button. |
-| 136878 | **BLOCKED — not implemented** | none | See Blocker below |
-| 136883 | **BLOCKED — not implemented** (dependent on 136878) | none | Nothing new to secure: the button has no click handler/route yet |
-| 136882 | **Verified, no regression** | n/a | `NavigateToStartPaf()`, "Begin PAF" button, "Begin Request" button, and the Recruitment branch are byte-for-byte unchanged |
+CURRENT PROBLEM
+---------------
+Existing Begin PAF:
 
-**3. NPP flow:** Still not wired — button renders and shows the approved tooltip, but has no `OnClick`/navigation, exactly as scoped in 136873/136876.
+PafQueueSearchCriteria
+  -> NavigateToStartPaf()
+  -> PageUri.PractitionerSearchUri
+  -> /Practitioner/Search
+  -> PractitionerSearchForm
+  -> MSP role
+  -> ExceptionSearch
 
-**4. Security:** No change. `PractitionerSearchPage` still `[Authorize(Roles = "Msp, Psg, Recruiter, RecruiterManager")]`; no new route exists to secure.
+Required new flow:
 
-**5. Begin PAF / Begin Request:** Unchanged — both buttons, their labels, and `NavigateToStartPaf()` are untouched.
+Begin NPP PAF
+  -> distinct URL-addressable NPP identity
+  -> existing PractitionerSearchForm
+  -> SearchMode.NpiSearch
+  -> Enforce NPI Search
 
-**6. Build:** Succeeded (`dotnet build` on `Hca.Credentialing.Client`), no warnings or errors.
+Do NOT change the existing Begin PAF behavior.
 
-**7. Changed files**
-- `Client/Pages/Queues/Components/PafQueueSearchCriteria.razor` — added `Tooltip` wrapper around the Begin NPP PAF button (136876)
-- `Client/Pages/Queues/Components/PafQueueSearchCriteria.razor.cs` — added `_nppTooltipTriggerTypes` field (136876)
+ARCHITECTURAL CONSTRAINT
+------------------------
+Repository investigation established:
 
-**8. Blocker (genuine — 136878 cannot be safely implemented as scoped):**
+- /Practitioner/Search currently has no mode/query/route signal.
+- SearchMode.NpiSearch and SearchMode.ExceptionSearch already exist.
+- MSP currently defaults to ExceptionSearch.
+- Changing the MSP default to NpiSearch would break 136882.
+- No existing query/route/state mechanism was found that can distinguish the two MSP buttons.
+- StateContainer is not an appropriate solution because it is not used for search entry and cannot satisfy direct-URL security.
+- A distinct URL-addressable identity is therefore required.
 
-I inspected `PageUri.cs`, `PractitionerSearchPage.razor(.cs)`, and `PractitionerSearchForm.razor(.cs)` as instructed. Finding:
+IMPLEMENTATION GOAL
+-------------------
+Introduce the SMALLEST safe URL-addressable identity for Begin NPP PAF.
 
-- **Begin PAF and "Enforce NPI Search" are the same URL and the same component** (`/Practitioner/Search` → `PractitionerSearchForm`), not two different screens.
-- `PractitionerSearchForm.OnInitializedAsync()` decides the search mode **purely by role**:
-  ```csharp
-  _isRecruitmentUser = currentUser.IsRecruitmentUser();
-  _isPsgUser = currentUser.IsPsgUser();
-  if (!_isRecruitmentUser && !_isPsgUser)
-      SwitchToExceptionSearch();   // this IS today's "Begin PAF" behavior for MSP
-  ```
-  Only Recruitment/PSG users default to `SearchMode.NpiSearch` (the NPI-required, "No NPI available? Search without NPI" screen that matches "Enforce NPI Search"). A plain MSP user is hard-coded into `ExceptionSearch` mode immediately, which renders the free-form NPI/SSN/Name search — i.e., today's ordinary Begin PAF screen.
-- Therefore, simply calling `NavigationManager.NavigateTo(PageUri.PractitionerSearchUri)` for "Begin NPP PAF" (the same call Begin PAF already makes) **would not launch Enforce NPI Search for an MSP user** — it would show them the identical screen Begin PAF already shows, because mode selection has no URL/query signal, only a role check.
-- Making "Begin NPP PAF" actually reach NPI-required mode would require introducing a new signal (query parameter, session/state flag, or altering the existing role check) into `PractitionerSearchForm`/`PractitionerSearchPage` — this is new search-mode-selection logic, explicitly out of scope ("no new search," "wire click only," and the instruction to STOP if the two screens can't be safely distinguished by a click-only change).
+Requirements:
 
-Per your explicit instruction ("If you cannot distinguish Enforce NPI Search from Begin PAF search, STOP"), I stopped here rather than inventing a routing signal. 136883 has no new route/action to secure as a result. Stopping — no further tickets attempted.
+1. Existing Begin PAF MUST remain:
+   NavigateToStartPaf()
+   -> existing PractitionerSearchUri
+   -> existing MSP ExceptionSearch
+
+2. Begin NPP PAF must navigate to the new NPP-specific identity.
+
+3. The new NPP identity must initialize the EXISTING PractitionerSearchForm in:
+   SearchMode.NpiSearch
+
+4. Do NOT create a second search page or duplicate the search workflow.
+
+5. Reuse the existing PractitionerSearchPage / PractitionerSearchForm.
+
+6. Use the application's existing routing/authorization conventions.
+
+7. The NPP entry must be URL-addressable so direct URL access can be authorized.
+
+8. 136883 requires authorized MSP users to access the NPP identity, while unauthorized users must not bypass the restriction through direct URL access.
+
+9. Do NOT invent a new authorization framework or policy if the existing role/Authorize conventions can express the requirement.
+
+10. Preserve existing PSG and Recruitment behavior.
+
+FILES TO INSPECT
+----------------
+Start with only:
+
+- Client/Pages/Queues/Components/PafQueueSearchCriteria.razor
+- Client/Pages/Queues/Components/PafQueueSearchCriteria.razor.cs
+- Client/Pages/Shared/PageUri.cs
+- Client/Pages/PractitionerSearch/PractitionerSearchPage.razor
+- Client/Pages/PractitionerSearch/PractitionerSearchPage.razor.cs
+- Client/Pages/PractitionerSearch/Components/PractitionerSearchForm.razor
+- Client/Pages/PractitionerSearch/Components/PractitionerSearchForm.razor.cs
+- existing PrincipalExtensions / authorization helpers if required
+
+Do not scan unrelated areas unless necessary.
+
+DESIGN GUIDANCE
+---------------
+Use the existing patterns already present in the repository.
+
+The existing code has:
+
+- SearchMode.NpiSearch
+- SearchMode.ExceptionSearch
+- SwitchToNpiSearch()
+- role-based initialization
+- existing [Authorize(...)] conventions
+- existing multiple @page directives on components elsewhere in the application
+
+Choose the smallest implementation that provides:
+
+Begin PAF:
+  existing URL -> ExceptionSearch
+
+Begin NPP PAF:
+  new URL identity -> NpiSearch
+
+SECURITY
+--------
+For the NPP-specific identity:
+
+- Authorized MSP users must be allowed.
+- Unauthorized roles must not gain access merely by typing the URL.
+- Do not accidentally remove access from existing PSG/Recruitment practitioner search.
+- Do not alter the authorization behavior of the existing /Practitioner/Search route.
+- Use the application's existing role/authorization mechanism.
+
+IMPORTANT ROLE DISTINCTION
+---------------------------
+Do not blindly use IsMspUser() if it includes PSG.
+
+Verify the application's actual role helpers.
+
+The requirement is specifically for MSP authorization.
+Do not change existing PSG/Recruitment behavior.
+
+136882 REGRESSION
+-----------------
+Existing Begin PAF must remain unchanged.
+
+Verify:
+
+- existing button markup unchanged except previously completed 136873/136876 work
+- NavigateToStartPaf() unchanged
+- existing PractitionerSearchUri unchanged
+- MSP Begin PAF still opens ExceptionSearch
+- Recruitment Begin Request still behaves as before
+- PSG/Recruitment existing search behavior remains intact
+
+IMPLEMENTATION DISCIPLINE
+-------------------------
+Make the smallest possible changes.
+
+Do NOT:
+- create a second PractitionerSearchForm
+- create a second search workflow
+- rewrite search-mode logic
+- change the existing MSP default
+- refactor unrelated routing
+- modify unrelated dashboards
+- modify CACTUS/PAF workflow code
+- implement downstream NPP PAF tickets
+
+VALIDATION
+----------
+After implementation:
+
+1. Build the affected project.
+2. Review git diff.
+3. Verify exact files changed.
+4. Search for accidental changes to NavigateToStartPaf().
+5. Verify the existing PractitionerSearchUri is unchanged.
+6. Verify the new NPP URL identity.
+7. Verify NPP identity initializes NpiSearch.
+8. Verify existing MSP Begin PAF initializes ExceptionSearch.
+9. Verify authorization for the NPP identity.
+10. Verify PSG/Recruitment existing search behavior.
+
+If automated UI tests do not exist for this area, do not create a new testing framework.
+
+If you discover that the requirements or existing authorization model make the proposed implementation unsafe, STOP and report the exact blocker rather than inventing behavior.
+
+FINAL REPORT
+------------
+Report:
+
+- 136878 status
+- 136883 status
+- exact files changed
+- exact new route/URL identity
+- how NpiSearch is selected
+- how authorization is enforced
+- confirmation that existing Begin PAF remains unchanged
+- build result
+- tests/manual validation performed
+- final git diff summary
+
+Do not implement anything outside 136878/136883.
