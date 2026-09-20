@@ -1,598 +1,603 @@
-You are performing READ-ONLY architecture discovery for the HCA HCP ADD NPP project.
-
-DO NOT IMPLEMENT ANY APPLICATION CODE.
-
-DO NOT MODIFY EXISTING APPLICATION SOURCE FILES.
-
-Your only job is to inspect the actual Credentialing-2.0 repository and create:
-
-.github/skills/hca-hcp-add-npp/08_Office_Repository_Evidence/ADD_NPP_CODE_LEVEL_ARCHITECTURE.md
-
-This document will become the verified bridge between the ADD NPP business requirements and the actual HCP source code.
-
-============================================================
-SOURCE OF TRUTH
-============================================================
-
-Use:
-
-1. NPP V5 requirements under:
-   .github/skills/hca-hcp-add-npp/01_Requirements/
-
-2. Azure DevOps project/ticket information under:
-   .github/skills/hca-hcp-add-npp/00_Master/
-   .github/skills/hca-hcp-add-npp/02_Epics/
-   .github/skills/hca-hcp-add-npp/03_Features/
-   .github/skills/hca-hcp-add-npp/04_User_Stories/
-
-3. Existing HCP architecture:
-   .github/skills/hca-hcp-add-npp/01_Requirements/ARCHITECTURE.md
-
-4. ACTUAL SOURCE CODE in this repository.
+You are working inside the actual HCA Credentialing-2.0 repository.
 
 IMPORTANT:
+This task is READ-ONLY repository analysis.
+DO NOT modify application/source code.
+DO NOT implement ADD NPP.
+DO NOT create new services, classes, APIs, database tables, or components.
+
+Your task is to create:
+
+04_GAP_ANALYSIS/ADD_NPP_EXISTING_VS_REQUIRED_GAP.md
+
+This document will become the master implementation gap analysis for the ADD NPP to Facility project.
+
+==================================================
+1. SOURCE OF TRUTH
+==================================================
+
+Use the following in this repository:
+
+1. HCP NPP PAF Type Requirements V5
+   Business source of truth for ADD NPP behavior.
+
+2. Azure DevOps 52350 project/ticket documentation available in
+   .github/skills/hca-hcp-add-npp/
+
+3. Existing high-level architecture:
+   HCA Credentialing 2.0 — Architecture & Project Guide.md
+
+4. Existing repository code.
+
+5. Most importantly:
+   .github/skills/hca-hcp-add-npp/08_Office_Repository_Evidence/ADD_NPP_CODE_LEVEL_ARCHITECTURE.md
+
+The code-level architecture document is already a verified repository discovery.
+
+DO NOT recreate the architecture document.
+
+DO NOT repeat the entire architecture document.
+
+Use it as the starting point for this gap analysis and inspect source code further whenever needed.
+
+==================================================
+2. OBJECTIVE
+==================================================
+
+Determine:
+
+WHAT ADD NPP requires
+
+versus
+
+WHAT the current HCP repository already supports
+
+versus
+
+WHAT must be changed
+
+versus
+
+WHAT cannot yet be determined.
+
+The result must be implementation-oriented but must NOT implement anything.
+
+Think like a Senior/Principal HCA HCP engineer preparing the repository for controlled implementation.
+
+==================================================
+3. CRITICAL REPOSITORY RULE
+==================================================
 
 The actual source code is the implementation source of truth.
 
-Never invent a repository path, class, method, component, service, API, database object, queue, configuration, feature flag, or authorization policy.
+Never invent:
 
-If something cannot be verified, mark:
+- file paths
+- classes
+- methods
+- services
+- controllers
+- APIs
+- database tables
+- configuration
+- feature flags
+- authorization policies
+- existing behavior
+
+Every repository claim must be verified from the actual repository.
+
+If something cannot be verified, explicitly write:
 
 Repository Evidence Gap
 
-============================================================
-OBJECTIVE
-============================================================
+or
 
-Discover how the CURRENT HCP application actually implements the
-existing workflows that ADD NPP will reuse or extend.
-
-The most important reference pattern is:
-
-EXISTING ADD PRACTITIONER TO FACILITY
-
-Do not design ADD NPP yet.
-
-Do not decide the implementation yet.
-
-First determine exactly where the existing functionality lives.
-
-============================================================
-DISCOVERY AREAS
-============================================================
-
-Trace the repository for the following.
-
-1. BEGIN PAF
-----------------
-
-Find:
-
-- MSP Dashboard
-- Begin PAF UI
-- Begin PAF action
-- routing/navigation
-- authorization
-- existing session/context initialization
-- existing search launch
-
-Document exact:
-
-- project
-- file path
-- component/class
-- relevant method
-- tests
-
-Then determine where a Begin NPP PAF entry point would naturally reuse the existing implementation.
-
-Do not implement it.
-
-------------------------------------------------------------
-
-2. ENFORCE NPI SEARCH
----------------------
-
-Find the actual implementation of:
-
-- Enforce NPI Search
-- NPI validation
-- practitioner search
-- duplicate search
-- search result handling
-- navigation after search
-
-Document exact repository evidence.
-
-Determine whether ADD NPP can reuse the existing search mechanism.
-
-------------------------------------------------------------
-
-3. ADD NEW PRACTITIONER
-------------------------
-
-Find the existing Add New Practitioner implementation.
-
-Trace:
-
-- UI component
-- search
-- practitioner creation
-- validation
-- PAF initialization
-- service/API
-- data model
-- tests
-
-Document exact paths and methods.
-
-------------------------------------------------------------
-
-4. ADD PRACTITIONER TO FACILITY
---------------------------------
-
-THIS IS THE MOST IMPORTANT AREA.
-
-Trace the complete existing:
-
-Add Practitioner to Facility
-
-workflow.
-
-Find:
-
-- PAF action
-- task/card
-- practitioner information
-- facility selection
-- address
-- specialty
-- license
-- PSV
-- submission
-- processing
-- CACTUS
-- history
-- PDF
-- audit
-- tests
-
-Document the complete code flow.
-
-For each layer identify:
-
-UI
-→ state/model
-→ API
-→ service
-→ database
-→ queue
-→ processor
-→ CACTUS
-→ document
-→ history/audit
-
-Only document what is verified.
-
-------------------------------------------------------------
-
-5. PAF CREATION
-----------------
-
-Find the actual mechanism for:
-
-- PAF creation
-- PAF type
-- PAF initialization
-- practitioner association
-- facility association
-- PAF actions
-- PAF task creation
-- required/optional task behavior
-
-Document exact implementation.
-
-------------------------------------------------------------
-
-6. PAF TASKS
-------------
-
-Find:
-
-- task model
-- task registration
-- task factory/strategy/configuration if present
-- task UI
-- required/optional state
-- task completion
-- Review & Submit blocking
-
-Determine how a new ADD NPP task would fit into the existing architecture.
-
-Do not implement it.
-
-------------------------------------------------------------
-
-7. PRACTITIONER INFORMATION
-----------------------------
-
-Find the existing practitioner information components.
-
-Trace:
-
-- demographic fields
-- CACTUS data
-- existing vs new practitioner behavior
-- read-only behavior
-- validation
-- save/update
-
-------------------------------------------------------------
-
-8. ADDRESS
-----------
-
-Find the existing address implementation.
-
-Trace:
-
-- UI
-- model
-- validation
-- API/service
-- CACTUS integration
-- primary address rules
-- facility relationship
-- tests
-
-------------------------------------------------------------
-
-9. SPECIALTY
-------------
-
-Find:
-
-- specialty UI
-- primary specialty
-- PPI
-- specialty validation
-- CACTUS mapping
-- existing practitioner behavior
-- net-new behavior
-- tests
-
-------------------------------------------------------------
-
-10. LICENSE
------------
-
-Find:
-
-- license UI
-- existing license retrieval
-- license selection
-- new license creation
-- duplicate detection
-- license validation
-- license status
-- facility/state rules
-- CACTUS license integration
-- tests
-
-------------------------------------------------------------
-
-11. PSV / DOCUMENTS
--------------------
-
-Find:
-
-- document upload
-- file validation
-- document conversion
-- storage
-- metadata
-- image creation
-- CACTUS attachment
-- audit
-
-Trace License PSV, NPI PSV and Sanctions-related implementation if existing.
-
-------------------------------------------------------------
-
-12. AUTO ACCEPTANCE
--------------------
-
-Find the actual processing pipeline for existing PAF auto-acceptance.
-
-Trace:
-
-PAF submission
-→ validation
-→ queue
-→ processor
-→ business rules
-→ CACTUS
-→ completion
-→ history
-→ documents
-
-Identify exact classes/methods/projects.
-
-------------------------------------------------------------
-
-13. CPC PROCESSING
-------------------
-
-Find existing CPC routing implementation.
-
-Document:
-
-- routing
-- status
-- queues
-- dashboard
-- processing
-- return/review
-- tests
-
-------------------------------------------------------------
-
-14. CVI
--------
-
-Find existing CVI creation and lifecycle.
-
-Document:
-
-- service
-- model
-- status
-- type
-- notes
-- due date
-- document attachment
-- completion
-- tests
-
-Do not assume ADD NPP will use CVI in every exception.
-
-------------------------------------------------------------
-
-15. CACTUS
-----------
-
-Trace existing CACTUS integration.
-
-Find:
-
-- client
-- service
-- provider creation
-- entity assignment
-- address
-- specialty
-- license
-- NPI
-- sanctions
-- images/documents
-
-Document exact repository evidence.
-
-------------------------------------------------------------
-
-16. PDF / HISTORY
------------------
-
-Find:
-
-- PAF PDF generation
-- templates
-- PAF type mapping
-- history
-- attachment
-- provider record
-
-------------------------------------------------------------
-
-17. AUDIT
----------
-
-Find:
-
-- audit framework
-- PAF audit
-- image/document audit
-- user identity
-- MSP identity
-- system user
-- entity tracking
-
-------------------------------------------------------------
-
-18. REPORTING
-------------
-
-Find existing reporting architecture related to:
-
-- PAF totals
-- CPC routing
-- PAF types
-- MOR
-- reporting jobs
-- queries
-- dashboards
-
-------------------------------------------------------------
-
-19. SECURITY
-------------
-
-Find:
-
-- authorization
-- roles
-- claims
-- policies
-- MSP permissions
-- PAF permissions
-- dashboard permissions
-
-Trace how Begin PAF is secured.
-
-============================================================
-EXISTING ADD PRACTITIONER TO FACILITY — REQUIRED FLOW
-============================================================
-
-Create a specific section:
-
-## Existing Add Practitioner to Facility Code Flow
-
-Show the actual repository flow in this style:
-
-UI
-↓
-Component
-↓
-State/Model
-↓
-Service
-↓
-API
-↓
-Controller
-↓
-Business Logic
-↓
-Data Access
-↓
-Queue/Processor if applicable
-↓
-CACTUS
-↓
-Documents/History/Audit
-
-Use actual verified names and paths.
-
-If a layer does not exist, say so.
-
-============================================================
-REUSE MAP
-============================================================
-
-Create:
-
-## ADD NPP Reuse Candidates
-
-For each capability classify:
-
-- Direct Reuse
-- Extend Existing
-- Configure Existing
-- Different Behavior
-- New Implementation Candidate
-- Cannot Determine
-
-Do not call something "New Implementation" simply because you have not found it.
-
-============================================================
-EXACT FILE INDEX
-============================================================
-
-Create a table:
-
-| Area | Project | File Path | Class/Component | Method | Purpose | Tests |
-|---|---|---|---|---|---|---|
-
-Only include verified information.
-
-============================================================
-DEPENDENCY MAP
-============================================================
-
-Create:
-
-## Code Dependency Map
-
-Show relationships between:
-
-- UI
-- shared models
-- APIs
-- services
-- PAF
-- tasks
-- queues
-- processors
-- CACTUS
-- documents
-- history
-- audit
-- tests
-
-============================================================
-TEST MAP
-============================================================
-
-Identify existing tests for each discovered area.
-
-Include exact test project/file/class where verified.
-
-============================================================
-REPOSITORY EVIDENCE GAPS
-============================================================
-
-Create:
-
-## Repository Evidence Gaps
-
-For anything that could not be confidently traced, record:
-
-- area
-- what was searched
-- what was found
-- what remains unknown
-- why it matters
+Cannot Determine
 
 Do not guess.
 
-============================================================
-FINAL SUMMARY
-============================================================
+==================================================
+4. EVIDENCE CLASSIFICATION
+==================================================
 
-End with:
+For every important finding classify the evidence as one of:
 
-## Executive Summary
+- Requirements Evidence
+- Ticket Evidence
+- Repository Evidence
+- UI Evidence
+- Inference
+- Unknown
+
+Do not present inference as repository fact.
+
+When requirements and repository behavior differ, explicitly show:
+
+Requirement:
+...
+
+Current Repository Behavior:
+...
+
+Gap / Impact:
+...
+
+Do not silently reinterpret the requirement.
+
+==================================================
+5. GAP STATUS
+==================================================
+
+Use exactly these status categories where applicable:
+
+- Implemented
+- Partially Implemented
+- Not Implemented
+- Different Behavior
+- Cannot Determine
+
+Do not use subjective labels such as:
+- Good
+- Bad
+- Best
+- Poor
+- Easy
+- Hard
+
+==================================================
+6. ANALYZE THESE AREAS
+==================================================
+
+Analyze the complete ADD NPP flow.
+
+A. Project / Ticket Scope
+- 52350
+- 136871 / 136872
+- 136873
+- 136876
+- 136878
+- 136882
+- 136883
+- 53658
+- 127104
+- 131785
+- 132255
+- 132275
+- 131794
+- 132247
+- 131728
+- 132591
+- 132537
+- 132600
+- 131783
+- 131724
+- 131794
+- 132687
+
+Use the repository's ticket documentation for exact captured details.
+Do not invent acceptance criteria that are not documented.
+
+B. MSP Begin NPP PAF Entry Point
+- existing Begin PAF
+- new Begin NPP PAF
+- navigation
+- authorization
+- tooltip
+- preservation of existing Begin PAF
+
+C. Practitioner Search
+- NPI search
+- 10-digit validation
+- existing Enforce NPI Search
+- no-NPI exception
+- Add New Practitioner
+- duplicate detection
+- search audit requirements
+
+D. PAF Creation
+- CreatePafRequest
+- PAF type/model
+- practitioner new/existing state
+- PAF initialization
+- state container
+- selected facilities
+- PAF persistence
+
+E. PAF Tasks
+- TaskType
+- task determination
+- task creation
+- task strategies
+- required/optional behavior
+- Review & Submit validation
+- existing Add Practitioner to Facility task
+
+F. Net-New Practitioner
+Compare requirements with:
+- demographic behavior
+- address
+- specialty
+- entity assignment
+- CACTUS creation
+
+G. Existing Active Practitioner
+
+H. Existing Inactive Practitioner
+
+I. Demographics
+Check:
+- required fields
+- optional fields
+- read-only behavior
+- existing practitioner behavior
+- NPI
+- provider category
+- degree
+- email
+- DOB/SSN
+- gender
+
+J. Address
+Check:
+- primary address
+- facility affiliation
+- allowed address types
+- required fields
+- read-only conditions
+- CACTUS persistence
+
+K. Specialty
+Check:
+- primary specialty
+- secondary/alternate behavior
+- inactive practitioner
+- PPI
+- CACTUS persistence
+
+L. ADD NPP to Facility
+Check:
+- task/card
+- facility association
+- requiredness
+- existing Add Practitioner to Facility implementation
+- facility questions
+- entity assignment
+
+M. VA / Active Duty / PA
+Determine whether repository currently has equivalent concepts.
+Do NOT assume they exist.
+
+N. State License
+Check:
+- existing license recall
+- new license
+- duplicate license
+- state matching
+- license status
+- expiration
+- temporary permit
+- active military
+- active compact
+- PA behavior
+- CPC routing
+
+O. PSV
+Check:
+- license PSV
+- NPI PSV
+- sanctions PSV
+- supported file types
+- attachment model
+- upload
+- conversion
+- CACTUS image linkage
+- audit
+
+P. Validation
+
+Q. Submit
+
+R. Auto Acceptance
+This area is especially important.
+
+Determine whether a reusable auto-acceptance mechanism actually exists.
+
+Search the repository thoroughly.
+
+Do not assume one exists merely because the requirements mention auto-acceptance.
+
+If no implementation exists, document the evidence.
+
+S. CPC Routing
+- CPC queues
+- statuses
+- actions
+- routing
+- manual processing
+
+T. CVI
+- CVI creation
+- CVI type
+- status
+- notes
+- due dates
+- relationship to PAF processing
+- relationship to packet processing
+
+U. CACTUS
+Trace:
+- practitioner
+- entity
+- facility
+- address
+- specialty
+- license
+- NPI image
+- sanctions
+- audit
+- transaction boundaries
+
+V. PDF / History
+- PAF PDF
+- ADD NPP title/type
+- history
+- attachment
+- OnBase
+- document generation
+
+W. Audit
+
+X. Security / RBAC
+
+Y. Reporting
+
+Z. Tests
+
+==================================================
+7. PRIMARY COMPARISON TABLE
+==================================================
+
+Create a detailed table:
+
+| # | ADD NPP Requirement | Ticket | Current Repository Location | Current Behavior | Status | Evidence Type | Gap | Likely Change Area | Test Impact |
+|---|---|---|---|---|---|---|---|---|---|
+
+Every row must be traceable.
+
+For repository locations include:
+
+- exact file path
+- class/component
+- method where known
+
+Do not provide vague locations such as:
+"PAF service"
+or
+"search component"
+
+if the exact location can be verified.
+
+==================================================
+8. EXISTING ADD PRACTITIONER TO FACILITY COMPARISON
+==================================================
+
+Create a dedicated section:
+
+# Existing Add Practitioner to Facility vs ADD NPP
+
+Compare:
+
+- Entry point
+- Search
+- Practitioner creation
+- PAF creation
+- Task creation
+- Task requiredness
+- Demographics
+- Address
+- Specialty
+- Facility
+- License
+- PSV
+- Submit
+- Processing
+- CACTUS
+- CPC
+- CVI
+- PDF
+- History
+- Audit
+- Reporting
+
+For every area classify:
+
+- Direct Reuse
+- Extend
+- Configure
+- New Implementation Required
+- Cannot Determine
+
+Do not choose "New Implementation Required" unless repository evidence supports it.
+
+==================================================
+9. IDENTIFY MAJOR ARCHITECTURAL GAPS
+==================================================
+
+Create:
+
+# Major ADD NPP Gaps
+
+Prioritize by implementation dependency, not subjective importance.
+
+For each:
+
+1. Gap
+2. Requirement
+3. Existing implementation
+4. Exact repository location
+5. Why existing implementation does not currently satisfy requirement
+6. Candidate extension point
+7. Evidence
+8. Dependency on other work
+9. Test impact
+
+Pay particular attention to areas already flagged in the code-level architecture:
+
+- task determination
+- auto acceptance
+- license workflow
+- PPI
+- NPP-specific security
+- reporting
+- CVI behavior
+- attachment conversion
+- CACTUS synchronization
+
+These must be VERIFIED further where possible.
+
+==================================================
+10. REPOSITORY EVIDENCE GAPS
+==================================================
+
+Create:
+
+# Repository Evidence Gaps
+
+For each unresolved area provide:
+
+| Area | What is Known | What is Missing | Exact File/Class to Inspect Next | Why Needed |
+|---|---|---|---|---|
+
+Do not simply say "more investigation required."
+
+Tell me the exact file/class/method that should be inspected next if discoverable.
+
+==================================================
+11. DEPENDENCY MAP
+==================================================
+
+Create:
+
+# Implementation Dependency Order
+
+Determine the technical dependency sequence.
+
+For example, consider whether the project should progress through something similar to:
+
+1. Begin NPP entry point
+2. NPP search
+3. PAF initialization/type
+4. Task determination
+5. ADD NPP task
+6. Practitioner information behavior
+7. License/PSV
+8. Submit/routing
+9. Auto acceptance
+10. CPC/CVI
+11. CACTUS
+12. PDF/history
+13. Reporting
+14. Regression testing
+
+BUT DO NOT blindly use this sequence.
+
+Derive the actual dependency order from repository evidence.
+
+Explain dependencies.
+
+==================================================
+12. IMPLEMENTATION READINESS
+==================================================
+
+Create:
+
+# Implementation Readiness by Ticket
+
+For each major ticket:
+
+| Ticket | Area | Repository Evidence | Requirements Mapped | Gap Known | Ready for Implementation? | Missing Evidence |
+|---|---|---|---|---|---|---|
+
+Use:
+
+YES
+
+NO
+
+PARTIAL
+
+Do not start implementation.
+
+The goal is to identify which ticket is actually ready for a focused Copilot implementation prompt.
+
+==================================================
+13. COPILOT IMPLEMENTATION RULE
+==================================================
+
+Do NOT generate implementation code in this task.
+
+Do NOT modify application code.
+
+Do NOT create implementation prompts yet.
+
+Only prepare the gap analysis.
+
+Later, Cursor will use this document to create focused Copilot prompts one ticket at a time.
+
+==================================================
+14. FINAL SUMMARY
+==================================================
+
+End the document with:
+
+# Executive Summary
 
 Include:
 
-1. Existing Add Practitioner to Facility architecture
-2. Existing search architecture
-3. Existing PAF architecture
-4. Existing task architecture
-5. Existing processing architecture
-6. Existing CACTUS integration
-7. Existing CPC/CVI architecture
-8. Existing PDF/history/audit architecture
-9. strongest ADD NPP reuse points
-10. areas requiring extension
-11. areas that may require new implementation
-12. repository evidence gaps
+1. What ADD NPP can directly reuse today.
+2. What can be extended.
+3. What appears missing.
+4. What requires deeper repository investigation.
+5. Which dependencies must be resolved first.
+6. Which ticket appears technically ready for the next implementation step based ONLY on evidence.
+7. Which repository evidence should be brought back to Cursor.
 
-IMPORTANT:
+Do NOT rank tickets as "best" or "worst."
 
-This document is NOT an ADD NPP implementation plan.
+Use dependency/readiness facts only.
 
-It is only a verified map of the CURRENT repository.
+==================================================
+15. FINAL VALIDATION
+==================================================
 
-Do not modify application code.
+Before saving the file, verify:
 
-Do not implement ADD NPP.
+- No application code was modified.
+- No invented repository paths.
+- No invented classes.
+- No invented methods.
+- Requirements are separated from repository facts.
+- Unknowns are explicitly marked.
+- Existing Add Practitioner to Facility was deeply compared.
+- Auto-acceptance was actually searched.
+- Task determination was investigated.
+- License implementation was investigated.
+- PPI was investigated.
+- CVI was investigated.
+- CACTUS write path was investigated.
+- Tests were investigated.
+- Exact file paths are provided wherever verified.
+- The output is implementation-oriented but contains NO implementation changes.
 
-Do not create new classes/components/services.
+Create/update only:
 
-Only create/update:
+04_GAP_ANALYSIS/ADD_NPP_EXISTING_VS_REQUIRED_GAP.md
 
-.github/skills/hca-hcp-add-npp/08_Office_Repository_Evidence/ADD_NPP_CODE_LEVEL_ARCHITECTURE.md
+Then give me a concise summary of:
+- number of requirements analyzed
+- major gaps found
+- repository evidence gaps
+- tickets that are ready/partial/not ready for implementation
+- files that should be inspected next
 
-Before finishing, verify that every repository path, class, method and
-behavior documented is actually present in the repository.
+STOP after producing the gap analysis.
