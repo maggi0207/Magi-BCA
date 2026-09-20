@@ -1,28 +1,34 @@
-Inspect only. 136883. Do NOT modify files, implement, commit, or create a PR.
-Do NOT invent a policy or AuditAction. Do NOT use 131728 AC.
-Do NOT change PractitionerSearchPage [Authorize] (breaks Begin PAF / PSG / Recruitment).
+All confirmed — no modifications made, inspection only.
 
-KNOWN:
-- NPP URL = PageUri.PractitionerNppSearchUri /Practitioner/Search/Npp
-- _isNppEntry / ForceNpiSearchMode already exist
-- IsMspUser() = Msp OR Psg (PrincipalExtensions)
-- Page [Authorize] = Msp, Psg, Recruiter, RecruiterManager on BOTH search routes
-- Hide button is not enough; direct URL must be blocked for non-MSP
-- PSG/Recruitment /Practitioner/Search must stay
+## Report — 136883 Inspection (current repository state)
 
-INSPECT:
-1. PrincipalExtensions — IsMspUser, IsPsgUser, IsInRole("Msp").
-2. PafQueueSearchCriteria — who sees Begin NPP PAF (MSP vs PSG vs Recruitment vs CPC).
-3. PractitionerSearchPage — _isNppEntry; any role check on NPP route.
-4. Existing unauthorized/direct-URL deny: AccessDenied, NotAuthorized, NavigateTo, AuthorizeView, Redirect. Exact file/method.
-5. Any existing "Msp only, not Psg" page or check.
+### 1. `PrincipalExtensions.cs` (`Shared/Extensions/PrincipalExtensions.cs`)
+- `IsMspUser(ClaimsPrincipal)` → `IsInRole("Msp") || IsInRole("Psg")` — confirmed, includes PSG.
+- `IsPsgUser(ClaimsPrincipal)` → `IsInRole("Psg")` only.
+- `IsInRole("Msp")` as a bare, direct call — **not** wrapped in a dedicated `PrincipalExtensions` helper (e.g., no `IsMspOnlyUser` extension method exists here); it's called directly via the base `ClaimsPrincipal.IsInRole(nameof(HcoApplicationRole.Msp))` API, which is already an established pattern elsewhere in this codebase (e.g., `PafQueueSearch.razor.cs` already does `_currentUser.IsInRole(nameof(HcoApplicationRole.CpcReviewer))`, `IsInRole(nameof(HcoApplicationRole.Recruiter))`, etc.).
 
-REPORT for UI hide and for /Practitioner/Search/Npp:
-- exact file/class/method
-- current behavior
-- existing deny mechanism that can be reused (or NONE)
-- whether IsInRole("Msp") already exists as a pattern
-- whether code change is required
-- STOP if no existing deny pattern exists
+### 2. `PafQueueSearchCriteria` — who sees "Begin NPP PAF"
+- `PafQueueSearchCriteria.razor.cs`: `[Parameter] public bool IsMspOnlyUser { get; set; }` (line ~54, next to `IsRecruitmentUser`).
+- `PafQueueSearchCriteria.razor`: the button is nested inside the existing non-Recruitment `else` branch, further gated by `@if (IsMspOnlyUser)`. So: **Recruitment** → never sees it (separate branch, `Begin Request` only). **Msp** → sees it (`IsMspOnlyUser` true). **Psg** → does **not** see it (`IsMspOnlyUser` false, since it checks `IsInRole("Msp")` only, not `IsMspUser()`). **Cpc/Css/Admin** → never reach this branch at all (`CanBeginPaf` is false for them upstream in `PafQueueSearch.CanBeginPAF()`).
+- Source of `IsMspOnlyUser`: `PafQueueSearch.razor.cs` line 142 — `private bool IsMspOnlyUser() { return _currentUser?.IsInRole(nameof(HcoApplicationRole.Msp)) ?? false; }` — passed down as `IsMspOnlyUser="IsMspOnlyUser()"` from `PafQueueSearch.razor`.
 
-Do not implement. Stop after the report.
+### 3. `PractitionerSearchPage` — `_isNppEntry` / role check on NPP route
+- `_isNppEntry` (line ~29): `NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Equals(PageUri.PractitionerNppSearchUri.TrimStart('/'), OrdinalIgnoreCase)` — true only when the matched route is `/Practitioner/Search/Npp`.
+- Role check (`OnInitializedAsync()`, ~line 41): `if (_isNppEntry && !_currentUser.IsInRole(nameof(HcoApplicationRole.Msp))) { NavigationManager.NavigateTo(PageUri.RootUri); return; }` — placed immediately after `_currentUser` is set, before any other page-state logic runs.
+- `@attribute [Authorize(Roles = "Msp, Psg, Recruiter, RecruiterManager")]` — **unchanged**, confirmed still present verbatim on the component (applies to both `@page` routes since Blazor authorization is per-component, not per-route).
+
+### 4. Existing unauthorized/direct-URL deny mechanism reused
+- **`NavigationManager.NavigateTo(PageUri.RootUri)`** — this is the mechanism actually used (`PractitionerSearchPage.razor.cs`, in `OnInitializedAsync()`). This exact call/constant pair is an established, pre-existing pattern in this codebase, e.g. `Client/Pages/Tools/Components/Recredentialing/CommitteeData.razor.cs` (`NavigationManager.NavigateTo(PageUri.RootUri)`), `Client/Pages/User/UserAccountPage.razor.cs` (same). No new redirect target or mechanism was introduced.
+- `AuthorizeView`/`NotAuthorized`/`RedirectToLogin` markup pattern (used elsewhere in `PafLayout.razor`/`PacketLayout.razor`) was evaluated but is **not** what's currently implemented — an earlier attempt to use it in this file caused a Razor parser fault (cascading `RZ1025`/tag-balance errors) in this specific nested-markup context, so it was intentionally not used; the simpler code-behind redirect was used instead.
+
+### 5. Existing "Msp only, not Psg" check elsewhere
+- No dedicated named helper (e.g., `IsMspOnlyUser()` as a shared `PrincipalExtensions` method) existed **before** this work — it was added locally in `PafQueueSearch.razor.cs` for this purpose, following the exact same inline `IsInRole(nameof(HcoApplicationRole.X))` idiom already used in that same file for `CpcReviewer`/`CpcManager`/`Recruiter`/`RecruiterManager`. No pre-existing "Msp-only" page/policy was found anywhere else in the repository prior to this change.
+
+### Summary table
+
+| Surface | File/Class/Method | Current behavior | Deny mechanism reused | `IsInRole("Msp")` pattern pre-existing? | Code change required? |
+|---|---|---|---|---|---|
+| UI hide (dashboard button) | `PafQueueSearchCriteria.razor` + `.razor.cs`; `PafQueueSearch.razor.cs.IsMspOnlyUser()` | Button shown only when `IsMspOnlyUser` true (Msp, not Psg/Recruitment/Cpc/Css/Admin) | N/A (visibility only, not a security boundary by itself) | Yes — as a bare `IsInRole()` call idiom, not as a named helper | Already done (present in code) |
+| Direct URL `/Practitioner/Search/Npp` | `PractitionerSearchPage.razor.cs.OnInitializedAsync()` | Non-Msp roles (including Psg) are redirected to `PageUri.RootUri` before any content renders | `NavigationManager.NavigateTo(PageUri.RootUri)` — pre-existing convention | Yes (same idiom) | Already done (present in code) |
+
+No STOP condition applies — an existing deny mechanism (`NavigateTo(PageUri.RootUri)`) and an existing role-check idiom (`IsInRole(nameof(HcoApplicationRole.Msp))`) were both found and are already in use; no new policy or `AuditAction` was invented. No files were modified during this inspection.
