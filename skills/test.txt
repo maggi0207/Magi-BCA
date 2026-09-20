@@ -1,175 +1,32 @@
-Implement ONLY the verified audit gap for:
+No code was changed. I inspected as instructed and found a genuine STOP condition on both required fronts.
 
-53658 — NPP PAF Search
-127104 — Add NPP search – Add New Practitioner
+## STOP — No Implementation Performed
 
-IMPORTANT:
-The NPP search workflow itself is ALREADY IMPLEMENTED through 136871.
+### What was found
 
-DO NOT rebuild or modify the NPP search workflow.
+1. **`AuditAction` enum** (`Shared/Data/Model/Audit/AuditLog.cs`) contains **no generic "practitioner search" or "exception search" value**. The only search-related value is `AffVerifyPractitionerSearchCriteria`, and its only builder, `CredentialingAuditLogger.GetAffVerifyPractitionerSearchAuditLog(...)`, is explicitly Affiliation-Verification-specific (matches your instruction not to reuse it merely because the parameter shape fits).
 
-The current verified state is:
+2. **No safe existing discriminator exists to isolate "exception search execution" within the server-side `PractitionerSearchType.Recruitment` branch.** I traced every caller that sets `SearchType = PractitionerSearchType.Recruitment`:
+   - `PractitionerSearchForm.OnFinish()` (`Client/Pages/PractitionerSearch/Components/PractitionerSearchForm.razor.cs`, line 267) — the actual exception-search execution (in scope).
+   - `PractitionerDuplicateCheckHelper.FindDuplicatesForRecruitment(...)` (`Shared/Helpers/PractitionerDuplicateCheckHelper.cs`, lines 94 and 127) — duplicate-check calls used during Add New Practitioner / demographic flows (explicitly **out of scope** — "Do not audit: Add New Practitioner").
 
-MSP Dashboard
-→ Begin NPP PAF
-→ /Practitioner/Search/Npp
-→ existing PractitionerSearchPage
-→ existing PractitionerSearchForm
-→ existing NpiSearch
+   Both call paths converge on the exact same server-side branch: `PractitionerRepository.SearchPractitionersAsync()`, `else if (searchParameters.SearchType == PractitionerSearchType.Recruitment)` (`Hca.Credentialing.Cactus.Api/Data/Repositories/Practitioner/PractitionerRepository.cs`, line 104). I inspected `PractitionerSearchParameters` (`Shared/Clients/Cactus/PractitionerSearchParameters.cs`) in full — it has no boolean/enum field that distinguishes "user-initiated exception search" from "system duplicate-check search." The only observed difference is incidental `Pager` values (`Next=10` for duplicate checks vs. `Next=pageSize` for the search table), which is not a real, named discriminator and would be an unreliable, implicit hack to key logic on.
 
-The following have already been verified and MUST remain unchanged:
+### Why this blocks implementation
 
-- NPP route
-- PractitionerSearchPage
-- ForceNpiSearchMode
-- SearchMode.NpiSearch
-- NPI validation
-- SearchExistingPractitionersAsync
-- PractitionerSearchTable
-- Add New Practitioner workflow
-- ConfirmationWizard
-- StartPafFrom
-- existing ExceptionSearch fields
-- SwitchToExceptionSearch
-- Begin PAF
-- /Practitioner/Search
-- MSP Begin PAF ExceptionSearch behavior
-- PSG behavior
-- Recruitment behavior
-- authorization
-- 131785
-- 131794
-- PafType / TaskType / downstream NPP workflow
+Adding the audit call inside `PractitionerRepository.SearchPractitionersAsync()`'s `PractitionerSearchType.Recruitment` branch (mirroring the `AffiliationVerification` pattern, as the ticket evidence suggests) would **also fire for every duplicate-check call from `PractitionerDuplicateCheckHelper`**, which your scope explicitly excludes ("Do not audit... Add New Practitioner"). There is no existing field, flag, or semantically distinct `AuditAction` to prevent that — meeting both of your explicit STOP conditions.
 
-==================================================
-VERIFIED GAP
-==================================================
+### Exact files involved
+- `Hca.Credentialing.Cactus.Api/Data/Repositories/Practitioner/PractitionerRepository.cs` (line 104 — the shared branch)
+- `PractitionerSearchForm.razor.cs` (line 267 — exception search sets `SearchType = Recruitment`)
+- `PractitionerDuplicateCheckHelper.cs` (lines 94, 127 — duplicate check also sets `SearchType = Recruitment`)
+- `PractitionerSearchParameters.cs` (no discriminator field present)
+- `AuditLog.cs` (no generic practitioner/exception-search `AuditAction` exists)
+- `CredentialingAuditLogger.cs` (only `GetAffVerifyPractitionerSearchAuditLog` exists; no generic sibling)
 
-The exception practitioner-search path does NOT currently create an audit event.
+### Decision required
+A product/architecture decision is needed on **one** of:
+1. Add a new discriminator field to `PractitionerSearchParameters` (e.g., a request-origin flag) so the server can distinguish "exception search execution" from "duplicate check," **or**
+2. Move the audit call to the client, immediately after `PractitionerSearchForm.OnFinish()` builds `searchParams` for the exception-search branch specifically (before invoking `OnSearchCallback`) — but this requires either a new `AuditAction` value or explicit confirmation that an existing one may be repurposed, and a decision on which existing "create audit entry" mechanism is callable from the Blazor Client (the only client-side `AuditClient` found, `Shared/Clients/Audit/AuditClient.cs`, exposes **only** `SearchAuditLogEntriesAsync` — a read/search endpoint, not a create endpoint).
 
-The flow is:
-
-PractitionerSearchForm.OnFinish()
-    ↓
-searchParams.SearchType = PractitionerSearchType.Recruitment
-    ↓
-SearchExistingPractitionersAsync(...)
-    ↓
-PractitionerRepository.SearchPractitionersAsync(searchParameters, userId)
-
-In PractitionerRepository.SearchPractitionersAsync():
-
-- PractitionerSearchType.AffiliationVerification already creates an audit entry using:
-  ICredentialingAuditLogger
-  +
-  IServiceBusService.QueueAuditLogEntry(...)
-
-- PractitionerSearchType.Recruitment currently has NO equivalent audit call.
-
-The existing audit infrastructure is already available.
-
-==================================================
-IMPLEMENTATION REQUIREMENT
-==================================================
-
-Add audit logging for the existing exception practitioner-search path ONLY.
-
-Before editing:
-
-1. Inspect CredentialingAuditLogger.cs / ICredentialingAuditLogger.
-2. Inspect AuditLog / AuditAction and existing practitioner-search audit events.
-3. Determine whether an existing audit method/event already semantically represents a practitioner search/exception search.
-4. Search the repository for other practitioner-search audit implementations.
-5. Inspect PractitionerSearchForm.OnFinish() for SearchType on NpiSearch vs ExceptionSearch.
-6. Reuse an existing semantically appropriate audit method/event if one exists.
-
-DO NOT blindly reuse GetAffVerifyPractitionerSearchAuditLog() merely because its parameter signature fits. It is specifically named for Affiliation Verification.
-
-If NpiSearch also uses PractitionerSearchType.Recruitment, do NOT audit the whole Recruitment branch.
-Use an existing discriminator for exception search only. If none exists, STOP.
-
-If there is an existing generic practitioner-search audit event appropriate for exception search, reuse it.
-
-If no appropriate existing audit event exists:
-
-STOP and report the evidence.
-
-DO NOT invent a new AuditAction, audit schema, or event type without sufficient existing repository evidence.
-
-==================================================
-SCOPE
-==================================================
-
-The audit should execute when the existing exception practitioner search actually executes.
-
-Do not audit:
-
-- opening the NPP search page
-- opening the search form
-- typing into the NPI field
-- validation failure
-- clicking the No-NPI link
-- Add New Practitioner
-- normal NPI search unless existing requirements explicitly require it
-
-The verified gap is specifically the exception practitioner search execution.
-
-Preserve all existing search behavior and return values.
-
-==================================================
-IMPLEMENTATION RULES
-==================================================
-
-- Minimal additive change only.
-- Prefer the existing repository audit pattern.
-- Do not refactor unrelated code.
-- Do not change method signatures unless absolutely required.
-- Do not create a new service.
-- Do not create a new audit framework.
-- Do not modify UI files unless repository evidence proves it is required.
-- Do not modify the NPP routing implemented in 136871.
-- Do not modify NPI validation.
-- Do not modify exception search criteria.
-- If you add the hook, fix only compile/using errors caused by THIS change.
-
-==================================================
-VALIDATION
-==================================================
-
-After implementation:
-
-1. Build the affected project(s).
-2. Verify no warnings/errors caused by the change.
-3. Inspect git diff.
-4. Confirm only files directly required for the audit change were modified.
-5. Confirm Begin PAF behavior is unchanged.
-6. Confirm NPP NPI search behavior is unchanged.
-7. Confirm the audit is executed only on exception search execution.
-
-If there is no existing semantically appropriate audit event and adding one would require inventing a new event/schema:
-
-DO NOT IMPLEMENT THAT PART.
-
-Instead report:
-
-- what was found
-- why existing events are not appropriate
-- exact files involved
-- what product/architecture decision is required.
-
-==================================================
-FINAL REPORT
-==================================================
-
-Return:
-
-1. Files changed
-2. Exact audit event/helper reused
-3. Where the audit call was added
-4. Why that event is semantically appropriate
-5. NpiSearch vs ExceptionSearch SearchType (and any discriminator used)
-6. Build result
-7. Diff summary
-8. Confirmation that NPP search and Begin PAF behavior were untouched
-9. Any remaining blocker or decision required
-   OR STOP evidence if no appropriate existing event exists
+No files were changed. Awaiting direction before any implementation.
