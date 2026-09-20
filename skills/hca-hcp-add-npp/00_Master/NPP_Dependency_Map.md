@@ -34,9 +34,19 @@ Project - Add NPP to existing PAF Types
                                       NPP: Add NPP to Facility PAF Practitioner Search – Add New Practitioner
 ```
 
+Captured child of 52350 (not under 136871):
+
+```text
+132255  NPP: Create "ADD NPP to Facility" PAF Action Option
+ ├── Child → 132256  Display New PAF Action for MSP User
+ ├── Child → 132257  Restrict Action to Eligible Practitioners
+ ├── Child → 132258  Apply Existing PAF Task Determination Rules
+ └── Child → 132259  Enforce Single PAF Action Selection
+```
+
 `52350` also lists additional children in the Azure DevOps screenshot. Titles only; do not invent parent/child links beyond “listed under 52350”:
 
-- 131724, 131728, 132600, 131783, 132591, 131785, 132255, 132537, 131794, 132687, 132247, 132275
+- 131724, 131728, 132600, 131783, 132591, 131785, 132537, 131794, 132687, 132247, 132275
 
 Full inventory: [../NPP_52350_Project_Scope.md](../NPP_52350_Project_Scope.md)
 
@@ -57,5 +67,6 @@ Full inventory: [../NPP_52350_Project_Scope.md](../NPP_52350_Project_Scope.md)
 4. `144239` — related; inspect before assuming impact
 5. `53658` — successor search area
 6. `127104` — child of the search successor
+7. `132255` and children `132256`–`132259` — PAF Action option (all child AC captured; next is office inspect)
 
 Do not infer implementation order from titles alone. Confirm from ticket acceptance criteria and office-repository evidence.

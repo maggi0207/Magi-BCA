@@ -26,3 +26,11 @@ Existing NPI-required search used as the reuse target (`136878`, `53658`, `12710
 | `01_MSP_Dashboard_Begin_NPP_PAF_Tooltip_Mockup.png` | Target mockup: Begin PAF + Begin NPP PAF + tooltip |
 
 Exception help text on the NPI-required screen (UI evidence only): Last Name plus one of First Name, DOB, SSN, or Email. That is not the same field list as NPP V5.
+
+## PAF_Action
+
+PAF Action & Facilities dialog for **132255**. Treat as UI/reference evidence, not proof the option is already implemented.
+
+| File | What it shows |
+|---|---|
+| `01_PAF_Action_Facilities_ADD_NPP.png` | Radios including **ADD NPP to Facility** with a **New** badge; facilities on the right. Badge is not in captured AC. |

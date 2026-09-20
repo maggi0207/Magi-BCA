@@ -23,7 +23,11 @@ This index records **only currently known** IDs, titles, types, and relationship
 | 131785 | Not captured | NPP: Controlled "No NPI Available" Exception Workflow for NPP | Listed under 52350 | 52350 | Title only |
 | 131794 | Not captured | NPP: Modify Add New Practitioner Card for ADD NPP to Facility PAF | Listed under 52350 | 52350 | Title only |
 | 132247 | Not captured | NPP: Verify Practitioner Information Card – Existing Practitioner | Listed under 52350 | 52350 | Title only |
-| 132255 | Not captured | NPP: Create "ADD NPP to Facility" PAF Action Option | Listed under 52350 | 52350 | Title only |
+| 132255 | Feature | NPP: Create "ADD NPP to Facility" PAF Action Option | Child | 52350 | To Do |
+| 132256 | Story | NPP: Display New PAF Action for MSP User - "ADD NPP to Facility" | Child | 132255 | To Do |
+| 132257 | Story | NPP: Restrict Action to Eligible Practitioners | Child | 132255 | To Do |
+| 132258 | Story | NPP: Apply Existing PAF Task Determination Rules | Child | 132255 | To Do |
+| 132259 | Story | NPP: Enforce Single PAF Action Selection | Child | 132255 | To Do |
 | 132275 | Not captured | PAF Tasks | Listed under 52350 | 52350 | Title only |
 | 132537 | Not captured | NPP: CVI Creation | Listed under 52350 | 52350 | Title only |
 | 132591 | Not captured | NPP: Auto-Acceptance and Automated Processing | Listed under 52350 | 52350 | Title only |
@@ -48,6 +52,11 @@ Structured summaries: [../tickets/README.md](../tickets/README.md)
 | 144239 | [../05_Related/144239_Begin_NPP_PAF_Entry_Point/144239.md](../05_Related/144239_Begin_NPP_PAF_Entry_Point/144239.md) |
 | 53658 | [../06_Successors/53658_NPP_PAF_Search/53658.md](../06_Successors/53658_NPP_PAF_Search/53658.md) |
 | 127104 | [../04_User_Stories/127104_NPP_Practitioner_Search/127104.md](../04_User_Stories/127104_NPP_Practitioner_Search/127104.md) |
+| 132255 | [../03_Features/132255_ADD_NPP_PAF_Action_Option/132255.md](../03_Features/132255_ADD_NPP_PAF_Action_Option/132255.md) |
+| 132256 | [../04_User_Stories/132256_Display_PAF_Action_MSP/132256.md](../04_User_Stories/132256_Display_PAF_Action_MSP/132256.md) |
+| 132257 | [../04_User_Stories/132257_Restrict_Eligible_Practitioners/132257.md](../04_User_Stories/132257_Restrict_Eligible_Practitioners/132257.md) |
+| 132258 | [../04_User_Stories/132258_Apply_Task_Determination/132258.md](../04_User_Stories/132258_Apply_Task_Determination/132258.md) |
+| 132259 | [../04_User_Stories/132259_Enforce_Single_PAF_Action/132259.md](../04_User_Stories/132259_Enforce_Single_PAF_Action/132259.md) |
 
 Do not interpret `Related` as a dependency.
 

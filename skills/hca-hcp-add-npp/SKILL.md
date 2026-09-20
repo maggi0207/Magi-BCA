@@ -190,6 +190,16 @@ NPI is the primary and required search criterion. Standard search requires a val
 
 Reuse existing Add New Practitioner search. NPI primary and required. Valid 10-digit NPI. Controlled no-NPI exception. Minimum alternate criteria required. Exception searches audit logged. Existing business rules unchanged. No new NPI search logic.
 
+## 7b. Known PAF Action Scope
+
+**132255 — NPP: Create "ADD NPP to Facility" PAF Action Option**
+
+Captured feature (child of 52350). Radio labeled **ADD NPP to Facility**. Visible to MSP only when the practitioner is net new or existing inactive with the selected entity. Reuse existing PAF task determination. Single PAF Action selection.
+
+Captured children of **132255** (all AC captured): **132256** MSP-only radio, last in list, fail closed if role unknown. **132257** SHOW net new or existing inactive at entity; HIDE active / other ineligible. **132258** reuse New vs Existing determination engine. **132259** keep radio single-select; client + server; reject/log multi-select.
+
+This is the PAF Action radio. It is not 136883, not 131728, not 131783 (CPC type filter), and not 132275 (task cards). Do not invent `PafType` / `TaskType` / authorization policies from this feature.
+
 ## 8. Core Business Flow
 
 ```text

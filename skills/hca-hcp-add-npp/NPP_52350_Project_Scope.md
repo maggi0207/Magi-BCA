@@ -51,7 +51,7 @@ Stories `136873`, `136876`, `136878`, `136882`, and `136883` were captured as **
 | MSP dashboard entry point | `136871`, `136872`, `136873`, `136876`, `136878`, `136882`, `136883` |
 | Practitioner search | `53658`, `127104` |
 | No-NPI exception | `131785` (title only) |
-| PAF action / type selection | `132255`, `131783` (title only) |
+| PAF action / type selection | `132255` (feature captured; child AC pending); `131783` (title only) |
 | PAF tasks | `132275` (title only) |
 | Existing practitioner handling | `132247` (title only) |
 | Add New Practitioner card | `131794` (title only) |
@@ -80,13 +80,17 @@ Titles for uncaptured `52350` children are taken **only** from the Azure DevOps 
 | 144239 | NPP: Add "Begin NPP PAF" Entry Point on MSP | User Story | Related to 136872 | No | Related; no AC export |
 | 53658 | NPP: PAF - Search | Feature | Successor of 136871; listed under 52350 | Yes | Blocked on 136871 |
 | 127104 | NPP: Add NPP to Facility PAF Practitioner Search – Add New Practitioner | User Story | Child of 53658 | Yes | Reuse existing search |
-| 131724 | NPP: Cactus Enable Maintenance and Management of New Credentialing Values for Non-... | Not captured | Listed under 52350 | No | Title only |
+| 131724 | NPP: Cactus Enable Maintenance and Management of New Credentialing Values for Non-... | Not captured | Child of 52350 | No | Title only. **ADO State: Done** (52350 Links screenshot 2026-09-20) |
 | 131728 | NPP: Enable HCP Access and Role-Based Security for Non-Defined Practitioner (NPP) ... | Not captured | Listed under 52350 | No | Title only |
 | 132600 | NPP: PAF to Cactus Credentialing Record Creation & Synchronization | Not captured | Listed under 52350 | No | Title only |
 | 131783 | NPP: Add NPP to Facility PAF Type Selection and Filtering in CPC Dashboard | Not captured | Listed under 52350 | No | Title only |
 | 132591 | NPP: Auto-Acceptance and Automated Processing | Not captured | Listed under 52350 | No | Title only |
 | 131785 | NPP: Controlled "No NPI Available" Exception Workflow for NPP | Not captured | Listed under 52350 | No | Title only; related to 53658/127104/V5 |
-| 132255 | NPP: Create "ADD NPP to Facility" PAF Action Option | Not captured | Listed under 52350 | No | Title only |
+| 132255 | NPP: Create "ADD NPP to Facility" PAF Action Option | Feature | Child of 52350 | Yes | Feature + all four child AC captured |
+| 132256 | NPP: Display New PAF Action for MSP User - "ADD NPP to Facility" | User Story | Child of 132255 | Yes | MSP-only radio; last in Practitioner Action list |
+| 132257 | NPP: Restrict Action to Eligible Practitioners | User Story | Child of 132255 | Yes | SHOW net new or existing inactive at entity; HIDE active / other |
+| 132258 | NPP: Apply Existing PAF Task Determination Rules | User Story | Child of 132255 | Yes | Reuse New vs Existing determination; no NPP engine |
+| 132259 | NPP: Enforce Single PAF Action Selection | User Story | Child of 132255 | Yes | Radio group + client/server single-select; reject multi-select |
 | 132537 | NPP: CVI Creation | Not captured | Listed under 52350 | No | Title only |
 | 131794 | NPP: Modify Add New Practitioner Card for ADD NPP to Facility PAF | Not captured | Listed under 52350 | No | Title only |
 | 132687 | NPP: Reports | Not captured | Listed under 52350 | No | Title only |
@@ -105,4 +109,5 @@ Treat as **UI/reference evidence**, not proof of final NPP implementation.
 
 - [screenshots/Begin_PAF_Current](screenshots/Begin_PAF_Current) — current MSP Begin PAF
 - [screenshots/NPP_Search](screenshots/NPP_Search) — existing NPI-required search + PSG chat + NPP dashboard mockup
+- [screenshots/PAF_Action](screenshots/PAF_Action) — PAF Action & Facilities dialog (`132255`)
 - Canonical copies also live in [10_Screenshots](10_Screenshots)
