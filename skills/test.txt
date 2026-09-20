@@ -1,90 +1,82 @@
-## 1. Files/classes confirmed (Add New + Verify)
+You are implementing a change in the HCA HCP Credentialing repository.
 
-- **Add New:** Client/Pages/PractitionerSearch/Components/ConfirmationWizard/AddNewPractitionerForm.razor + `.razor.cs` — class `AddNewPractitionerForm`, model class `NewPractitionerModel` (same file, bottom).
-- **Verify existing:** Client/Pages/PractitionerSearch/Components/ConfirmationWizard/VerifyExistingPractitionerForm.razor + `.razor.cs` — class `VerifyExistingPractitionerForm`, model class `VerifyPractitionerModel` (same file, bottom).
-- **Host dialog:** `ConfirmationWizardModal.razor` + `.razor.cs` — line 69: `ConfirmationWizardViewState.Verify => "Verify Practitioner Information"`. Renders `<AddNewPractitionerForm ... ShowNoNpiOption="IsNpiOptional">` (line 32).
-- **Results/Start/Add New button caller:** `PractitionerSearchTable.razor` line 60: `<ConfirmationWizardModal OnComplete="@OnNewPractitionerModalComplete" Practitioner="@_targetPractitioner" SearchParameters="@_searchParameters" IsNpiOptional="@_isNoNpiUser" Visible="true" />`.
-- NPP search page confirmed correct: `PractitionerSearchPage.razor` (`@page "/Practitioner/Search"` + `@page "/Practitioner/Search/Npp"`, `_isNppEntry`, `ForceNpiSearchMode` passed only to `PractitionerSearchForm`, not to `PractitionerSearchTable`).
+ROLE:
+Senior engineer. One session. Inspect only the files listed as already discovered, then implement. Do not start a second chat.
 
-## 2. Begin PAF vs NPP isolation signal (quote)
+TASK:
+1) Pass existing PractitionerSearchPage._isNppEntry into Add New and Verify forms as IsNppRequest.
+2) 131794/131795: when IsNppRequest, Add New required = First, Last, Degree, Provider Category, Individual NPI. Optional = Email, Cell, DOB, SSN, Gender, Suffix.
+3) 132247 family: when IsNppRequest, existing email read-only (PropertyDescription); blank email editable and not required; ExtendedEmailAddress still runs only when a value is entered.
 
-**None exists on these two forms.** `IsNpiOptional`/`ShowNoNpiOption` is driven by `PractitionerSearchTable.razor.cs`: `_isNoNpiUser = _isRecruitmentUser || CurrentUser.IsPsgUser();` (from `OnParametersSetAsync`) — this is role-based (Recruitment/PSG), not route-based, and is unrelated to `_isNppEntry`/`ForceNpiSearchMode`. `PractitionerSearchTable` receives no NPP-aware parameter at all from `PractitionerSearchPage.razor` (`<PractitionerSearchTable @ref="_searchTable" PageSize="25" CurrentUser="_currentUser" FormHasValidInput="_formHasValidInput" UseFormInputForAddButton="_useFormInputForAddButton"/>` — no `_isNppEntry`/`ForceNpiSearchMode` passed). **Smallest existing signal the form could read: `PractitionerSearchPage._isNppEntry` (private, computed from `NavigationManager.Uri`), which is not currently propagated past `PractitionerSearchPage` itself.**
+Treat inspect RETURN as fact unless you re-read and disprove:
+- _isNppEntry is private on PractitionerSearchPage (from NavigationManager.Uri). ForceNpiSearchMode goes only to PractitionerSearchForm. Table does not get NPP.
+- IsNpiOptional/_isNoNpiUser = Recruitment || PSG. Do NOT use that for NPP. Do NOT turn on ShowNoNpiOption for NPP.
+- Add New: AddNewPractitionerForm + NewPractitionerModel. ShouldRequireField required unless IsRecruitmentRole. ShouldRequireNpi required only if IsPsgRole (MSP NPI optional today).
+- Category = hardcoded APP/DHP/Physician/Other. Leave it.
+- Duplicate NPI already in ConfirmationWizardModal.SaveNewPractitionerAsync / PractitionerDuplicateCheckHelper. Do not change helper.
+- Verify: VerifyExistingPractitionerForm + VerifyPractitionerModel. Email always InputHca; ShouldRequireField unless IsRecruitmentRole. Identity card already uses PropertyDescription (reuse for read-only email).
+- ExtendedEmailAddress Required defaults false. Do not edit ExtendedEmailAddress.cs or Npi.cs.
+- No tests for these forms. Do not create a test project.
 
-## 3. A–L answers
+COMMENTS:
+Do not add ticket-ID comments, essays, or region banners. No // 131794, // NPP isolation, // 132247. Match existing Parameter style only (if the file already has [Parameter] with no XML, add none). One-word names are enough.
 
-**A. Add New — required vs optional today:**
-| Field | Required today (plain MSP) |
-|---|---|
-| First Name | Required — `[Required(ErrorMessage = "Required field")]` |
-| Last Name | Required — `[Required(ErrorMessage = "Required field")]` |
-| DOB | Required — `[CustomValidation(..., nameof(ShouldRequireField))]`; `ShouldRequireField`: required unless `IsRecruitmentRole` |
-| Gender | Required — same `ShouldRequireField` |
-| SSN | Required — same `ShouldRequireField` |
-| Email | Required — same `ShouldRequireField` (+ format via `[ExtendedEmailAddress]`) |
-| Cell (Phone) | Required — same `ShouldRequireField` |
-| Degree | Required — `[Required(ErrorMessage = "Required field")]` |
-| Provider Category | Required — `[Required(ErrorMessage = "Required field")]` |
-| Individual NPI | **Optional for MSP** — `ShouldRequireNpi`: only required when `model.IsPsgRole` is true (blank NPI is `Success` for plain MSP) |
-| Suffix | Optional — `[StringLength(5)]` only |
-| Middle Name | Optional — `[StringLength(20)]` only |
+STOP AND REPORT (do not invent):
+- If _isNppEntry is gone or not URI-based and you would need a new feature flag or auth policy.
+- If you must edit PractitionerSearchForm, PageUri, Paf.Api, or 136883 authorize/redirect to plumb the flag.
 
-**B. How requiredness is applied:** DataAnnotations (`[Required]`, `[StringLength]`) plus custom `[CustomValidation(typeof(NewPractitionerModel), nameof(ShouldRequireField))]` / `nameof(ShouldRequireNpi)` static methods that branch on `model.IsRecruitmentRole` / `model.IsPsgRole` / `model.ShowNoNpiOption`. Quote (`ShouldRequireField`):
-```csharp
-public static ValidationResult ShouldRequireField(string value, ValidationContext validationContext)
-{
-    var model = validationContext.ObjectInstance as NewPractitionerModel;
-    if (value == null && !model.IsRecruitmentRole)
-        return new ValidationResult("Required field.", new[] { validationContext.MemberName });
-    return ValidationResult.Success;
-}
-```
+THEN IMPLEMENT (smallest reuse):
 
-**C. Begin PAF vs NPP branch:** **No branch exists.** `AddNewPractitionerForm.OnInitializedAsync()` only sets `_model.IsPsgRole`, `_model.IsRecruitmentRole`, `_model.ShowNoNpiOption = ShowNoNpiOption` (param). No `_isNppEntry`/`ForceNpiSearchMode`/route check anywhere in this file or `VerifyExistingPractitionerForm.razor.cs`. Smallest existing signal to plumb down (not yet wired): `PractitionerSearchPage._isNppEntry`.
+Plumbing
+- PractitionerSearchPage.razor: pass _isNppEntry into PractitionerSearchTable (new [Parameter] bool, same name style as existing table params).
+- PractitionerSearchTable: hold it; pass into ConfirmationWizardModal.
+- ConfirmationWizardModal: [Parameter] bool IsNppRequest (or IsNppEntry — pick one name and use it end-to-end). Pass to AddNewPractitionerForm and VerifyExistingPractitionerForm.
+- Do not change [Authorize], NPP URL redirect, or ForceNpiSearchMode behavior.
 
-**D. Provider Category lookup:** Hardcoded in `AddNewPractitionerForm.razor.cs`: `private readonly IList<FieldOption> _categoryOptions = new List<FieldOption> { {Text="APP",Value="APP"}, {Text="DHP",Value="DHP"}, {Text="Physician",Value="Physician"}, {Text="Other",Value="Other"} };`. Not an API/RTK lookup — a fixed in-code list.
+131794 / 131795
+- Set NewPractitionerModel.IsNppRequest from the parameter in OnInitializedAsync (same place as IsPsgRole / IsRecruitmentRole).
+- ShouldRequireField: if IsNppRequest, return Success for the optional demographics (same members ShouldRequireField already gates: DOB, Gender, SSN, Email, Phone). First/Last/Degree/Category stay [Required] as today.
+- ShouldRequireNpi: if IsNppRequest, NPI is required (blank = Required field). Do not set ShowNoNpiOption true for NPP. Do not show No NPI radio/Reason on NPP.
+- Begin PAF (IsNppRequest false): zero behavior change.
 
-**E. Individual NPI validation + duplicate check:** `[Npi]` attribute (`Shared/Validations/Npi.cs`, `NpiAttribute : ValidationAttribute`) for format; `ShouldRequireNpi` (above) for requiredness. Duplicate check: `AddNewPractitionerForm` doesn't call it directly — it happens in `ConfirmationWizardModal.SaveNewPractitionerAsync()` via `PractitionerDuplicateCheckHelper` (per prior session evidence). **No existing NPI-N/A / exception UI on the Verify form; on Add New, a "No NPI" radio + Reason dropdown DOES already exist** (`ShowNoNpiOption`/`_npiSelection`/`NoNpiReason`, gated by `IsNpiOptional` = Recruitment/PSG only) — this is a pre-existing feature for Recruitment/PSG, not NPP, and is out of scope (131785) per your instructions; noted only as context.
+132247 / 132250 / 132252 / 132248 / 132253
+- Verify: set model IsNppRequest the same way.
+- If IsNppRequest && !string.IsNullOrWhiteSpace(Practitioner.EmailAddress): render Email with existing PropertyDescription (Label Email, Value the address). No InputHca. User cannot edit.
+- Else (NPP and blank, or not NPP): keep current InputHca.
+- VerifyPractitionerModel.ShouldRequireField: if IsNppRequest, Email is not required (blank Success). Non-NPP unchanged.
+- Do not change ExtendedEmailAddress. Invalid typed email still fails format.
+- Do not change the identity PropertyDescription block except reusing it for Email when read-only.
+- Begin PAF Verify unchanged.
 
-**F. Verify component files:** `VerifyExistingPractitionerForm.razor` + `.razor.cs`. Title `"Verify Practitioner Information"` set by the **host** `ConfirmationWizardModal.razor.cs` line 69 (`GetTitle()`/`GetModalTitle()`-style switch), not by this component itself. `"Update Email Address"` is a literal `<span>` inside `VerifyExistingPractitionerForm.razor` line 41.
+DO NOT CHANGE:
+- PractitionerSearchForm.razor / .cs
+- PageUri.cs
+- PractitionerSearchPage authorize / NPP redirect (136883)
+- ExtendedEmailAddress.cs, Npi.cs, PractitionerDuplicateCheckHelper.cs
+- Paf.Api, PafTaskSelection, TaskDeterminationService
+- Add New input markup structure (no new fields, no V5 "starts with 1 or 20")
+- Recruitment/PSG No-NPI UI
 
-**G. Existing email loading / requiredness / read-only:** `VerifyExistingPractitionerForm.OnInitialized()`: `_model.Email = Practitioner.EmailAddress;` (always loaded, always into an editable field). **Email is required today** via `VerifyPractitionerModel.ShouldRequireField`, required unless `IsRecruitmentRole`. **Email is never bound read-only anywhere on this component** — it is always rendered as `<InputHca @bind-Value="@context.Email" ...>`, editable regardless of whether `Practitioner.EmailAddress` was already populated.
+IMPLEMENTATION REQUIREMENTS:
+1. Reuse existing Parameter + ShouldRequire* pattern.
+2. Begin PAF and other roles unchanged.
+3. No duplicate forms.
+4. No invented flags, policies, or NPI N/A.
+5. Almost no new comments.
 
-**H. Email format validator:** `Shared/Validations/ExtendedEmailAddress.cs`, class `ExtendedEmailAddress : ValidationAttribute`, default `Required = false`; `IsValid()` calls `ValidationRoutines.DoExtendedEmailAddressValidation(strValue, Required)`. **Blank does NOT trigger a required error from this validator** (`Required` defaults to `false`); the separate `ShouldRequireField` custom validation is what currently makes blank email an error for non-Recruitment users on both forms.
+TESTS:
+- Do not create a test project.
+- dotnet build the Client (or the project that hosts these pages).
+- If an existing test project already references these types, add nothing unless a test breaks — then fix.
 
-**I. Existing read-only field pattern (reuse target for 132250):** `VerifyExistingPractitionerForm.razor`, top `<Card>` block — `<PropertyDescription Label="Gender" Value="@Practitioner.Gender"></PropertyDescription>` (and identical siblings for DOB/SSN/NPI/Cell/Category). This is a plain label+value display component, not an input — the exact existing pattern for "show read-only, no edit."
+VALIDATION: build, inspect diff (comments should be near-zero).
 
-**J. Tests locking these forms/requiredness:** **None.** Grep across every `*Tests*` project for `AddNewPractitionerForm` returned zero matches; no test references `VerifyExistingPractitionerForm` either (no Blazor client test project exists at all, consistent with prior findings).
-
-**K. Smallest safe extension point for 131794/131795:** Add an `IsNppRequest`-style bool `[Parameter]` to `AddNewPractitionerForm` (mirroring the existing `IsPsgRole`/`IsRecruitmentRole` pattern already on `NewPractitionerModel`), sourced from a new pass-through of `_isNppEntry` from `PractitionerSearchPage` → `PractitionerSearchTable` → `ConfirmationWizardModal` → `AddNewPractitionerForm`. Then extend `ShouldRequireField`/`ShouldRequireNpi` with an NPP-aware branch (opposite polarity from today: DOB/Gender/SSN/Email/Phone optional, NPI required) instead of only checking `IsRecruitmentRole`/`IsPsgRole`. Files that would change: `PractitionerSearchPage.razor`, `PractitionerSearchTable.razor`/`.razor.cs`, `ConfirmationWizardModal.razor`/`.razor.cs`, `AddNewPractitionerForm.razor.cs` (`NewPractitionerModel`, `ShouldRequireField`, `ShouldRequireNpi`). Files that must not change: `AddNewPractitionerForm.razor` field markup structure itself (labels/inputs are already generic over `_isFieldRequired`-style flags), `PractitionerSearchForm.razor(.cs)`, `PageUri.cs`, anything in `Hca.Credentialing.Paf.Api`.
-
-**L. Smallest safe extension point for 132247 family:** Same NPP signal plumbed into `VerifyExistingPractitionerForm` (new `[Parameter] bool IsNppRequest`), then: (a) if `Practitioner.EmailAddress` is non-empty, render the existing `PropertyDescription` read-only pattern (§I) instead of the editable `<InputHca>` for Email; (b) if blank, keep the current editable `<InputHca>` but make `VerifyPractitionerModel.ShouldRequireField` treat it as optional for the NPP case (mirroring how it already treats `IsRecruitmentRole`). Files that would change: `ConfirmationWizardModal.razor`/`.razor.cs` (pass-through), `VerifyExistingPractitionerForm.razor` (conditional read-only vs. editable Email block), `VerifyExistingPractitionerForm.razor.cs` (`VerifyPractitionerModel.ShouldRequireField`). Files that must not change: the top `PropertyDescription` read-only block (already exactly right, reused as-is), `ExtendedEmailAddress.cs` (format validator, untouched), `PractitionerDuplicateCheckHelper.cs`.
-
-## 4. STOP conditions hit? (yes/no + which)
-
-**Yes — one STOP condition hit:** *"If there is no existing flag/route/mode to isolate NPP vs Begin PAF on these forms."* Confirmed by direct inspection: no such flag/route/mode reaches `AddNewPractitionerForm` or `VerifyExistingPractitionerForm` today (§2, §C). No feature flag or auth policy was invented to work around this — reported only.
-
-Other STOP conditions: **not hit.** 131795's NPI-N/A/exception UI (131785) was not required to complete this inspection and was not designed here. Add New and Verify do share requiredness logic with no NPP branch today, but this is reported as the extension point (§K/§L), not treated as a blocker requiring invention.
-
-## 5. Ready to implement 131794+131795? (yes/no + blocker)
-
-**No.** Blocker: the NPP-vs-Begin-PAf isolation signal (§2/§4) does not yet reach `AddNewPractitionerForm` — it must first be plumbed through `PractitionerSearchPage` → `PractitionerSearchTable` → `ConfirmationWizardModal` → `AddNewPractitionerForm` before any requiredness branch can be added safely without affecting Begin PAF's existing Add New behavior.
-
-## 6. Ready to implement 132247 family? (yes/no + blocker)
-
-**No.** Same blocker as §5 — the isolation signal must reach `VerifyExistingPractitionerForm` first. Once present, the read-only-vs-editable Email branch is straightforward (existing `PropertyDescription` pattern + existing `ShouldRequireField` custom-validation convention already support exactly this shape of conditional).
-
-## 7. Must-not-change file list
-
-- `PractitionerSearchForm.razor`/`.razor.cs` (NPI search / `SearchMode` / `ForceNpiSearchMode` — 136878, already complete)
-- `PageUri.cs`
-- `PractitionerSearchPage.razor.cs`'s existing `[Authorize]`/role-redirect logic (136883)
-- `ExtendedEmailAddress.cs`, `Npi.cs` (format validators)
-- `PractitionerDuplicateCheckHelper.cs`
-- Any file under `Hca.Credentialing.Paf.Api`/`TaskDeterminationService`/`PafTaskSelection` (not opened, per instructions)
-- Existing `PropertyDescription` read-only block in `VerifyExistingPractitionerForm.razor` (reuse target, not a rewrite target)
-
-## 8. Assumptions
-
-- "MSP" for this inspection is treated as the residual/default case in these two forms (i.e., not `IsPsgRole`, not `IsRecruitmentRole`) — this matches the pattern already established elsewhere in the app (`PafTaskSelection`, `PractitionerSearchForm`) where MSP has no dedicated explicit flag and is simply "neither PSG nor Recruitment."
-- The pre-existing `ShowNoNpiOption`/"No NPI" radio+Reason UI on `AddNewPractitionerForm` (gated to Recruitment/PSG via `IsNpiOptional`) is unrelated to NPP/131785 and was not touched or reinterpreted as satisfying any NPP requirement.
-- No code was modified, created, or run through a formatter during this inspection.
+RETURN:
+1. Files changed
+2. Parameter name used end-to-end
+3. Quote ShouldRequireField and ShouldRequireNpi NPP branches
+4. How Verify chooses PropertyDescription vs InputHca
+5. Confirm ShowNoNpiOption is false for NPP
+6. Build result
+7. Remaining gaps
+8. Assumptions
