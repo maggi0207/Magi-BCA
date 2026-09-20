@@ -1,82 +1,86 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+8 files changed, exactly matching this feature's scope (the other listed changes are pre-existing unrelated local artifacts). `PractitionerSearchForm`, `PageUri.cs`, `[Authorize]`/136883 redirect, `ExtendedEmailAddress.cs`, `Npi.cs`, `PractitionerDuplicateCheckHelper.cs`, Paf.Api, `PafTaskSelection`, `TaskDeterminationService` — none touched.
 
-ROLE:
-Senior engineer. One session. Inspect only the files listed as already discovered, then implement. Do not start a second chat.
+## RETURN
 
-TASK:
-1) Pass existing PractitionerSearchPage._isNppEntry into Add New and Verify forms as IsNppRequest.
-2) 131794/131795: when IsNppRequest, Add New required = First, Last, Degree, Provider Category, Individual NPI. Optional = Email, Cell, DOB, SSN, Gender, Suffix.
-3) 132247 family: when IsNppRequest, existing email read-only (PropertyDescription); blank email editable and not required; ExtendedEmailAddress still runs only when a value is entered.
+**1. Files changed (8)**
+- `Client/Pages/PractitionerSearch/PractitionerSearchPage.razor`
+- `Client/Pages/PractitionerSearch/Components/PractitionerSearchTable.razor` / `.razor.cs`
+- `Client/Pages/PractitionerSearch/Components/ConfirmationWizard/ConfirmationWizardModal.razor` / `.razor.cs`
+- `Client/Pages/PractitionerSearch/Components/ConfirmationWizard/AddNewPractitionerForm.razor.cs`
+- `Client/Pages/PractitionerSearch/Components/ConfirmationWizard/VerifyExistingPractitionerForm.razor` / `.razor.cs`
 
-Treat inspect RETURN as fact unless you re-read and disprove:
-- _isNppEntry is private on PractitionerSearchPage (from NavigationManager.Uri). ForceNpiSearchMode goes only to PractitionerSearchForm. Table does not get NPP.
-- IsNpiOptional/_isNoNpiUser = Recruitment || PSG. Do NOT use that for NPP. Do NOT turn on ShowNoNpiOption for NPP.
-- Add New: AddNewPractitionerForm + NewPractitionerModel. ShouldRequireField required unless IsRecruitmentRole. ShouldRequireNpi required only if IsPsgRole (MSP NPI optional today).
-- Category = hardcoded APP/DHP/Physician/Other. Leave it.
-- Duplicate NPI already in ConfirmationWizardModal.SaveNewPractitionerAsync / PractitionerDuplicateCheckHelper. Do not change helper.
-- Verify: VerifyExistingPractitionerForm + VerifyPractitionerModel. Email always InputHca; ShouldRequireField unless IsRecruitmentRole. Identity card already uses PropertyDescription (reuse for read-only email).
-- ExtendedEmailAddress Required defaults false. Do not edit ExtendedEmailAddress.cs or Npi.cs.
-- No tests for these forms. Do not create a test project.
+**2. Parameter name used end-to-end:** `IsNppRequest` (bool), plumbed unchanged through `PractitionerSearchPage._isNppEntry` → `PractitionerSearchTable.IsNppRequest` → `ConfirmationWizardModal.IsNppRequest` → `AddNewPractitionerForm.IsNppRequest` / `VerifyExistingPractitionerForm.IsNppRequest`.
 
-COMMENTS:
-Do not add ticket-ID comments, essays, or region banners. No // 131794, // NPP isolation, // 132247. Match existing Parameter style only (if the file already has [Parameter] with no XML, add none). One-word names are enough.
+**3. Quotes — NPP branches**
 
-STOP AND REPORT (do not invent):
-- If _isNppEntry is gone or not URI-based and you would need a new feature flag or auth policy.
-- If you must edit PractitionerSearchForm, PageUri, Paf.Api, or 136883 authorize/redirect to plumb the flag.
+`NewPractitionerModel.ShouldRequireField`:
+```csharp
+public static ValidationResult ShouldRequireField(string value, ValidationContext validationContext)
+{
+    var model = validationContext.ObjectInstance as NewPractitionerModel;
 
-THEN IMPLEMENT (smallest reuse):
+    if (model.IsNppRequest)
+        return ValidationResult.Success;
 
-Plumbing
-- PractitionerSearchPage.razor: pass _isNppEntry into PractitionerSearchTable (new [Parameter] bool, same name style as existing table params).
-- PractitionerSearchTable: hold it; pass into ConfirmationWizardModal.
-- ConfirmationWizardModal: [Parameter] bool IsNppRequest (or IsNppEntry — pick one name and use it end-to-end). Pass to AddNewPractitionerForm and VerifyExistingPractitionerForm.
-- Do not change [Authorize], NPP URL redirect, or ForceNpiSearchMode behavior.
+    if (value == null && !model.IsRecruitmentRole)
+    {
+        return new ValidationResult("Required field.", new[] { validationContext.MemberName });
+    }
 
-131794 / 131795
-- Set NewPractitionerModel.IsNppRequest from the parameter in OnInitializedAsync (same place as IsPsgRole / IsRecruitmentRole).
-- ShouldRequireField: if IsNppRequest, return Success for the optional demographics (same members ShouldRequireField already gates: DOB, Gender, SSN, Email, Phone). First/Last/Degree/Category stay [Required] as today.
-- ShouldRequireNpi: if IsNppRequest, NPI is required (blank = Required field). Do not set ShowNoNpiOption true for NPP. Do not show No NPI radio/Reason on NPP.
-- Begin PAF (IsNppRequest false): zero behavior change.
+    return ValidationResult.Success;
+}
+```
 
-132247 / 132250 / 132252 / 132248 / 132253
-- Verify: set model IsNppRequest the same way.
-- If IsNppRequest && !string.IsNullOrWhiteSpace(Practitioner.EmailAddress): render Email with existing PropertyDescription (Label Email, Value the address). No InputHca. User cannot edit.
-- Else (NPP and blank, or not NPP): keep current InputHca.
-- VerifyPractitionerModel.ShouldRequireField: if IsNppRequest, Email is not required (blank Success). Non-NPP unchanged.
-- Do not change ExtendedEmailAddress. Invalid typed email still fails format.
-- Do not change the identity PropertyDescription block except reusing it for Email when read-only.
-- Begin PAF Verify unchanged.
+`NewPractitionerModel.ShouldRequireNpi` (relevant line only):
+```csharp
+if (string.IsNullOrWhiteSpace(value))
+{
+    if (model.IsPsgRole || model.IsNppRequest)
+    {
+        return new ValidationResult("Required field", new[] { validationContext.MemberName });
+    }
+}
+```
 
-DO NOT CHANGE:
-- PractitionerSearchForm.razor / .cs
-- PageUri.cs
-- PractitionerSearchPage authorize / NPP redirect (136883)
-- ExtendedEmailAddress.cs, Npi.cs, PractitionerDuplicateCheckHelper.cs
-- Paf.Api, PafTaskSelection, TaskDeterminationService
-- Add New input markup structure (no new fields, no V5 "starts with 1 or 20")
-- Recruitment/PSG No-NPI UI
+`VerifyPractitionerModel.ShouldRequireField`:
+```csharp
+public static ValidationResult ShouldRequireField(string value, ValidationContext validationContext)
+{
+    var model = validationContext.ObjectInstance as VerifyPractitionerModel;
 
-IMPLEMENTATION REQUIREMENTS:
-1. Reuse existing Parameter + ShouldRequire* pattern.
-2. Begin PAF and other roles unchanged.
-3. No duplicate forms.
-4. No invented flags, policies, or NPI N/A.
-5. Almost no new comments.
+    if (string.IsNullOrEmpty(value) && !model.IsRecruitmentRole && !model.IsNppRequest)
+    {
+        return new ValidationResult("Please enter a valid email address", new[] { validationContext.MemberName });
+    }
 
-TESTS:
-- Do not create a test project.
-- dotnet build the Client (or the project that hosts these pages).
-- If an existing test project already references these types, add nothing unless a test breaks — then fix.
+    return ValidationResult.Success;
+}
+```
 
-VALIDATION: build, inspect diff (comments should be near-zero).
+**4. How Verify chooses PropertyDescription vs InputHca**
+```razor
+@if (IsNppRequest && !string.IsNullOrWhiteSpace(Practitioner?.EmailAddress))
+{
+    <PropertyDescription Label="Email" Value="@Practitioner.EmailAddress"></PropertyDescription>
+}
+else
+{
+    <Form ...><InputHca Id="verifyEmail" @bind-Value="@context.Email" .../></Form>
+}
+```
+NPP + existing (non-blank) email → read-only `PropertyDescription` (same component already used for Gender/DOB/SSN/NPI/Cell/Category on this same card). NPP + blank email, or non-NPP at all → unchanged editable `InputHca` path. `_isFieldRequired` (drives the visual `*`) is also set `false` when `IsNppRequest`, so a blank-email NPP field shows no required asterisk. `ExtendedEmailAddress` is untouched — format is still validated whenever a value is present, regardless of path. Also extended the existing recruitment-only "skip duplicate check when email is blank" guard to also cover NPP (`if (!_model.IsRecruitmentRole && !_model.IsNppRequest)`), so a blank NPP email doesn't trigger an unnecessary/invalid duplicate-check call against `PractitionerDuplicateCheckHelper` — the helper itself was not modified.
 
-RETURN:
-1. Files changed
-2. Parameter name used end-to-end
-3. Quote ShouldRequireField and ShouldRequireNpi NPP branches
-4. How Verify chooses PropertyDescription vs InputHca
-5. Confirm ShowNoNpiOption is false for NPP
-6. Build result
-7. Remaining gaps
-8. Assumptions
+**5. Confirm `ShowNoNpiOption` is false for NPP**
+Confirmed — `ConfirmationWizardModal.razor` still passes `ShowNoNpiOption="IsNpiOptional"` (unchanged), and `IsNpiOptional` is still sourced only from `PractitionerSearchTable._isNoNpiUser = IsRecruitmentUser || IsPsgUser` (unchanged). `IsNppRequest` was added as a **separate, additional** parameter and never touches `IsNpiOptional`/`ShowNoNpiOption`. An NPP (MSP) user therefore never sees the No-NPI radio/Reason UI.
+
+**6. Build result**
+`dotnet build` on `Hca.Credentialing.Client` — succeeded, no warnings or errors.
+
+**7. Remaining gaps**
+- No automated test exists (or was created) to lock this behavior — consistent with your instruction not to create a test project.
+- `Category` lookup remains the hardcoded APP/DHP/Physician/Other list — untouched, per instructions.
+- 131785 (No-NPI/exception UI) and downstream CACTUS/task-card/CVI/CPC behavior remain entirely out of scope and untouched.
+
+**8. Assumptions**
+- "Existing email" for the read-only branch is defined as `!string.IsNullOrWhiteSpace(Practitioner.EmailAddress)`, matching how the rest of this form already treats a populated vs. blank email.
+- No `[Authorize]`, `PageUri`, `PractitionerSearchForm`, or 136883 redirect logic needed touching — `_isNppEntry` was already computed and simply read one level further down via a new parameter, consistent with the "smallest existing signal" identified in the prior inspection.
