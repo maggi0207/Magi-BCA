@@ -1,32 +1,4 @@
-No code was changed. I inspected as instructed and found a genuine STOP condition on both required fronts.
-
-## STOP — No Implementation Performed
-
-### What was found
-
-1. **`AuditAction` enum** (`Shared/Data/Model/Audit/AuditLog.cs`) contains **no generic "practitioner search" or "exception search" value**. The only search-related value is `AffVerifyPractitionerSearchCriteria`, and its only builder, `CredentialingAuditLogger.GetAffVerifyPractitionerSearchAuditLog(...)`, is explicitly Affiliation-Verification-specific (matches your instruction not to reuse it merely because the parameter shape fits).
-
-2. **No safe existing discriminator exists to isolate "exception search execution" within the server-side `PractitionerSearchType.Recruitment` branch.** I traced every caller that sets `SearchType = PractitionerSearchType.Recruitment`:
-   - `PractitionerSearchForm.OnFinish()` (`Client/Pages/PractitionerSearch/Components/PractitionerSearchForm.razor.cs`, line 267) — the actual exception-search execution (in scope).
-   - `PractitionerDuplicateCheckHelper.FindDuplicatesForRecruitment(...)` (`Shared/Helpers/PractitionerDuplicateCheckHelper.cs`, lines 94 and 127) — duplicate-check calls used during Add New Practitioner / demographic flows (explicitly **out of scope** — "Do not audit: Add New Practitioner").
-
-   Both call paths converge on the exact same server-side branch: `PractitionerRepository.SearchPractitionersAsync()`, `else if (searchParameters.SearchType == PractitionerSearchType.Recruitment)` (`Hca.Credentialing.Cactus.Api/Data/Repositories/Practitioner/PractitionerRepository.cs`, line 104). I inspected `PractitionerSearchParameters` (`Shared/Clients/Cactus/PractitionerSearchParameters.cs`) in full — it has no boolean/enum field that distinguishes "user-initiated exception search" from "system duplicate-check search." The only observed difference is incidental `Pager` values (`Next=10` for duplicate checks vs. `Next=pageSize` for the search table), which is not a real, named discriminator and would be an unreliable, implicit hack to key logic on.
-
-### Why this blocks implementation
-
-Adding the audit call inside `PractitionerRepository.SearchPractitionersAsync()`'s `PractitionerSearchType.Recruitment` branch (mirroring the `AffiliationVerification` pattern, as the ticket evidence suggests) would **also fire for every duplicate-check call from `PractitionerDuplicateCheckHelper`**, which your scope explicitly excludes ("Do not audit... Add New Practitioner"). There is no existing field, flag, or semantically distinct `AuditAction` to prevent that — meeting both of your explicit STOP conditions.
-
-### Exact files involved
-- `Hca.Credentialing.Cactus.Api/Data/Repositories/Practitioner/PractitionerRepository.cs` (line 104 — the shared branch)
-- `PractitionerSearchForm.razor.cs` (line 267 — exception search sets `SearchType = Recruitment`)
-- `PractitionerDuplicateCheckHelper.cs` (lines 94, 127 — duplicate check also sets `SearchType = Recruitment`)
-- `PractitionerSearchParameters.cs` (no discriminator field present)
-- `AuditLog.cs` (no generic practitioner/exception-search `AuditAction` exists)
-- `CredentialingAuditLogger.cs` (only `GetAffVerifyPractitionerSearchAuditLog` exists; no generic sibling)
-
-### Decision required
-A product/architecture decision is needed on **one** of:
-1. Add a new discriminator field to `PractitionerSearchParameters` (e.g., a request-origin flag) so the server can distinguish "exception search execution" from "duplicate check," **or**
-2. Move the audit call to the client, immediately after `PractitionerSearchForm.OnFinish()` builds `searchParams` for the exception-search branch specifically (before invoking `OnSearchCallback`) — but this requires either a new `AuditAction` value or explicit confirmation that an existing one may be repurposed, and a decision on which existing "create audit entry" mechanism is callable from the Blazor Client (the only client-side `AuditClient` found, `Shared/Clients/Audit/AuditClient.cs`, exposes **only** `SearchAuditLogEntriesAsync` — a read/search endpoint, not a create endpoint).
-
-No files were changed. Awaiting direction before any implementation.
+53658/127104 NPP Search functionality is complete using the existing Practitioner Search workflow; no new search code is required.
+The only pending item is AC7 — audit logging for Exception Practitioner Search.
+The existing Affiliation Verification audit cannot be safely reused because it represents a different business activity.
+We need a decision: A) new audit action, B) existing action + discriminator, or C) defer AC7
