@@ -1,4 +1,28 @@
-53658/127104 NPP Search functionality is complete using the existing Practitioner Search workflow; no new search code is required.
-The only pending item is AC7 — audit logging for Exception Practitioner Search.
-The existing Affiliation Verification audit cannot be safely reused because it represents a different business activity.
-We need a decision: A) new audit action, B) existing action + discriminator, or C) defer AC7
+Inspect only. 136883. Do NOT modify files, implement, commit, or create a PR.
+Do NOT invent a policy or AuditAction. Do NOT use 131728 AC.
+Do NOT change PractitionerSearchPage [Authorize] (breaks Begin PAF / PSG / Recruitment).
+
+KNOWN:
+- NPP URL = PageUri.PractitionerNppSearchUri /Practitioner/Search/Npp
+- _isNppEntry / ForceNpiSearchMode already exist
+- IsMspUser() = Msp OR Psg (PrincipalExtensions)
+- Page [Authorize] = Msp, Psg, Recruiter, RecruiterManager on BOTH search routes
+- Hide button is not enough; direct URL must be blocked for non-MSP
+- PSG/Recruitment /Practitioner/Search must stay
+
+INSPECT:
+1. PrincipalExtensions — IsMspUser, IsPsgUser, IsInRole("Msp").
+2. PafQueueSearchCriteria — who sees Begin NPP PAF (MSP vs PSG vs Recruitment vs CPC).
+3. PractitionerSearchPage — _isNppEntry; any role check on NPP route.
+4. Existing unauthorized/direct-URL deny: AccessDenied, NotAuthorized, NavigateTo, AuthorizeView, Redirect. Exact file/method.
+5. Any existing "Msp only, not Psg" page or check.
+
+REPORT for UI hide and for /Practitioner/Search/Npp:
+- exact file/class/method
+- current behavior
+- existing deny mechanism that can be reused (or NONE)
+- whether IsInRole("Msp") already exists as a pattern
+- whether code change is required
+- STOP if no existing deny pattern exists
+
+Do not implement. Stop after the report.
