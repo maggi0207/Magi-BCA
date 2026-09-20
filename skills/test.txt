@@ -1,152 +1,59 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+136871 remaining work only. 136873 is DONE. Do not redo or revert the Begin NPP PAF button.
 
-ROLE:
-Act as a senior engineer familiar with the existing HCP Blazor Client patterns.
+ROLE: senior HCP Blazor engineer. Complete remaining 136872 children. Do not scan the whole repo.
 
-TASK:
-Implement Azure DevOps user story 136873 only — NPP: Add Begin NPP PAF action to MSP Dashboard.
+IF STUCK, read only these analysis files (skip if not in this workspace):
+- 08_Office_Repository_Evidence / ADD NPP code-level architecture (search + Begin PAF)
+- 04_GAP_ANALYSIS existing-vs-required (entry-point rows; do not treat gap as automatically correct)
+- ADD_NPP_MASTER_IMPLEMENTATION_PLAN.md §9 (136873 was blocked on shared visibility; that is resolved)
+- 136873_evidence.md
+Treat source code as truth over those docs. Do not rediscover architecture already listed below.
 
-This is a markup-only UI change. Stop when 136873 is complete. Do not start 136876, 136878, 136882, or 136883.
+ALREADY ESTABLISHED (do not re-investigate):
+- Begin NPP PAF is in PafQueueSearchCriteria.razor Extra template, non-Recruitment else branch, beside Begin PAF.
+- CanBeginPaf comes from PafQueueSearch.CanBeginPAF(): true if IsMspUser() (Msp OR Psg) OR IsRecruitmentUser() (Recruiter OR RecruiterManager).
+- Begin PAF / Begin Request both call NavigateToStartPaf() → PageUri.PractitionerSearchUri with NO mode/query.
+- Do NOT assume that URI is Enforce NPI Search. UI: Begin PAF search is NPI+SSN+name; Enforce NPI Search is NPI-required + No NPI exception. Prove from source.
+- PractitionerSearchForm has SearchMode.NpiSearch / ExceptionSearch (architecture evidence; confirm in source before using).
+- MspDashboardPage: /Msp/Dashboard and /Psg/Dashboard, [Authorize(Roles="Msp, Psg")].
+- SharedPafQueue is also on CPC, CSS, Recruitment, Admin. Do not show NPP on Recruitment (Begin Request branch).
+- Tooltip mockup extra sentence is NOT approved.
+- 53658 is out of scope (blocked until 136871 deployed).
 
-BUSINESS REQUIREMENT:
-As an MSP user, I want a dedicated Begin NPP PAF option so that I can initiate requests for Non-Privileged Practitioners.
+ORDER:
+1. Confirm 136873 markup. Do not change Begin PAF / Begin Request / NavigateToStartPaf for Begin PAF.
+2. 136876
+3. 136878 (inspect search target first)
+4. 136883
+5. 136882 regression throughout
+6. Client build + git diff. Stop.
 
-Acceptance criteria:
-- Given the user is on the MSP Dashboard, when the page loads, both Begin PAF and Begin NPP PAF are displayed.
-- Begin NPP PAF appears immediately adjacent to Begin PAF.
-- The new button is keyboard accessible, screen-reader compatible, and styled consistently with existing application controls.
+---
+136876 — FILE: Client/Pages/Queues/Components/PafQueueSearchCriteria.razor
+Exact text: Use this option only when submitting a request for a Non-Privileged Practitioner (NPP).
+Grep Client only: Tooltip, Title=, info-circle (or similar) with Button. Reuse that pattern. Hover AND focus. NPP control only.
 
-This story does not define click routing (136878), tooltip (136876), or authorization (136883).
+---
+136878
+Inspect only: PageUri.cs; PractitionerSearchPage; PractitionerSearchForm (SearchMode); how PSG/Recruitment open NPI-required search; PafQueueSearchCriteria.razor.cs NavigateToStartPaf.
+Wire Begin NPP PAF click only. No new search. If you cannot distinguish Enforce NPI Search from Begin PAF search, STOP.
 
-REPOSITORY EVIDENCE:
-File: Client/Pages/Queues/Components/PafQueueSearchCriteria.razor
-Existing Extra-template rendering:
+---
+136883
+MSP may use Begin NPP PAF. Hide is not enough; block direct URL/mode. Reuse existing [Authorize]/IsInRole. Do not invent a policy. Do not break Begin PAF or existing PSG/Recruitment search.
 
-@if (CanBeginPaf)
-{
-    @if (IsRecruitmentUser)
-    {
-        <Button HtmlType="button" Type="@ButtonType.Primary" OnClick="@NavigateToStartPaf">Begin Request</Button>
-    }
-    else
-    {
-        <Button HtmlType="button" Type="@ButtonType.Primary" OnClick="@NavigateToStartPaf">Begin PAF</Button>
-    }
-}
+---
+136882
+Begin PAF label, visibility, click, NavigateToStartPaf, Begin Request must stay equivalent.
 
-CanBeginPaf is a [Parameter] supplied by PafQueueSearch as CanBeginPaf="@CanBeginPAF()".
-CanBeginPAF() returns true for IsMspUser() or IsRecruitmentUser().
-IsMspUser() = roles Msp or Psg.
-IsRecruitmentUser() = roles Recruiter or RecruiterManager.
-NavigateToStartPaf() calls NavigationManager.NavigateTo(PageUri.PractitionerSearchUri) with no extra context.
-
-PafQueueSearchCriteria is reached via:
-MspDashboardPage | CpcDashboardPage | CssDashboardPage | RecruitmentDashboardPage | Admin/HomePage
-→ SharedPafQueue
-→ PafQueueSearch
-→ PafQueueSearchCriteria
-
-EXISTING PATTERN TO REUSE:
-The existing Ant Design Button in PafQueueSearchCriteria.razor Extra template:
-HtmlType="button", Type="@ButtonType.Primary".
-Reuse that exact control. Put the new button in the existing non-Recruitment else branch, immediately adjacent to Begin PAF.
-
-SCOPE:
-Change this file only:
-- Client/Pages/Queues/Components/PafQueueSearchCriteria.razor
-
-If and only if the markup cannot compile without it, a click stub in:
-- Client/Pages/Queues/Components/PafQueueSearchCriteria.razor.cs
-Prefer no .cs change. Prefer no OnClick on the new button (136878 owns navigation). Do not add a new handler that calls NavigateToStartPaf.
-
-DO NOT CHANGE:
-- CanBeginPAF()
-- CanBeginPaf
-- IsRecruitmentUser behavior
-- Begin PAF button
-- Begin Request button
-- NavigateToStartPaf()
-- PageUri.PractitionerSearchUri
-- PafQueueSearch.razor / PafQueueSearch.razor.cs
-- SharedPafQueue.razor / SharedPafQueue.razor.cs
-- Any dashboard page
-- PageUri.cs
-- Practitioner search
-- authorization / policies / roles
-- tooltip
-- APIs / services / models
-
-Do not implement:
-- NPP navigation
-- Enforce NPI Search
-- SearchMode
-- query parameters
-- NPP PAF creation
-
-IMPLEMENTATION REQUIREMENTS:
-1. Read PafQueueSearchCriteria.razor first. Confirm the CanBeginPaf / IsRecruitmentUser Extra-template block before editing.
-2. Make the smallest possible markup-only change.
-3. Do not refactor, rename, restyle, or reformat unrelated markup.
-4. Do not modify unrelated files.
-5. Do not invent business rules.
-6. The new button must NOT appear in the Recruitment branch.
-
-BEFORE CODING:
-1. Inspect the existing Begin PAF / Begin Request markup.
-2. Confirm the extension point is the non-Recruitment else branch.
-3. State the planned one-line/adjacent-button change briefly.
-4. Then implement.
-
-IMPLEMENTATION:
-In the existing non-Recruitment branch where Begin PAF is rendered, add a second button labeled exactly:
-
-Begin NPP PAF
-
-Required:
-- immediately adjacent to Begin PAF
-- same Button component
-- same HtmlType="button"
-- same Type="@ButtonType.Primary"
-- same accessibility/keyboard/screen-reader pattern as Begin PAF
-- visible only when CanBeginPaf is true AND IsRecruitmentUser is false
-
-Target structure:
-
-@if (CanBeginPaf)
-{
-    @if (IsRecruitmentUser)
-    {
-        Begin Request
-    }
-    else
-    {
-        Begin PAF
-        Begin NPP PAF
-    }
-}
-
-Do not wire NPP navigation. Ticket 136878 owns click/navigation. Ticket 136876 owns tooltip. Ticket 136883 owns security.
-
-TESTS:
-No Blazor client test project covers this component. Do not create a new test project.
-
-Manual verification after the change:
-- MSP Dashboard: Begin PAF and Begin NPP PAF both visible, adjacent
-- Begin PAF unchanged
-- Recruitment: Begin Request only; Begin NPP PAF not shown
-- Keyboard focus can reach the new button
-- Accessible name is Begin NPP PAF
-
-VALIDATION:
-1. Build the affected Client project (Hca.Credentialing.Client / the project that compiles PafQueueSearchCriteria.razor).
-2. Review git diff. It should contain only the intended markup (and .cs only if a compile stub was unavoidable).
-3. Confirm Begin Request and Begin PAF markup/handlers are unchanged.
+Build Client. git diff = only files required for 136876/136878/136883.
 
 RETURN:
-1. Files changed
-2. Implementation summary
-3. Git diff summary
-4. Build result
-5. Warnings/errors
-6. Remaining gaps (click/navigation still owned by 136878)
-7. Stop. Do not continue to other tickets.
+1. 136871 COMPLETE / PARTIALLY COMPLETE / BLOCKED
+2. Each child: status, files, validation
+3. NPP flow
+4. Security
+5. Begin PAF / Begin Request
+6. Build
+7. Every changed file + why
+8. Blockers only if genuine
