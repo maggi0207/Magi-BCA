@@ -1,20 +1,50 @@
-136883 only. Do not redo 136873/136876/136878. Do not change Begin PAF.
+Inspect only. 53658/127104. Do NOT modify files, implement, commit, or create a PR.
 
-BUG (UI evidence): PSG Dashboard /Psg/Dashboard shows Begin NPP PAF next to Begin PAF. That fails 136883. MSP-only may start Begin NPP PAF. PSG/Recruitment existing search must stay.
+136871 is DONE. Do not redo it.
+Begin NPP PAF → /Practitioner/Search/Npp → PractitionerSearchPage → PractitionerSearchForm → NpiSearch (ForceNpiSearchMode).
+Begin PAF → /Practitioner/Search → MSP ExceptionSearch. Leave that path unchanged.
 
-CAUSE: Begin NPP PAF sits in the CanBeginPaf && !IsRecruitmentUser else branch. IsMspUser() is Msp OR Psg (PrincipalExtensions). Same MspDashboardPage serves /Msp/Dashboard and /Psg/Dashboard.
+Inspect ONLY these files/symbols. Stop after the report.
 
-DO NOT:
-- Invent a new policy/claim (not 131728)
-- Change NavigateToStartPaf() or PageUri.PractitionerSearchUri
-- Change PractitionerSearchPage [Authorize(Roles = "Msp, Psg, Recruiter, RecruiterManager")] — that would break Begin PAF / PSG / Recruitment on /Practitioner/Search
-- Remove or retarget the NPP URI /Practitioner/Search/Npp
-- Hide Begin PAF from PSG
+1. EXCEPTION SEARCH
+PractitionerSearchForm.razor + .cs
+- ExceptionSearch fields
+- minimum criteria
+- what blocks exception search
+- SwitchToExceptionSearch() body
+- whether "No NPI available? Search without NPI" still works after /Practitioner/Search/Npp
+- whether ForceNpiSearchMode is init-only or blocks later SwitchToExceptionSearch
+Do NOT change exception fields. Do NOT propose V5 Reason/license/state.
 
-1. UI: show Begin NPP PAF only when current user IsInRole("Msp"). Do not use IsMspUser(). Reuse PrincipalExtensions / AuthenticationState already on the queue components. Inspect before adding a new parameter.
+2. EXCEPTION AUDIT
+Grep practitioner-search files for QueueAuditLogEntry, ICredentialingAuditLogger, AuditAction.
+Trace exception-search submit.
+- Is an audit event already created?
+- If yes: exact pipeline/type
+- If no: exact EXISTING audit helper that could be reused
+Do NOT invent AuditAction/schema.
 
-2. Direct URL: if _isNppEntry and user is not IsInRole("Msp"), deny using the app’s existing unauthorized pattern (AuthorizeView/NotAuthorized, existing redirect — find one, do not invent). PSG/Recruitment must still use /Practitioner/Search.
+3. NPI EMPTY RESULTS
+PractitionerSearchTable.razor + .cs
+- zero results after valid NPI search
+- is Add New Practitioner shown, including in NpiSearch?
+- method that opens Add New Practitioner
+- does NPP route use the same table/empty-state?
 
-3. Build Client. Diff only the files required for this gate. Report exact role check and deny behavior.
+4. ADD NEW PRACTITIONER
+Confirm ConfirmationWizardModal / AddNewPractitionerForm / StartPafFrom is reused after NPP NPI search.
+Do NOT change AddNewPractitionerForm or required fields (131794).
 
-STOP.
+5. NPI VALIDATION
+Confirm DoNpiValidation, NpiAttribute, OnNpiFieldChanged. Do NOT change them.
+
+OUT OF SCOPE: 131785, 131794, PafType, TaskType.Npp, CACTUS, tasks, PSV, CVI, auto-accept, eligibility, demographics.
+
+REPORT ONLY. For each item use:
+A. VERIFIED — ALREADY SATISFIED
+B. VERIFIED GAP — CODE CHANGE REQUIRED
+C. NOT PART OF 53658/127104
+D. EVIDENCE NOT FOUND
+Include: exact file, class/method, current behavior, evidence, whether code change is required.
+
+End with one line: 53658/127104 needs (no code | audit hook only | empty-state reuse only | inspect incomplete).
