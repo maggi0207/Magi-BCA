@@ -1,111 +1,64 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+4 files changed for this feature, exactly as intended; the rest are pre-existing unrelated local changes.
 
-ROLE:
-Act as a senior engineer familiar with the existing repository patterns.
+## RETURN
 
-TASK:
-Implement feature 132255 in this single session: Practitioner Action radio "ADD NPP to Facility" for eligible MSP users, single-select preserved, submit mapped onto existing New/Existing PAF task workflows. Inspect the remaining gaps first in this same turn, then code. Do not stop after inspect unless a STOP condition below is hit.
+**1. Files changed**
+- `Shared/Clients/Paf/TaskListParameters.cs`
+- `Hca.Credentialing.Paf.Api/Controllers/TaskController.cs`
+- `Hca.Credentialing.Paf.Api/Services/TaskDeterminationService.cs`
+- `Hca.Credentialing.Paf.Api/Domain/Strategy/PafProcessingStrategyContext.cs`
 
-CHILDREN IN THIS SHOT:
-132256 Display radio for MSP — last in list, exact label, hide non-MSP, fail-closed + log if role cannot be retrieved.
-132257 Restrict to eligible practitioners — SHOW net new OR existing inactive with entity; HIDE active / other ineligible.
-132259 Enforce single PAF action selection — keep radio single-select including the new option; client + server must not accept multiple actions.
-132258 Apply existing PAF task determination — on submit of ADD NPP, reuse New Practitioner vs Existing Practitioner rules; no separate NPP determination engine; on failure show error, block submit, log, no partial task set.
+**2. Classes/methods changed**
+- `TaskListParameters` — added `IsMspUserMode` (bool) and `UserId` (string), both documented as server-computed-only.
+- `TaskController.GetAvailableTaskListAsync` — resolves `IsMspUserMode`/`UserId` from `_httpContextAccessor.HttpContext.User` inside a try/catch; fails closed (`IsMspUserMode = false`) and logs via existing `_logger.LogWarning` on any failure.
+- `TaskController.GetAvailableFacilityListAsync` — added `TaskType.Npp` to the allowed-task whitelist.
+- `TaskDeterminationService.GetAvailableTaskListAsync` — appends the `Npp` `TaskDto` last in the NewPractitioner branch (MSP-only) and last in the ExistingPractitioner branch (MSP-only **and** eligible).
+- `TaskDeterminationService.GetAvailableFacilityListAsync` — the existing `AddPractitionerToFacility` branch condition now also matches `TaskType.Npp` (`||`), reusing the identical facility filter.
+- `PafProcessingStrategyContext.CreateAddTaskStrategy` — added `TaskType.Npp => new AddTaskAddPractitionerToFacilityStrategy(this)`.
 
-BUSINESS REQUIREMENT:
-Enable MSP users to add a Net New Practitioner or an existing practitioner inactive with the selected entity via a dedicated PAF Action while reusing existing task determination.
+**3. Quote — `CreateAddTaskStrategy` and Npp save mapping**
+```csharp
+return task switch
+{
+    TaskType.AddPractitionerToFacility => new AddTaskAddPractitionerToFacilityStrategy(this),
+    // ADD NPP to Facility (132258) reuses the existing Add-Practitioner-to-Facility add-task workflow
+    // as-is, so New vs Existing Practitioner mode already on the PAF continues to apply unchanged.
+    TaskType.Npp => new AddTaskAddPractitionerToFacilityStrategy(this),
+    TaskType.AddPrivilegesMss18 => new AddTaskAddPrivilegesMss18Strategy(this),
+    ...
+    _ => throw new ArgumentException($"Task \"{task}\" does not have an add strategy")
+};
+```
+No new strategy class was created — `TaskType.Npp` maps to the exact same `AddTaskAddPractitionerToFacilityStrategy` instance construction as `AddPractitionerToFacility`, so the existing New-vs-Existing-practitioner initialization logic (`AddPractitionerToFacilitiesTask`, `SpecialtyTask`, PSG/`PerfTask` handling) applies unchanged.
 
-Exact radio label: ADD NPP to Facility
+**4. How MSP is evaluated (client/server)**
+Server-only. `PafTaskSelection.razor.cs` is unchanged and never sets `IsMspUserMode` — it defaults to `false` client-side. `TaskController.GetAvailableTaskListAsync` overwrites it unconditionally from `_httpContextAccessor.HttpContext.User.IsInRole(nameof(HcoApplicationRole.Msp))` (the identical `IsInRole(Msp)` idiom already used for PSG/Recruitment in this same dialog and for 136883). A client-supplied value is never trusted. On any exception (null user, etc.) it fails closed to `false` and logs `_logger.LogWarning(ex, "Unable to determine Msp role for {Action}; ADD NPP to Facility will be hidden.", ...)`.
 
-REPOSITORY EVIDENCE (already inspected — treat as fact unless you re-read and disprove):
-- Dialog: Client/Pages/Paf/Components/PafTaskSelection.razor + .razor.cs. GetTitle() returns "PAF Action & Facilities" for non-PSG/non-Recruitment (~line 154). Caller: PafFormComponent, ShowFacilities.
-- Radios: AntDesign RadioGroup @bind-Value _selectedTask TValue=TaskType; foreach _currentAvailableTasks. Already structurally single-select.
-- List: LoadAvailableTasks → PafClient.GetAvailableTaskListAsync(TaskListParameters { Mode, PractitionerId, IsPsgUserMode, IsRecruitmentUserMode }) → TaskController → TaskDeterminationService.GetAvailableTaskListAsync.
-- Existing-practitioner last option: "Add Privilege MSS-18". New-practitioner list today: only "Add Practitioner to Facility" (re-confirm by reading the method).
-- TaskType.Npp exists: Shared/Data/Model/Paf/TaskType.cs [Description("NPP PAF")] — NOT in the list. Unwired. No AddTaskNppStrategy.
-- Save: OnSaveClicked → TaskSelectionEvent.PafType (TaskType?) → HandleTaskSelectionEvent → AddTaskToPafAsync([FromQuery] TaskType task) → CreateAddTaskStrategy(task). Npp will fail without a mapping.
-- This dialog does not check MSP. Only IsPsgUser()/IsRecruitmentUser(). Fallthrough is NOT MSP-only.
-- 136883 IsMspOnlyUser() is private on PafQueueSearch.razor.cs: IsInRole(nameof(HcoApplicationRole.Msp)). Do not move that method. Search for existing IsMspUser() extension; else use IsInRole(Msp) idiom already used for PSG/Recruitment in this dialog.
-- Facility active/inactive is applied in GetAvailableFacilityListAsync via GetUserFacilitiesNotAddedToOrInactiveAtAsync for AddPractitionerToFacility, NOT at radio visibility. PractitionerSummary.Active semantics are unconfirmed — do not use it unless you open the CACTUS mapping and prove it is per-entity.
-- Tests: none for this dialog / TaskDeterminationService. Do not break CrudEntityCredentialingOperationTests GetMsoDueDate_ReturnsNull_ForAddPractitionerToFacilityWithTemporaryCredentialingTypeRtk.
+**5. Exact `TaskDto.Name`**
+`"ADD NPP to Facility"` — a literal string, not `TaskType.Npp.GetDescription()` (which remains `"NPP PAF"` and was not changed).
 
-STOP AND REPORT (do not invent):
-- If mapping Npp onto existing add-task requires a new CACTUS RTK constant that is not already in code.
-- If GetCredentialingTypeRtk (or equivalent) is invoked on this AddTask path and cannot reuse the AddPractitionerToFacility case without a new RTK.
-- If inactive-at-entity cannot be evaluated with an existing query (GetUserFacilitiesNotAddedToOrInactiveAtAsync or proven per-entity field). Do not guess PractitionerSummary.Active.
+**6. Eligibility query for 132257 + load-time interpretation**
+Reused verbatim: `TaskDeterminationService`'s existing private `GetUserFacilitiesNotAddedToOrInactiveAtAsync(userId, practitionerKey)` (the same method `GetAvailableFacilityListAsync` already calls for `AddPractitionerToFacility`). For the ExistingPractitioner branch, called as `GetUserFacilitiesNotAddedToOrInactiveAtAsync(listParameters.UserId, practitioner.Key)` using the `practitioner` object already fetched in that branch. If the returned list is non-empty, Npp is shown; if empty, it's hidden (treated as active/ineligible everywhere). **Interpretation documented per your instruction:** since no facility is selected yet at Practitioner-Action-radio load time, "existing practitioner inactive with the entity" is evaluated as "has at least one facility where the practitioner is not-added-to-or-inactive" — the same interpretation already embodied by this exact query for the existing `AddPractitionerToFacility` action. NewPractitioner mode is always eligible (no facility context exists yet, mirrors `AddPractitionerToFacility`'s NewPractitioner branch).
 
-BEFORE CODING (same turn — quote paths/methods):
-1. TaskDeterminationService.GetAvailableTaskListAsync — New and Existing non-recruitment branches; last item each.
-2. GetAvailableFacilityListAsync — AddPractitionerToFacility inactive/not-added filter; how userId is obtained.
-3. TaskController GetAvailableTaskList / AddTaskToPaf — client role flags vs HttpContext.User. Prefer server ClaimsPrincipal for MSP.
-4. PafProcessingStrategyContext.CreateAddTaskStrategy — switch/default for unknown / Npp. Quote it.
-5. AddTaskAddPractitionerToFacilityStrategy — what it does on add (reuse target for 132258).
-6. Whether GetAvailableTaskListAsync can call the same facility query as GetAvailableFacilityListAsync (userId + practitionerKey).
-7. PafTaskSelection Save/Next disable pattern.
-8. Any existing IsMspUser() extension.
+**7. Facility list handling for Npp**
+`GetAvailableFacilityListAsync`'s branch condition changed from `listParameters.Task == TaskType.AddPractitionerToFacility` to `listParameters.Task == TaskType.AddPractitionerToFacility || listParameters.Task == TaskType.Npp` — identical `GetUserFacilitiesAsync`/`GetUserFacilitiesNotAddedToOrInactiveAtAsync` filtering is reused for both. Also added `TaskType.Npp` to `TaskController.GetAvailableFacilityListAsync`'s allowed-task whitelist (previously would have 400'd).
 
-THEN IMPLEMENT (smallest reuse):
+**8. 132259 — extra server check or "already scalar"**
+**Already scalar — no additional check added.** `PafTaskSelection.razor`'s `RadioGroup`/`foreach` markup was **not touched**; `TaskType.Npp` simply becomes another entry in the same data-driven, single-bound-value radio group. `TaskSelectionEvent.PafType` (`TaskType?`) and `PafController.AddTaskToPafAsync([FromQuery] TaskType task, ...)` were **not changed** — both are structurally single-valued types that cannot carry multiple selections. Per your instruction, since a realistic multi-select path is structurally impossible, no dummy validator was invented.
 
-132256
-- Add TaskType.Npp as LAST TaskDto in MSP-applicable NewPractitioner and ExistingPractitioner branches (not PSG, not Recruitment).
-- TaskDto.Name MUST be exactly "ADD NPP to Facility". Do NOT use GetDescription() ("NPP PAF"). Do not change [Description] on the enum in this shot unless it is unused everywhere; prefer Name override.
-- Explicit MSP: IsInRole(nameof(HcoApplicationRole.Msp)) or existing IsMspUser(). Not "not PSG and not Recruitment".
-- If role cannot be retrieved (exception on AuthenticationState / null principal when MSP cannot be evaluated): do not add Npp; log warning/error with existing ILogger. Other actions unchanged.
-- Prefer server-side MSP check if TaskController/service has the user. If PSG/Recruitment flags are client-supplied, still do not trust a client-only "isMsp" without also checking the API user when possible.
+**9. Tests / build results**
+- No `Hca.Credentialing.Paf.Api.Tests` project exists — confirmed (not created, per instructions).
+- `dotnet build` on `Hca.Credentialing.Paf.Api`: **succeeded**, no warnings/errors.
+- `dotnet build` on `Hca.Credentialing.Client`: **succeeded**, no warnings/errors (no client files were changed).
+- `CrudEntityCredentialingOperationTests.GetMsoDueDate_ReturnsNull_ForAddPractitionerToFacilityWithTemporaryCredentialingTypeRtk`: **passed** (1/1), unaffected.
+- One incidental environment issue encountered and resolved: a stale, previously-running `Hca.Credentialing.Paf.Api` process (PID 34148) was locking its own build output DLLs, causing transient MSB3026 copy-retry build failures unrelated to this code change; it was a leftover local dev process, stopped, and the build then succeeded cleanly.
 
-132257
-- SHOW Npp when Mode is NewPractitioner (net new) AND MSP.
-- SHOW Npp for ExistingPractitioner only if existing facility-eligibility query indicates the practitioner can be added or is inactive at a user facility (reuse GetUserFacilitiesNotAddedToOrInactiveAtAsync or the same repository method). If that list is empty → HIDE (treat as active/ineligible).
-- Do not hide other actions with this rule.
-- Do not wait for a facility checkbox to show/hide the radio (AC is on Practitioner Action load). Using "has at least one eligible facility" is the allowed interpretation of "inactive with the entity" at load time because no facility is selected yet. Document that interpretation in RETURN.
-- GetAvailableFacilityListAsync for TaskType.Npp must use the SAME facility filter as AddPractitionerToFacility so the right-hand picker matches eligibility.
+**10. Remaining gaps (especially 132275)**
+- **Task-card lifecycle (132275, explicitly out of scope):** `PafFormComponent.HandleTaskSelectionEvent`'s existing-PAF branch and `PafProcessingStrategyContext.CreateUpdateTaskStrategy` only special-case `TaskType.AddPractitionerToFacility` (and a few others) for task-status refresh / update-strategy resolution. If a PAF with `TaskSelected == TaskType.Npp` is later re-opened for editing, `CreateUpdateTaskStrategy`'s `default` case will throw `ArgumentException("Task \"Npp\" does not have an update strategy")`. Not fixed here — genuinely belongs to task-card/edit-flow work (132275), not the "Add" step this ticket covers.
+- **Downstream PAF submission / CACTUS sync (out of scope, different project):** `Hca.Credentialing.Paf.Processor`'s `PafExtensions.GetCredentialingTypeRtk()` has no `TaskType.Npp` case and would throw `ArgumentOutOfRangeException` if a PAF with `TaskSelected == TaskType.Npp` is fully submitted. Confirmed via grep that `GetCredentialingTypeRtk()` is **never invoked** on the `AddTaskToPafAsync` path in `Hca.Credentialing.Paf.Api` (only in `Paf.Processor`, post-submission) — so this is not a STOP condition for 132255–132259 as scoped, but is a known follow-on blocker for whenever ADD NPP submission/CACTUS-sync work (132258's later phase / 132600) begins.
+- VA/PA, PSV, Delegate/FSQ suppression, CVI, auto-acceptance: not touched, per explicit scope boundary.
 
-132259
-- Keep the existing RadioGroup; do not switch to checkboxes.
-- Do not change AddTaskToPafAsync signature (already a single TaskType).
-- If you find a realistic multi-select path, reject + log with existing ILogger. If structurally impossible, do not invent a dummy validator; note that in RETURN.
-
-132258
-- Do NOT create a new determination service or a parallel GetAvailableTaskList engine.
-- On AddTaskToPafAsync(TaskType.Npp), map onto the existing AddPractitionerToFacility add-task workflow: prefer CreateAddTaskStrategy(Npp) delegating to AddTaskAddPractitionerToFacilityStrategy (or the factory calling that same strategy) so New vs Existing Mode already on the PAF continues to apply.
-- A new AddTaskNppStrategy class is allowed ONLY as a thin wrapper that reuses that existing strategy — that is the existing per-TaskType factory pattern, not a new engine.
-- If add-task fails: existing error UI, do not save a partial PAF, log. Follow how AddTaskToPafAsync already handles strategy exceptions; extend only if Npp would otherwise save half-state.
-- Do not implement NPP-specific task cards, VA/PA, Delegate/FSQ suppression (132275).
-- If GetCredentialingTypeRtk (or switch on TaskType during this add path) would throw for Npp, add Npp to the SAME case as AddPractitionerToFacility. Do not add new RTK string literals.
-
-DO NOT CHANGE:
-- RadioGroup/foreach structure in PafTaskSelection.razor (disable-Save binding OK).
-- AddTaskToPafAsync / TaskSelectionEvent / TaskDto shapes except TaskListParameters if that is how role flags already work.
-- Other TaskType list entries' order and rules.
-- PafQueueSearch.razor.cs.
-- Begin PAF / NPI search.
-- Do not invent authorization policies, AuditAction, or CACTUS RTKs.
-- Do not add a New badge.
-
-IMPLEMENTATION REQUIREMENTS:
-1. Reuse existing patterns.
-2. Preserve other PAF actions.
-3. No duplicate dialog.
-4. Existing DI, logging, validation.
-5. Do not invent business rules.
-6. Unrelated code unchanged.
-
-TESTS:
-- If Paf.Api (or matching) test project exists, add the smallest tests in existing style: MSP+net-new sees Npp last named "ADD NPP to Facility"; non-MSP/PSG/Recruitment do not; existing-active-with-no-eligible-facility hides Npp; other actions unchanged; AddTask Npp reuses add-facility path and does not throw in the factory.
-- If no such test project, say so; do not create a new test project.
-- Build. Do not break the AddPractitionerToFacility CVI due-date test named above.
-
-VALIDATION: build, relevant tests, inspect diff.
-
-RETURN:
-1. Files changed
-2. Classes/methods changed
-3. Quotes from CreateAddTaskStrategy and how Npp save is mapped
-4. How MSP is evaluated (client/server)
-5. Exact TaskDto.Name
-6. Eligibility query used for 132257 and the load-time interpretation
-7. Facility list handling for Npp
-8. 132259: any extra server check or "already scalar"
-9. Tests / build results
-10. Remaining gaps (especially 132275)
-11. Assumptions
+**11. Assumptions**
+- MSP-only visibility intentionally uses the raw `IsInRole(nameof(HcoApplicationRole.Msp))` idiom (not `IsMspUser()`, which also matches Psg) — consistent with your instruction and with 136883's precedent, on the assumption that MSP and PSG roles are not simultaneously assigned to the same user in practice (the same assumption 136883 already relies on).
+- "Existing practitioner inactive with the entity" is interpreted at Practitioner-Action-radio load time as "has at least one not-added-or-inactive facility," per your explicit permission to use that interpretation given no facility is selected yet.
+- `PractitionerSummary.Active` was **not** used anywhere in this implementation (per your explicit instruction not to guess its semantics).
