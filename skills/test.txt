@@ -1,9 +1,81 @@
-Revert the BaseApiClient.cs change from the last shot only.
+You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
 
-- Remove HttpStatusCode.BadRequest from the exemption list. Restore prior ErrorProcessor behavior for 400.
-- Do not change AddNewPractitionerForm, ConfirmationWizardModal catch, or PractitionerDuplicateCheckHelper skip.
-- If a 400 can still fire when email OR ssn is present, intercept only on DelegateClient / SearchExistingDelegatesAsync — not BaseApiClient.
-- Optional: Add New NPI Required="@context.IsPsgRole || IsNppRequest" in the non-ShowNoNpiOption branch only.
-- Do not edit Verify files.
-- Almost no comments.
-- dotnet build. RETURN: files changed, quote exemption list after revert, build result.
+ROLE:
+Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not ask for a follow-up inspect chat.
+
+TASK:
+Map existing Practitioner Search NPI vs Exception Search, and whether /Practitioner/Search/Npp can reuse it for NPP-only 131785 rules. Answer A–N with file/class/method quotes. Then STOP.
+
+KNOWN STARTING POINTS (confirm or correct — do not glob the whole repo):
+- Client/Pages/PractitionerSearch/PractitionerSearchPage.razor + .razor.cs — @page /Practitioner/Search and /Practitioner/Search/Npp; _isNppEntry; ForceNpiSearchMode to PractitionerSearchForm only.
+- PractitionerSearchForm.razor + .razor.cs — SearchMode.NpiSearch / ExceptionSearch; SwitchToExceptionSearch(); SwitchToNpiSearch(); IsExceptionButtonEnabled(); OnFinish().
+- PractitionerSearchTable — results, HasNoResults / "No Results Found", Start / Add New.
+- Search API (prior inspect): ICactusClient.Practitioners.SearchExistingPractitionersAsync → Cactus.Api PractitionerController → PractitionerRepository.SearchPractitionersAsync. SearchType.Recruitment set on exception OnFinish.
+- Audit (prior inspect): SearchPractitionersAsync audits only PractitionerSearchType.AffiliationVerification via GetAffVerifyPractitionerSearchAuditLog. Do NOT propose reusing that event for NPP. Do not invent AuditAction.
+- If a path is wrong, search only under Client/Pages/PractitionerSearch/ then Shared/Clients/Cactus and Cactus.Api Practitioner/license. Quote real files.
+
+TICKETS (context only — do not implement):
+131786 — From Practitioner Search, "No NPI Available? Search Without NPI" opens Exception Search. Fields: Reason (required), First Name (optional), Last Name (required), State License Number, State of License. Reason value: "Practitioner does not have NPI" only (do not invent more).
+131787 — Search disabled until valid. Reason required. Last Name min 2 alpha: "Minimum 2 alpha characters required." First if entered: 1 alpha; blank OK. License if entered: min 2 chars: "Minimum of two characters is required." State without license / license without state: pair messages. Last-name-only (Reason + Last, State/License blank) ENABLES Search. State+License also ENABLES Search.
+131788 — License search: normalize special characters; LIKE/partial; state restricts; existing no-results. Reuse HCP-to-VC. Do not add a second search stack.
+131790 — VC AND lookup on PROVIDERLICENSES_LICENSE_RTK: PROVIDERLICENSES_STATE AND PROVIDERLICENSES_LICENSENUMBER same row. No OR. Empty copy in ticket: "No Matching Practitioner Found". Continue exception workflow on no-match. AC10: log criteria + outcome with EXISTING HCP audit only.
+131791 — Valid Search executes exception search. Cancel returns to Practitioner Search. Exception values cleared.
+
+STOP AND REPORT (do not invent):
+- If NPP Exception Search cannot be isolated from Begin PAF / Recruitment / PSG without a new feature flag or auth policy.
+- If license lookup requires a new CACTUS client/table/RTK not already in code (report the gap; do not invent PROVIDERLICENSES_* wrappers).
+- If AC10 audit has no existing search-audit event that can be reused without a new AuditAction / schema (same STOP as 127104 AC7 — report only).
+- If last-name-only (131787 AC7) and "both State+License required for VC" (131790 AC9) are two APIs vs one — say which exist; do not pick a product rule.
+
+ANSWER (quote path + symbol + relevant lines):
+
+A. No-NPI link: exact label, where rendered, click handler. Does /Npp show it today? What does click do on NPP vs Begin PAF vs Recruitment/PSG? Quote ForceNpiSearchMode vs SwitchToExceptionSearch.
+
+B. Exception Search UI today: which fields exist (NPI, SSN, First, Last, Reason, State, License)? Is it the same form for MSP / NPP / Recruitment / PSG? Quote IsFlexiblePafUser / ShowNoNpiOption if they change the form. 131786 field gap list (present vs missing).
+
+C. Reason dropdown: exists? values? "Practitioner does not have NPI"? Where sourced (enum / hardcoded / API)?
+
+D. Validation today: IsExceptionButtonEnabled / other. Compare to 131787 (Reason, Last 2 alpha, First 1 alpha, License 2 chars, State↔License pair, Search disabled). Quote exact existing messages. Gap list.
+
+E. OnFinish / search execute: SearchMode, SearchType, parameters sent (name, NPI, SSN, state, license). Last-name-only path vs license path — one API or two?
+
+F. License / VC: any PROVIDERLICENSES_LICENSE_RTK / PROVIDERLICENSES_STATE / PROVIDERLICENSES_LICENSENUMBER / license normalize / LIKE in repo? Quote. If none, say none.
+
+G. State of License dropdown: existing lookup service / list? Quote. Do not invent an RTK.
+
+H. Cancel: SwitchToNpiSearch / history.back / other. Does it clear exception fields? What screen does NPP Cancel land on?
+
+I. Empty state: exact string(s) — "No Results Found" vs "No Matching Practitioner Found" vs other. Can user continue (Add New) on no-match?
+
+J. Audit: who logs practitioner search today? Which SearchType? Can NPP exception log criteria+outcome WITHOUT a new AuditAction? If no, say STOP for AC10 only.
+
+K. Isolation: smallest existing signal for NPP-only exception rules (_isNppEntry / ForceNpiSearchMode / URI / IsNppRequest). Is it on PractitionerSearchForm today? What would leak to Begin PAF or Recruitment/PSG if ExceptionSearch validators change globally?
+
+L. Tests that lock Begin PAF search, NPI search, Recruitment/PSG Exception Search, PractitionerRepository search, license lookup. Project + test names. If none, say none.
+
+M. Smallest reuse plan (no code): files that would change for 131786–131791 on NPP only. Files that must not change. Do not propose a second search framework.
+
+N. Tensions — report only, do not resolve:
+   1) 131787 last-name-only Search enabled vs 131790 missing State/License blocks VC lookup.
+   2) 131788 "No Results Found" vs 131790 "No Matching Practitioner Found".
+   Quote which strings/APIs already exist.
+
+DO NOT:
+- Implement or edit.
+- Open PafTaskSelection, task cards, CPC, CVI, Add New NPI N/A, 132600 sync.
+- Invent AuditAction, auth policy, feature flag, or a new CACTUS table wrapper.
+- Implement 127104 AC7.
+- Browse outside PractitionerSearch + Cactus practitioner/license search + existing audit helpers + tests that reference them.
+
+RETURN (use these headings only):
+1. Files/classes confirmed
+2. /Npp No-NPI click today (quote)
+3. A–N answers (short quotes)
+4. STOP conditions hit? (yes/no + which)
+5. Ready to implement 131786 screen? (yes/no + blocker)
+6. Ready to implement 131787 validation? (yes/no + blocker)
+7. Ready to implement 131788+131790 lookup? (yes/no + blocker)
+8. Ready to implement 131791 Search/Cancel? (yes/no + blocker)
+9. AC10 audit: existing event reusable? (yes/no + name, or STOP)
+10. Must-not-change file list
+11. Assumptions
