@@ -1,7 +1,426 @@
-You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
+## 1. Files/classes confirmed
 
-ROLE:
-Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not ask for a follow-up inspect chat.
+- `PractitionerSearchPage.razor`: routes `/Practitioner/Search` and `/Practitioner/Search/Npp`; passes `ForceNpiSearchMode` and `IsNppRequest`.
+- `PractitionerSearchPage.razor.cs`: `_isNppEntry`.
+- `PractitionerSearchForm.razor`: NPI/exception UI.
+- `PractitionerSearchForm.razor.cs`: `SearchMode`, switching, validation, `OnFinish`.
+- `PractitionerSearchTable.razor`: results, empty state, Add New/Start.
+- `PractitionerController.cs`: `SearchExistingPractitionersAsync`.
+- `PractitionerRepository.cs`: `SearchPractitionersAsync`.
+- `PractitionerSearchParameters.cs`: search contract and validation.
+- `AdvancedSearchPagedQueryBuilder.cs`.
+- `RecruitmentMatchSearchPagedQueryBuilder.cs`.
+- `CredentialingAuditLogger.cs`: existing search audit event.
+- `PractitionerLicenseRepository.cs`: unrelated practitioner-license work queues, not exception lookup.
+
+## 2. /Npp No-NPI click today (quote)
+
+The page uses:
+
+```razor
+<PractitionerSearchForm ... ForceNpiSearchMode="@_isNppEntry"/>
+```
+
+`_isNppEntry` is:
+
+```csharp
+private bool _isNppEntry => NavigationManager.ToBaseRelativePath(NavigationManager.Uri)
+    .Equals(PageUri.PractitionerNppSearchUri.TrimStart('/'), StringComparison.OrdinalIgnoreCase);
+```
+
+The link is rendered by `PractitionerSearchForm.razor`:
+
+```razor
+<a href="javascript:void(0)" @onclick="SwitchToExceptionSearch">
+    No NPI available? Search without NPI
+</a>
+```
+
+The handler is:
+
+```csharp
+private async void SwitchToExceptionSearch()
+{
+    _currentSearchMode = SearchMode.ExceptionSearch;
+    _model.PractitionerNpi = string.Empty;
+    _showNpiValidationError = false;
+    _npiValidationMessage = string.Empty;
+    await OnResetCallback.InvokeAsync();
+    StateHasChanged();
+}
+```
+
+`/Practitioner/Search/Npp` starts in NPI mode because `ForceNpiSearchMode` prevents the non-flexible user from switching to exception mode during initialization. The link is still rendered in NPI mode, so NPP can click it today.
+
+Begin PAF MSP defaults to exception mode:
+
+```csharp
+if (!_isRecruitmentUser && !_isPsgUser && !ForceNpiSearchMode)
+{
+    SwitchToExceptionSearch();
+}
+```
+
+Recruitment/PSG users start in NPI mode and can use the link. `SwitchToNpiSearch()` clears exception values for flexible users; MSP uses:
+
+```csharp
+await JsRuntime.InvokeVoidAsync("history.back");
+```
+
+## 3. A–N answers (short quotes)
+
+**A. No-NPI link**
+
+Present in the shared form. `/Npp` starts in NPI mode but the link is currently visible. The click only changes client-side mode and clears NPI; it does not create an NPP-specific search path.
+
+**B. Exception Search UI**
+
+For flexible users (`Recruitment`/`PSG`), the form renders:
+
+- Reason
+- SSN
+- First Name
+- Last Name
+- DOB
+- Practitioner Email
+
+Quote:
+
+```razor
+@if (IsFlexiblePafUser())
+{
+    <FormItem Required="true" Label="Reason">
+...
+    <FormItem Label="SSN">
+...
+    <FormItem Label="First Name">
+...
+    <FormItem Required="@IsFlexiblePafUser()" Label="Last Name">
+...
+    <FormItem Label="DOB">
+...
+    <FormItem Label="Practitioner Email">
+```
+
+For non-flexible MSP users, exception mode renders NPI, SSN, First Name, and Last Name. It does not render Reason, DOB, Email, State, or License.
+
+131786 gaps: State of License and State License Number are missing. The current NPP route reuses the MSP/non-flexible branch, not the flexible branch.
+
+**C. Reason dropdown**
+
+Exists only for flexible users. It is hardcoded:
+
+```csharp
+private ICollection<FieldOption> _exceptionReasons = new List<FieldOption>
+{
+    new FieldOption
+    {
+        Value = "Practitioner does not have NPI",
+        Text = "Practitioner does not have NPI"
+    }
+};
+```
+
+No enum, lookup service, or API supplies it.
+
+**D. Validation today**
+
+`IsExceptionButtonEnabled()` for flexible users requires Reason, Last Name, and one additional criterion:
+
+```csharp
+return !string.IsNullOrWhiteSpace(_selectedReason)
+    && !string.IsNullOrWhiteSpace(_model.PractitionerLastName)
+    && hasAtLeastOneAdditionalCriterion;
+```
+
+The additional criterion is First Name, DOB, SSN, or Email.
+
+Existing messages:
+
+```csharp
+"Must be a minimum of 2 alpha characters"
+"Must be a minimum of 1 alpha characters"
+"Please enter at least one additional search criteria along with Last Name."
+```
+
+Gaps against 131787:
+
+- Exact required Reason behavior is only present for flexible users.
+- Last Name is minimum 2 characters, but the message does not match the ticket wording and does not explicitly enforce alpha-only characters.
+- First Name is effectively optional for flexible users, but no meaningful 1-alpha validation exists because the current condition checks `Length < 1`.
+- No License validation exists.
+- No State/License pair validation exists.
+- Last-name-only is disabled for flexible users because an additional criterion is required.
+- MSP exception validation follows older mutual-exclusivity rules and is not NPP-specific.
+
+**E. `OnFinish` / search execution**
+
+NPI mode:
+
+```csharp
+searchParams.SearchType = PractitionerSearchType.Simple;
+searchParams.Npi = _npiInputMask?.RawValue ?? _npiInputMaskNonRecruitment?.RawValue;
+```
+
+Exception mode:
+
+```csharp
+searchParams.SearchType = PractitionerSearchType.Recruitment;
+searchParams.LastName = _model.PractitionerLastName;
+searchParams.FirstName = _model.PractitionerFirstName;
+searchParams.DateOfBirth = _model.DateOfBirth;
+searchParams.EmailAddress = _model.PractitionerEmail;
+searchParams.Ssn = ssnRawValue;
+```
+
+The client calls one endpoint:
+
+```csharp
+ICactusClient.Practitioners.SearchExistingPractitionersAsync
+```
+
+The controller calls:
+
+```csharp
+_practitionerRepo.SearchPractitionersAsync(searchParams, GetCurrentUser().GetUserId())
+```
+
+Current last-name-only exception search is not supported by the Recruitment contract:
+
+```csharp
+throw new ArgumentException(
+    "At least one additional search criteria is required along with Last Name");
+```
+
+There are not two current APIs. Both NPI and exception search use the same endpoint, with different `SearchType` values and query builders.
+
+**F. License / VC**
+
+No permitted repository surface contains:
+
+- `PROVIDERLICENSES_LICENSE_RTK`
+- `PROVIDERLICENSES_STATE`
+- `PROVIDERLICENSES_LICENSENUMBER`
+
+The existing `PractitionerLicenseRepository` supports expired, verified, and unverified license work queues, not practitioner exception lookup. No existing license normalization or VC lookup for this flow was found.
+
+**G. State of License dropdown**
+
+No State of License control, lookup, or state-list service exists in the current PractitionerSearch form. The current form has no state/license parameters in `PractitionerSearchParameters`.
+
+**H. Cancel**
+
+Exception-mode Cancel calls:
+
+```csharp
+private async void SwitchToNpiSearch()
+{
+    if (IsFlexiblePafUser())
+    {
+        _currentSearchMode = SearchMode.NpiSearch;
+        _selectedReason = string.Empty;
+        _model.PractitionerSsn = string.Empty;
+        _model.PractitionerFirstName = string.Empty;
+        _model.PractitionerLastName = string.Empty;
+        _model.PractitionerEmail = string.Empty;
+        _model.DateOfBirth = null;
+        await OnResetCallback.InvokeAsync();
+    }
+    else
+    {
+        await JsRuntime.InvokeVoidAsync("history.back");
+    }
+}
+```
+
+For NPP, the user is MSP/non-flexible, so Cancel uses browser history rather than clearing exception fields or explicitly returning to `/Practitioner/Search`.
+
+Results-table Cancel navigates MSP users to:
+
+```csharp
+PageUri.MspOpenPafQueueUri
+```
+
+**I. Empty state**
+
+The exact current strings are:
+
+```razor
+<Card Title=@(HasNoResults() ? "No Results Found" : "Practitioner Search Results")>
+```
+
+and:
+
+```razor
+<Text>There are no matching Practitioners found. Please search again if you expected results.</Text>
+```
+
+On no results, Add New remains available when `ShouldShowAddButton()` is true. There is no current `"No Matching Practitioner Found"` string.
+
+**J. Audit**
+
+`PractitionerRepository.SearchPractitionersAsync` audits only:
+
+```csharp
+if (searchParameters.SearchType == PractitionerSearchType.AffiliationVerification)
+{
+    ...
+    await _serviceBusService.QueueAuditLogEntry(
+        _auditLogger.GetAffVerifyPractitionerSearchAuditLog(...));
+}
+```
+
+The existing event is:
+
+```csharp
+GetAffVerifyPractitionerSearchAuditLog(...)
+```
+
+with:
+
+```csharp
+Action = AuditAction.AffVerifyPractitionerSearchCriteria
+```
+
+This is affiliation-verification-specific and is not reusable for NPP exception audit without misrepresenting the event. **STOP condition hit for AC10.**
+
+**K. Isolation**
+
+Existing signals:
+
+```csharp
+private bool _isNppEntry
+```
+
+and:
+
+```razor
+ForceNpiSearchMode="@_isNppEntry"
+```
+
+`_isNppEntry` is not currently passed to `PractitionerSearchForm` as an NPP-specific parameter; it is only used to force initial NPI mode. The form knows only `ForceNpiSearchMode`, `_isRecruitmentUser`, and `_isPsgUser`.
+
+Changing shared exception validation would affect Begin PAF MSP because both routes use the same non-flexible form branch. Recruitment/PSG use different flexible validation, but global changes could affect them too.
+
+Isolation is possible using the existing route signal without a new auth policy or feature flag, but the current form does not yet receive an explicit NPP identity signal.
+
+**L. Tests**
+
+No dedicated Practitioner Search, `PractitionerSearchForm`, `PractitionerRepository.SearchPractitionersAsync`, or practitioner-license lookup tests were found in the targeted test search.
+
+The repository contains unrelated practitioner operation tests, but no tests locking:
+
+- Begin PAF search
+- NPI search
+- Recruitment/PSG exception search
+- PractitionerRepository search behavior
+- Exception license lookup
+
+**M. Smallest reuse plan, no code**
+
+Likely existing surfaces for 131786–131791:
+
+- `PractitionerSearchPage.razor` / `.razor.cs`: pass the existing NPP route signal to the form if NPP-specific behavior is required.
+- `PractitionerSearchForm.razor` / `.razor.cs`: NPP-only fields, validation, mode behavior, and request mapping.
+- `PractitionerSearchTable.razor` / `.razor.cs`: reuse existing result, empty-state, Start, and Add New behavior.
+- `PractitionerSearchParameters.cs`: add state/license criteria only if the existing API contract is extended.
+- `PractitionerController.cs` / `PractitionerRepository.cs`: continue using the existing practitioner search endpoint if the backend can support the criteria.
+- Existing practitioner query-builder surface: extend the appropriate existing builder rather than create a second search stack.
+
+Files that must not change for this scope: Verify forms, PAF task/CPC/CVI surfaces, Add New NPI N/A flow, 132600 sync, and unrelated license work-queue APIs.
+
+**N. Tensions**
+
+1. Ticket tension: 131787 allows Last Name only, while 131790 describes State + License as required for VC lookup. Current code has neither license criteria nor a VC lookup path. Current Recruitment validation rejects last-name-only:
+
+```csharp
+"At least one additional search criteria is required along with Last Name"
+```
+
+Current Advanced SQL supports First Name + Last Name, but not license criteria.
+
+2. Empty-state tension: current UI uses:
+
+```text
+No Results Found
+There are no matching Practitioners found. Please search again if you expected results.
+```
+
+131790 requests:
+
+```text
+No Matching Practitioner Found
+```
+
+No current implementation uses the requested 131790 string.
+
+## 4. STOP conditions hit? (yes/no + which)
+
+**Yes.**
+
+- **131790 license lookup:** no existing `PROVIDERLICENSES_*` lookup or wrapper was found in the permitted repository surfaces.
+- **AC10 audit:** only the affiliation-verification audit event exists; reusing it for NPP would be incorrect and would not satisfy the requested NPP search audit semantics.
+- **NPP isolation:** not blocked by a new feature flag or auth policy, but the existing `_isNppEntry` signal is not currently passed into `PractitionerSearchForm`; shared validator changes would leak into Begin PAF.
+
+## 5. Ready to implement 131786 screen? (yes/no + blocker)
+
+**No.**
+
+The existing form can be reused, but NPP-specific State of License and State License Number fields are absent. Their source/contract behavior must be defined without inventing a CACTUS lookup contract.
+
+## 6. Ready to implement 131787 validation? (yes/no + blocker)
+
+**No.**
+
+The NPP form is not isolated from Begin PAF MSP validation. Also, the last-name-only rule conflicts with the current shared Recruitment validation and with the separate 131790 VC requirement.
+
+## 7. Ready to implement 131788+131790 lookup? (yes/no + blocker)
+
+**No.**
+
+Blocked by the absence of an existing permitted license/VC lookup using `PROVIDERLICENSES_LICENSE_RTK`, `PROVIDERLICENSES_STATE`, and `PROVIDERLICENSES_LICENSENUMBER`.
+
+## 8. Ready to implement 131791 Search/Cancel? (yes/no + blocker)
+
+**No.**
+
+The shared endpoint and existing mode transitions are reusable, but NPP-specific SearchType/criteria mapping and Cancel behavior depend on resolving the field and validation rules first.
+
+## 9. AC10 audit: existing event reusable? (yes/no + name, or STOP)
+
+**No. STOP.**
+
+The only relevant existing event is:
+
+```csharp
+GetAffVerifyPractitionerSearchAuditLog(...)
+Action = AuditAction.AffVerifyPractitionerSearchCriteria
+```
+
+It is specifically for affiliation verification and should not be reused for NPP exception search.
+
+## 10. Must-not-change file list
+
+- `VerifyExistingPractitionerForm.razor`
+- `VerifyExistingPractitionerForm.razor.cs`
+- `PractitionerSearchTable` result/Start behavior unless required by confirmed NPP acceptance criteria
+- PAF task-selection and task-card files
+- CPC/CVI files
+- Add New NPI N/A flow
+- Recruitment PSG No-NPI behavior
+- `Paf.Api`
+- `PafTaskSelection`
+- `TaskDeterminationService`
+- 132600 synchronization surfaces
+- Existing affiliation-verification audit behavior
+- Existing `PractitionerLicenseRepository` work-queue behavior
+
+## 11. Assumptions
+
+- Repository inspection was read-only; no files were edited and no build or formatter was run.
+- “Current code” means the files present in this workspace at inspection time.
+- The requested 131786–131791 ticket rules are treated as requirements context, not as evidence that corresponding repository APIs already exist.
+- The existing `SearchExistingPractitionersAsync` endpoint is the only current practitioner search endpoint confirmed for this flow.dit files, create files, or run formatters. Do not start implementation. Do not ask for a follow-up inspect chat.
 
 TASK:
 Map existing Practitioner Search NPI vs Exception Search, and whether /Practitioner/Search/Npp can reuse it for NPP-only 131785 rules. Answer A–N with file/class/method quotes. Then STOP.
