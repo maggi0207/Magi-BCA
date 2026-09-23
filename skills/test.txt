@@ -1,86 +1,350 @@
-You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
+## 1. Files/classes confirmed
 
-ROLE:
-Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not ask for a follow-up inspect chat.
+- `PafFormComponent.razor.cs`
+- `AddPractitionerToFacilitiesTask.razor`
+- `AddPractitionerToFacilitiesTask.razor.cs`
+- `AddPractitionerToFacilitiesTask.cs`
+- `RecruitmentPsvTask.razor`
+- `RecruitmentPsvTask.razor.cs`
+- `RecruitmentStateLicenseVerificationForm.razor`
+- `StateLicenseModal.razor.cs`
+- `RecruitmentPsvTask.cs`
+- `PractitionerLicenseClient.cs`
+- `LicenseClient.cs`
+- `PractitionerImagesClient.cs`
+- `PafFile.razor.cs`
+- `PafProcessingStrategyContext.cs`
+- `UpdateTaskAddPractitionerToFacilityStrategy.cs`
+- `SubmitPafStrategy.cs`
 
-TASK:
-Map existing PAF task-card Work targets that ADD NPP (TaskType.Npp) could reuse: VA/PA questions, state license capture, license recall, PSV upload, duplicate license, routing. Answer A–N with file/class/method quotes. Then STOP.
+## 2. Npp Work target today (none / which file)
 
-KNOWN STARTING POINTS (confirm or correct — do not glob the whole repo):
-- PafFormComponent.HandleRequestEditAsync — NO TaskType.Npp branch (132260 inspect). Quote the switch and default.
-- Client/Pages/Paf/Components/Tasks/AddPractitionerToFacilities/ (or current) — facility / FSQ form opened by AddPractitionerToFacility
-- Client/Pages/Paf/Components/Tasks/ — other Work targets
-- Shared/Data/Model/Paf/Form/AddPractitionerToFacilitiesTask and any license/PSV task models
-- Shared/Clients/Cactus/PractitionerLicenseClient or LicenseClient
-- CreateAddTaskStrategy(Npp) => AddTaskAddPractitionerToFacilityStrategy
-- CreateUpdateTaskStrategy — no Npp; default throws
-- PafExtensions.GetCredentialingTypeRtk() — no Npp; do NOT invent an RTK
-- STATUS_RTK / PROVIDERLICENSES_LICENSUREFIELD_RTK — report only if already in code. Do not invent values.
-- If a path is wrong, search only under Client/Pages/Paf/Components/Tasks/ then Shared license/image clients and Paf.Api update strategies. Quote real files.
+**None.**
 
-TICKETS (context only — do not implement):
-132354 — Card title ADD NPP to Facility; disclaimer; Practitioner Type = NPP only, preselected, required.
-132355 — VA question: Is the practitioner an active duty military member or practicing at the VA? Yes/No.
-132372 — If VA=YES: Is the Practitioner a PA? Required. Word also says PA=YES → auto-accept + CVI + CPC — REPORT only; do not pick a side.
-132365 — VA=YES PA=YES: hide license; Sanctions PSV + NPI PSV; CPC.
-132366 / 132367 — license + License/Sanctions/NPI PSV; Effective Date >= today.
-132368 / 132369 — recall existing licenses; Add New option; inactive/expired → CPC message.
-132374 — duplicate State + License Number block.
-132527 — State, Effective Date, License Number max 20, Status STATUS_RTK only, Expiration, Field of Licensure. Named STATUS_RTK: Active DRFB0IQ54S, Temporary Permit D2H11CCT3V, Active Military D3UK1E0UF6, Active-Compact M5890K2GGY.
-132529 — entity states CA LA NV KY TX; missing state license blocks submit.
-132530 — PSV DOC/DOCX/PDF/JPG/TIFF; Cactus image attrs if already in code.
-132531 — routing table (PA=YES / inactive / expired → CPC). Graph 132351 is not this ID.
+`PafFormComponent.HandleRequestEditAsync()` has no `TaskType.Npp` branch. `TaskType.AddPractitionerToFacility` opens:
 
-STOP AND REPORT (do not invent):
-- If NPP Work cannot reuse an existing Tasks/* form without a new page AND no existing license/PSV/VA pattern exists — say so; do not invent a card framework.
-- If STATUS_RTK / FOL RTKs in the ticket are not in code — list ticket values as gap; do not add them.
-- If auto-accept/CVI for PA=YES has no existing strategy — STOP for 132372 extra path only (same as 132591).
-- If routing to CPC requires a new status/RTK — STOP for 132531; do not invent.
+```csharp
+else if (taskType == TaskType.AddPractitionerToFacility)
+    SetViewState(PractitionerPafViewState.FacilitySpecificQuestions);
+```
 
-ANSWER (quote path + symbol + relevant lines):
+The method ends after the existing `Perf` branch; there is no NPP fallback or default action. Therefore, NPP Work does nothing today.
 
-A. HandleRequestEditAsync switch. What does AddPractitionerToFacility Work open? What would Npp do today (nothing)?
+## 3. A–N answers (short quotes)
 
-B. Existing facility / FSQ form files. Is there any NPP / VA / PA UI already?
+**A. Work routing**
 
-C. Existing state-license capture on any PAF task (fields, STATUS lookup, FOL). Compare to 132527. Quote RTKs already in code vs missing.
+Current switch:
 
-D. Existing practitioner license recall / select / add-new. Duplicate State+Number check?
+```csharp
+else if (taskType == TaskType.AddPractitionerToFacility)
+    SetViewState(PractitionerPafViewState.FacilitySpecificQuestions);
+```
 
-E. Existing PSV / image upload (types, Cactus ParentFile / Type / Publish On Web). Reuse for License/Sanctions/NPI PSV?
+There is no:
 
-F. Existing VA or PA questions anywhere in PAF?
+```csharp
+TaskType.Npp
+```
 
-G. CreateUpdateTaskStrategy default throw — confirm. Any Npp update path?
+branch. NPP Work currently has no target.
 
-H. Routing to CPC today (PafStatus / strategy). Can 132531 reuse it without a new RTK?
+**B. Existing facility / FSQ form**
 
-I. Auto-accept / CVI creation — existing entry points? Do not propose implementing 132372 extra path.
+The existing facility target is:
 
-J. Tests for license task, PSV upload, VA/PA, CPC route. If none, say none.
+```razor
+<TaskHeader Title="Facility Specific Questions" ... />
+<CorporateQuestions ... />
+<PerFacilityQuestions ... />
+```
 
-K. Isolation: Begin PAF Add Practitioner to Facility / FSQ must not change. Smallest Npp-only Work target (new Tasks/Npp folder vs extend existing form behind TaskType.Npp).
+The model is `AddPractitionerToFacilitiesTask.cs`, with `CorporateQuestionValues` and `FacilityQuestionValues`.
 
-L. Smallest reuse plan (no code) for 132354–132531. Files that would change. Files that must not change.
+No NPP, VA, or PA-specific UI was found in the allowed PAF task surfaces.
 
-M. Confirm you did not implement and did not invent RTKs.
+**C. Existing state-license capture**
 
-N. Ready per child? 132354 chrome, 132355/372 VA-PA, 132368–374 license select, 132527 fields, 132530 upload, 132531 route, 132365–367 paths. Yes/no + blocker each.
+Recruitment PSV has an existing reusable state-license UI:
 
-DO NOT:
-- Implement or edit.
-- Open 132260 hide/requiredness implement, 131785, 132600 sync internals, new GetCredentialingTypeRtk case.
-- Invent AuditAction, auth policy, STATUS_RTK, FOL RTK, or CVI.
+```razor
+<Card Title="State License Verification">
+    <Button ... OnClick="ShowStateLicenseModal">Add License</Button>
+```
 
-RETURN (use these headings only):
-1. Files/classes confirmed
-2. Npp Work target today (none / which file)
-3. A–N answers (short quotes)
-4. STOP conditions hit? (yes/no + which)
-5. Ready to implement 132354 card body? (yes/no + blocker)
-6. Ready to implement VA/PA (132355/372)? (yes/no + blocker)
-7. Ready to implement license + PSV (132527/530/368–374)? (yes/no + blocker)
-8. Ready to implement routing 132531? (yes/no + blocker)
-9. Reuse vs new Tasks/Npp form (one sentence)
-10. Must-not-change file list
-11. Assumptions
+The modal has:
+
+```razor
+<FieldLabel Required="true" For="stateLicense">State</FieldLabel>
+<InputHca @bind-Value="@context.LicenseNumber" />
+```
+
+The model contains only:
+
+```csharp
+public class RecruitmentStateLicenseVerificationDetail
+{
+    public string LicenseState { get; set; }
+    public string LicenseNumber { get; set; }
+}
+```
+
+The modal validation has:
+
+```csharp
+[Required(ErrorMessage = "State is required")]
+public string LicenseState { get; set; }
+
+[MaxLength(20, ErrorMessage = "License number can not exceed 20 characters")]
+public string LicenseNumber { get; set; }
+```
+
+Missing versus 132527:
+
+- Effective Date: missing
+- Status lookup: missing
+- Expiration: missing
+- Field of Licensure: missing
+- NPP-specific license task model: missing
+
+The repository contains generic database `STATUS_RTK` columns, including `PROVIDERLICENSES.STATUS_RTK` in license queries, but the ticket values are not defined in the PAF UI/model. `PROVIDERLICENSES_LICENSUREFIELD_RTK` was not found.
+
+Ticket values remain a gap and were not invented:
+
+```text
+DRFB0IQ54S
+D2H11CCT3V
+D3UK1E0UF6
+M5890K2GGY
+```
+
+**D. License recall, add-new, duplicate checking**
+
+Existing Recruitment PSV supports add, edit, and remove in memory:
+
+```csharp
+_stateLicenses.Add(eventArgs.StateLicense);
+SortLicenses(_stateLicenses);
+```
+
+and:
+
+```csharp
+private void EditStateLicense(...)
+private void RemoveStateLicense(...)
+```
+
+No existing PAF implementation was found for:
+
+- Recall of existing Cactus licenses
+- Existing-license selection
+- “Add New” alongside recalled licenses
+- Inactive/expired license handling
+- Duplicate State + License Number validation
+
+`PractitionerLicenseClient` only exposes work-queue searches:
+
+```csharp
+SearchExpiredLicensesAsync(...)
+SearchUnverifiedInstitutionsAsync(...)
+SearchUnverifiedPractitionersAsync(...)
+SearchVerifiedAsync(...)
+```
+
+It does not expose a practitioner-license recall/select API.
+
+**E. PSV/image upload**
+
+The reusable upload component is `PafFile.razor.cs`.
+
+It accepts:
+
+```csharp
+".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".tif", ".tiff"
+```
+
+It sends:
+
+```csharp
+FormType = FormType!.Value,
+TaskId = TaskId!.Value,
+PractitionerActionFormId = _currentPafId!.Value
+```
+
+Recruitment uses:
+
+```razor
+<PafFile
+    FormType="PractitionerActionFormAttachmentType.RecruitmentCv"
+    TaskId="@StateContainer.PafState.RecruitmentPsvTask.TaskId" />
+```
+
+Existing attachment types include `RecruitmentCv`, but no license, sanctions, or NPI PSV attachment types were found.
+
+The Cactus image client exposes read operations:
+
+```csharp
+GetImageContentsAsync(...)
+GetImagesByImageTypeAsync(...)
+GetImageCountsByParentFileKAsync(...)
+```
+
+`PractitionerImage` already has:
+
+```csharp
+public string ParentFileK { get; set; }
+public string Type { get; set; }
+public string TypeRtk { get; set; }
+public bool Active { get; set; }
+```
+
+No PAF NPP upload mapping for Cactus image `ParentFile`, image type, or “Publish On Web” was found.
+
+**F. VA / PA questions**
+
+No existing PAF task model or form was found for:
+
+- Active duty military member
+- Practicing at the VA
+- Practitioner is a PA
+
+The existing facility-question model contains fields such as:
+
+```csharp
+public bool? IsTreatingMilitary { get; set; }
+```
+
+but this is a facility-question value, not the requested NPP VA/PA workflow. No existing PA routing or NPP-specific VA question was found.
+
+**G. NPP update strategy**
+
+`CreateUpdateTaskStrategy()` has no NPP mapping:
+
+```csharp
+TaskType.Recruitment => new UpdateTaskRecruitmentPsvStrategy(...),
+TaskType.Mss18FacilitySpecificQuestions => new UpdateTaskMss18FacilitySpecificQuestionsStrategy(...),
+_ => throw new ArgumentException($"Task \"{task}\" does not have an update strategy"),
+```
+
+There is no `TaskType.Npp` update path.
+
+**H. Existing CPC routing**
+
+Existing MSP submission routes task failures back to MSP:
+
+```csharp
+if (pafProcessingResult.Status == PafProcessingResultStatus.Failure)
+{
+    FormData.SetStatus(PafStatus.ReturnedToMsp, "One or more tasks were invalid");
+}
+```
+
+Successful MSP submission uses:
+
+```csharp
+FormData.SetStatus(
+    FormData.Status == PafStatus.SavedByMsp
+        ? PafStatus.SubmittedByMsp
+        : PafStatus.ResubmittedByMsp,
+    null);
+```
+
+CPC review supports existing statuses:
+
+```csharp
+FormData.SetStatus(PafStatus.RejectedToMsp, detail);
+FormData.SetStatus(PafStatus.ReturnedToMsp, detail);
+FormData.SetStatus(PafStatus.AcceptedByCpc, detail);
+```
+
+No NPP-specific PA/inactive/expired routing rule exists. Existing statuses can represent CPC return paths, but the requested NPP decision logic is not present. No new RTK was invented.
+
+**I. Auto-accept / CVI entry points**
+
+Existing submission enters:
+
+```csharp
+await ProcessSubmitForMspAsync(pafProcessingResult);
+```
+
+and later queues processing:
+
+```csharp
+await _pafProcessingService.QueuePafForProcessingAsync(FormData.FormId);
+```
+
+The repository also has existing CVI-related processing paths in `SubmitPafStrategy`, but no confirmed NPP PA=YES auto-accept/CVI strategy. Per instruction, that extra path is a STOP condition rather than an implementation proposal.
+
+**J. Tests**
+
+No dedicated tests were found for:
+
+- NPP license task
+- License recall/select/add-new
+- Duplicate State + License Number
+- VA/PA questions
+- PSV upload in this workflow
+- NPP CPC routing
+
+## 4. STOP conditions hit? (yes/no + which)
+
+**Yes.**
+
+- No existing NPP/VA/PA task form exists.
+- Existing state-license UI is Recruitment PSV-only and lacks the required NPP fields.
+- No practitioner-license recall/select API exists in the inspected client surface.
+- No duplicate State + License Number validation exists.
+- No NPP-specific PSV attachment mapping exists.
+- No NPP PA=YES auto-accept/CVI strategy exists.
+- No NPP-specific inactive/expired routing rule exists.
+- `STATUS_RTK` appears as a generic Cactus database field, but the requested NPP status values and FOL RTK are not defined in the PAF implementation.
+
+## 5. Ready to implement 132354 card body? (yes/no + blocker)
+
+**Yes, for the card shell only.**
+
+Existing PAF card chrome and task components can host the title/disclaimer. The actual NPP Work target remains missing.
+
+## 6. Ready to implement VA/PA (132355/372)? (yes/no + blocker)
+
+**No.**
+
+No existing NPP VA/PA form pattern exists. 132372’s PA=YES auto-accept/CVI behavior has no confirmed existing strategy.
+
+## 7. Ready to implement license + PSV (132527/530/368–374)? (no + blocker)
+
+**No.**
+
+Recruitment PSV provides only a partial state/license form and generic file upload. Missing are license recall, add-new selection, status/effective/expiration/FOL fields, duplicate validation, Cactus license persistence, NPP PSV mappings, and existing-license routing.
+
+## 8. Ready to implement routing 132531? (no + blocker)
+
+**No.**
+
+Existing PAF/CPC statuses can represent return/submission outcomes, but no NPP-specific PA/inactive/expired decision path exists. The requested routing behavior cannot be confirmed without a new NPP strategy; no new status or RTK should be invented.
+
+## 9. Reuse vs new Tasks/Npp form (one sentence)
+
+Reuse the existing `PafTaskDisplay`, `PafFile`, state dropdown, and partial Recruitment PSV license controls where applicable, but use a dedicated `Tasks/Npp` form/model because the existing facility and Recruitment PSV forms do not represent the NPP VA/PA, license, recall, duplicate, and routing requirements.
+
+## 10. Must-not-change file list
+
+- Existing `AddPractitionerToFacility` facility/FSQ form and strategy behavior
+- Existing `CreateAddTaskStrategy(Npp)` mapping unless explicitly revisited with confirmed requirements
+- Existing `UpdateTaskAddPractitionerToFacilityStrategy`
+- Existing Recruitment PSV behavior
+- `GetCredentialingTypeRtk()` existing cases
+- Existing Cactus image/license client contracts
+- Existing PAF/CPC status meanings
+- Practitioner Search and 131785 surfaces
+- 132600 synchronization internals
+- CVI, CPC, and unrelated PAF task internals
+- Existing RTK values and authorization policies
+
+## 11. Assumptions
+
+- Inspection was read-only. No files were edited, created, formatted, built, or executed.
+- `STATUS_RTK` exists as a generic Cactus database column in existing processor/repository code, but the named NPP values are not implemented in the inspected PAF task model/UI.
+- `PROVIDERLICENSES_LICENSUREFIELD_RTK` was not found.
+- The existing Recruitment PSV state-license form is the closest reusable UI pattern, but it is not an NPP license workflow.
+- The requested PA=YES auto-accept/CVI behavior remains unconfirmed and was not proposed.
