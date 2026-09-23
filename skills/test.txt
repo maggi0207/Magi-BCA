@@ -1,407 +1,86 @@
-## 1. Files/classes confirmed
-
-- `PafFormComponent.razor`
-- `PafFormComponent.razor.cs`
-- `PafTaskDisplay.razor`
-- `PafTaskDisplay.razor.cs`
-- `PafReviewForm.razor`
-- `PafReviewForm.razor.cs`
-- `ModelExtensions.cs`
-- `TaskType.cs`
-- `TaskStatus.cs`
-- `TaskDeterminationService.cs`
-- `TaskController.cs`
-- `PafProcessingStrategyContext.cs`
-- `AddTaskAddPractitionerToFacilityStrategy.cs`
-- `PafExtensions.cs`
-
-No task-specific PAF test project or matching tests were found.
-
-## 2. TaskType.Npp Description + is a Tasks card already rendered?
-
-`TaskType.Npp` exists:
-
-```csharp
-[Description("NPP PAF")]
-Npp,
-```
-
-It is available from server task selection, but it is not rendered as a PAF Tasks card. `PafFormComponent.razor` has cards for demographic, delegate, addresses, specialties, facility questions, PSV, MSS-18, PERF, and recruitment. There is no `TaskType.Npp` card branch.
-
-The server currently maps NPP task creation to the existing facility strategy:
-
-```csharp
-TaskType.Npp => new AddTaskAddPractitionerToFacilityStrategy(this),
-```
-
-## 3. A–N answers (short quotes)
-
-**A. Task list and Save Facilities path**
-
-`PafTaskSelection.LoadAvailableTasks()` uses practitioner status:
-
-```csharp
-var isNewPractitioner = StateContainer.PafState.Practitioner is {IsNew: true};
-
-Mode = isNewPractitioner
-    ? TaskAllowedListMode.NewPractitioner
-    : TaskAllowedListMode.ExistingPractitioner
-```
-
-The server adds NPP for MSP users:
-
-```csharp
-if (listParameters.IsMspUserMode)
-{
-    list.Add(new()
-    {
-        Name = "ADD NPP to Facility",
-        Type = TaskType.Npp
-    });
-}
-```
-
-After facility selection, `PafFormComponent` calls:
+You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
 
-```csharp
-result = await PafClient.AddTaskToPafAsync(eventArgs.PafType.Value, PafData);
-```
-
-The resulting PAF task cards are not dynamically enumerated; they are hardcoded component blocks in `PafFormComponent.razor`.
-
-**B. Existing card chrome**
+ROLE:
+Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not ask for a follow-up inspect chat.
 
-`PafTaskDisplay.razor` renders the image, title, description, and badge:
+TASK:
+Map existing PAF task-card Work targets that ADD NPP (TaskType.Npp) could reuse: VA/PA questions, state license capture, license recall, PSV upload, duplicate license, routing. Answer A–N with file/class/method quotes. Then STOP.
 
-```razor
-@if (Task?.Status == TaskStatus.Invalid)
-{
-    <Tag Color="red">Invalid</Tag>
-}
-else if (Task?.Status == TaskStatus.Complete)
-{
-    <Tag Color="green">Complete</Tag>
-}
-else if (Task?.IsRequired ?? false)
-{
-    <Tag Color="volcano">Required</Tag>
-}
-else
-{
-    <Tag>Optional</Tag>
-}
-```
+KNOWN STARTING POINTS (confirm or correct — do not glob the whole repo):
+- PafFormComponent.HandleRequestEditAsync — NO TaskType.Npp branch (132260 inspect). Quote the switch and default.
+- Client/Pages/Paf/Components/Tasks/AddPractitionerToFacilities/ (or current) — facility / FSQ form opened by AddPractitionerToFacility
+- Client/Pages/Paf/Components/Tasks/ — other Work targets
+- Shared/Data/Model/Paf/Form/AddPractitionerToFacilitiesTask and any license/PSV task models
+- Shared/Clients/Cactus/PractitionerLicenseClient or LicenseClient
+- CreateAddTaskStrategy(Npp) => AddTaskAddPractitionerToFacilityStrategy
+- CreateUpdateTaskStrategy — no Npp; default throws
+- PafExtensions.GetCredentialingTypeRtk() — no Npp; do NOT invent an RTK
+- STATUS_RTK / PROVIDERLICENSES_LICENSUREFIELD_RTK — report only if already in code. Do not invent values.
+- If a path is wrong, search only under Client/Pages/Paf/Components/Tasks/ then Shared license/image clients and Paf.Api update strategies. Quote real files.
 
-The Work button is supplied by each card in `PafFormComponent.razor`:
+TICKETS (context only — do not implement):
+132354 — Card title ADD NPP to Facility; disclaimer; Practitioner Type = NPP only, preselected, required.
+132355 — VA question: Is the practitioner an active duty military member or practicing at the VA? Yes/No.
+132372 — If VA=YES: Is the Practitioner a PA? Required. Word also says PA=YES → auto-accept + CVI + CPC — REPORT only; do not pick a side.
+132365 — VA=YES PA=YES: hide license; Sanctions PSV + NPI PSV; CPC.
+132366 / 132367 — license + License/Sanctions/NPI PSV; Effective Date >= today.
+132368 / 132369 — recall existing licenses; Add New option; inactive/expired → CPC message.
+132374 — duplicate State + License Number block.
+132527 — State, Effective Date, License Number max 20, Status STATUS_RTK only, Expiration, Field of Licensure. Named STATUS_RTK: Active DRFB0IQ54S, Temporary Permit D2H11CCT3V, Active Military D3UK1E0UF6, Active-Compact M5890K2GGY.
+132529 — entity states CA LA NV KY TX; missing state license blocks submit.
+132530 — PSV DOC/DOCX/PDF/JPG/TIFF; Cactus image attrs if already in code.
+132531 — routing table (PA=YES / inactive / expired → CPC). Graph 132351 is not this ID.
 
-```razor
-<Button Type="@ButtonType.Primary" Ghost
-        OnClick="() => HandleRequestEditAsync(EditSource.Edit, TaskType.ManagePersonalInfo)">
-    Work
-</Button>
-```
+STOP AND REPORT (do not invent):
+- If NPP Work cannot reuse an existing Tasks/* form without a new page AND no existing license/PSV/VA pattern exists — say so; do not invent a card framework.
+- If STATUS_RTK / FOL RTKs in the ticket are not in code — list ticket values as gap; do not add them.
+- If auto-accept/CVI for PA=YES has no existing strategy — STOP for 132372 extra path only (same as 132591).
+- If routing to CPC requires a new status/RTK — STOP for 132531; do not invent.
 
-The reuse target for 132261 is this card plus a new NPP title/description mapping.
+ANSWER (quote path + symbol + relevant lines):
 
-**C. Work navigation**
+A. HandleRequestEditAsync switch. What does AddPractitionerToFacility Work open? What would Npp do today (nothing)?
 
-`PafFormComponent.HandleRequestEditAsync()` maps:
+B. Existing facility / FSQ form files. Is there any NPP / VA / PA UI already?
 
-```csharp
-TaskType.ManagePersonalInfo => ManageDemographic
-TaskType.ManageDelegate => ManageDelegate
-TaskType.ManageAddresses => ManageAddresses
-TaskType.ManageSpecialities => ManageSpecialties
-TaskType.AddPractitionerToFacility => FacilitySpecificQuestions
-TaskType.Mss18FacilitySpecificQuestions => Mss18PerFacilitySpecificQuestions
-TaskType.OffCyclePsv => OffCyclePsv
-TaskType.OffCycleRrfc => OffCycleRrfc
-TaskType.Perf => Perf
-TaskType.Recruitment => RecruitmentPsv
-```
+C. Existing state-license capture on any PAF task (fields, STATUS lookup, FOL). Compare to 132527. Quote RTKs already in code vs missing.
 
-There is no `TaskType.Npp` branch. NPP Work would currently have no client target and is a 132263 gap.
+D. Existing practitioner license recall / select / add-new. Duplicate State+Number check?
 
-The server also has no NPP update strategy:
+E. Existing PSV / image upload (types, Cactus ParentFile / Type / Publish On Web). Reuse for License/Sanctions/NPI PSV?
 
-```csharp
-TaskType.Recruitment => new UpdateTaskRecruitmentPsvStrategy(...),
-_ => throw new ArgumentException($"Task \"{task}\" does not have an update strategy")
-```
+F. Existing VA or PA questions anywhere in PAF?
 
-**D. Required versus optional**
+G. CreateUpdateTaskStrategy default throw — confirm. Any Npp update path?
 
-The task model stores the decision here:
+H. Routing to CPC today (PafStatus / strategy). Can 132531 reuse it without a new RTK?
 
-```csharp
-public virtual bool IsRequired { get; set; }
-```
+I. Auto-accept / CVI creation — existing entry points? Do not propose implementing 132372 extra path.
 
-The new/existing signal is already present:
+J. Tests for license task, PSV upload, VA/PA, CPC route. If none, say none.
 
-```csharp
-TaskAllowedListMode.NewPractitioner
-TaskAllowedListMode.ExistingPractitioner
-```
+K. Isolation: Begin PAF Add Practitioner to Facility / FSQ must not change. Smallest Npp-only Work target (new Tasks/Npp folder vs extend existing form behind TaskType.Npp).
 
-and the UI derives it from:
+L. Smallest reuse plan (no code) for 132354–132531. Files that would change. Files that must not change.
 
-```csharp
-StateContainer.PafState.Practitioner is { IsNew: true }
-```
+M. Confirm you did not implement and did not invent RTKs.
 
-`IsSubmittable()` evaluates required tasks differently:
+N. Ready per child? 132354 chrome, 132355/372 VA-PA, 132368–374 license select, 132527 fields, 132530 upload, 132531 route, 132365–367 paths. Yes/no + blocker each.
 
-```csharp
-if (task.IsRequired)
-    return task.Status != TaskStatus.Complete;
-else
-    return task.Status != TaskStatus.New && task.Status != TaskStatus.Complete;
-```
+DO NOT:
+- Implement or edit.
+- Open 132260 hide/requiredness implement, 131785, 132600 sync internals, new GetCredentialingTypeRtk case.
+- Invent AuditAction, auth policy, STATUS_RTK, FOL RTK, or CVI.
 
-The current NPP add strategy sets the facility task required:
-
-```csharp
-FormData.AddPractitionerToFacilitiesTask = new AddPractitionerToFacilitiesTask()
-{
-    IsRequired = true
-};
-```
-
-However, it reuses the standard Add Practitioner strategy and does not visibly establish the NPP-specific required/optional matrix. The NPP card itself is also absent.
-
-**E. Task status and refresh**
-
-Status is stored on every task:
-
-```csharp
-public virtual TaskStatus Status { get; set; } = TaskStatus.New;
-```
-
-Allowed values are:
-
-```csharp
-New,
-Invalid,
-Complete
-```
-
-After a task saves, `PafFormComponent.SavePafAsync()` reloads the server result:
-
-```csharp
-PafData = result.PafFormData;
-pafState.LoadFrom(PafData);
-StateHasChanged();
-```
-
-This is the existing completion/incompletion refresh pattern and is reusable for 132264. The missing NPP Work/update path is the blocker.
-
-**F. Review & Submit**
-
-The Tasks page always renders the button:
-
-```razor
-<Button Type="@ButtonType.Primary" Loading="@_pafIsSaving"
-        OnClick="@ShowReviewAndSubmit">
-    Review & Submit
-</Button>
-```
-
-For MSP, `ShowReviewAndSubmit()` checks:
-
-```csharp
-else if (PafData.IsSubmittable())
-{
-    _editSource = EditSource.Review;
-    SetViewState(PractitionerPafViewState.ReviewAndSubmit);
-}
-```
-
-`IsSubmittable()` checks all instantiated tasks and requires every required task to be complete:
-
-```csharp
-if (IsTaskInError(pafData.AddPractitionerToFacilitiesTask))
-    return false;
-```
-
-This gate is reusable in principle. However, because no NPP task property/card is currently present, NPP completion is not included. Also, `GetCredentialingTypeRtk()` has no NPP case:
-
-```csharp
-case TaskType.Recruitment:
-    result = CommonCactusRtks.RecruitmentPsvCredentialingTypeRtk;
-    break;
-...
-default:
-    throw new ArgumentOutOfRangeException();
-```
-
-That is a downstream 132267 blocker if NPP submission reaches that processor path.
-
-**G. Delegate card**
-
-The card is visible whenever the task object exists:
-
-```razor
-<Card Class="@(PafData?.ManageDelegateTask != null ? "paf-card" : "hide")">
-```
-
-There is no PAF-type or `TaskType.Npp` suppression branch. The existing card can be hidden with a direct `PafData.Type`/task-type condition; no new suppression framework is evident.
-
-**H. Facility Specific Questions / MSS-18 FSQ**
-
-The regular facility card is also null-driven:
-
-```razor
-<Card Class="@(PafData?.AddPractitionerToFacilitiesTask != null ? "paf-card" : "hide")">
-```
-
-The MSS-18 FSQ card is:
-
-```razor
-<Card Class="@(PafData?.Mss18FacilitySpecificQuestionsTask != null ? "paf-card" : "hide")">
-```
-
-The current NPP reuse of `AddTaskAddPractitionerToFacilityStrategy` creates:
-
-```csharp
-FormData.AddPractitionerToFacilitiesTask = new AddPractitionerToFacilitiesTask()
-{
-    IsRequired = true
-};
-```
-
-The existing task initialization therefore creates the facility task object, while no NPP-specific branch removes Delegate or MSS-18 FSQ objects. That explains why UAT still showed an unwanted required FSQ-related card when the corresponding task object was initialized.
-
-**I. MSP / ADD NPP access**
-
-The server computes MSP access from the authenticated principal:
-
-```csharp
-listParameters.IsMspUserMode =
-    currentUser.IsInRole(nameof(HcoApplicationRole.Msp));
-```
-
-It does not trust a client-supplied role flag. NPP task selection is then guarded by:
-
-```csharp
-if (listParameters.IsMspUserMode)
-```
-
-This reuses the existing MSP role check and does not introduce a new policy. The client currently sends PSG/recruitment flags, while the server computes MSP status.
-
-**J. Tests**
-
-No dedicated tests were found for:
-
-- PAF task cards
-- Required/optional card behavior
-- Review & Submit enablement
-- Delegate visibility
-- Facility Specific Questions visibility
-- `TaskDeterminationService` NPP task selection
-- NPP processing strategies
-
-The only matching test search result was an unrelated packet processor test.
-
-**K. Isolation**
-
-Existing isolation signals are sufficient in principle:
-
-```csharp
-TaskType.Npp
-PafType
-Practitioner.IsNew
-TaskAllowedListMode.NewPractitioner / ExistingPractitioner
-```
-
-The smallest NPP-only branch is a `TaskType.Npp` or PAF-type check in the task-card and navigation surfaces. Begin PAF and Add Practitioner to Facility should remain on their existing task types and branches.
-
-**L. Smallest reuse plan**
-
-Likely surfaces for 132261–132268:
-
-- `PafFormComponent.razor`: NPP card, Delegate/FSQ visibility conditions.
-- `PafFormComponent.razor.cs`: NPP Work routing and return state.
-- `PafTaskDisplay.razor.cs`: NPP title/description/icon mapping.
-- `PafReviewForm.razor` / `.razor.cs`: NPP review representation if the task becomes a distinct model property.
-- `ModelExtensions.cs`: include NPP required-task status in `IsSubmittable()`.
-- `TaskDeterminationService.cs`: preserve/verify MSP-only task availability.
-- `PafProcessingStrategyContext.cs`: only if a distinct NPP add/update strategy is required.
-- NPP task model under `Shared/Data/Model/Paf/Form/`: only if the existing task object cannot represent NPP state.
-
-Must not change the existing `CreateAddTaskStrategy(Npp)` mapping or the existing Add Practitioner to Facility behavior without confirmed need.
-
-**M. Confirmed scope exclusion**
-
-I did not inspect ManageSpecialties, ManageAddresses, or VA/PA card internals. They were considered only as existing Work targets and requiredness context.
-
-**N. Remaining blockers**
-
-- **132261:** No. Card chrome is reusable; NPP title/description mapping and card rendering are currently absent.
-- **132262:** No. Existing server-side MSP role isolation is present.
-- **132263:** Yes. No NPP client Work route or update strategy exists.
-- **132264:** Yes. Status reload exists, but there is no NPP task/card path to return through.
-- **132265:** Yes. Existing `IsRequired` supports the concept, but current NPP strategy reuses the standard facility task and does not establish the NPP-specific matrix.
-- **132266:** Yes. `IsNew` and `TaskAllowedListMode` exist, but the current NPP strategy does not implement the requested net-new/existing requiredness rules.
-- **132267:** Yes. Client required-task gating exists, but the NPP task is absent and `GetCredentialingTypeRtk()` has no `TaskType.Npp` case.
-- **132268:** No architectural stop. Existing null-based card rendering plus `PafData.Type`/`TaskType.Npp` can isolate the hide behavior without a new framework.
-
-## 4. STOP conditions hit? (yes/no + which)
-
-**Yes.**
-
-- **132267:** `GetCredentialingTypeRtk()` has no NPP case, so downstream NPP submission/processing cannot be confirmed without inventing an RTK.
-- The current NPP task is not independently represented in the client card/review/update flow, so 132263–132266 are not implementation-ready as-is.
-
-No new TaskType or auth policy is required; `TaskType.Npp` and server-side MSP role checking already exist.
-
-## 5. Ready to implement 132261/132265 card chrome? (yes/no + blocker)
-
-**No.**
-
-The card chrome is reusable, but there is no NPP task object/card or title/description mapping. Requiredness also cannot be confirmed until the NPP task representation and net-new/existing matrix are defined.
-
-## 6. Ready to implement 132266 requiredness? (yes/no + blocker)
-
-**No.**
-
-`IsNew` and `TaskAllowedListMode` exist, but the current NPP path reuses `AddTaskAddPractitionerToFacilityStrategy`; it does not establish the requested NPP-specific requiredness for demographic, addresses, specialties, and NPP.
-
-## 7. Ready to implement 132267 Review & Submit gate? (yes/no + blocker)
-
-**No.**
-
-The existing `IsSubmittable()` required-task gate is reusable, but NPP is not included as a task object and `GetCredentialingTypeRtk()` has no NPP case. Per instruction, this is a STOP rather than an invented RTK.
-
-## 8. Ready to implement 132268 hide Delegate/FSQ? (yes/no + blocker)
-
-**Yes.**
-
-Existing cards are already conditionally rendered by task-object presence. A direct NPP/PAF-type condition can isolate Delegate and FSQ visibility without a new suppression framework. Other PAF types can retain current behavior.
-
-## 9. Ready to implement 132262/132263/132264? (yes/no + blocker)
-
-**No.**
-
-- 132262: access signal exists, but the Tasks-page card itself is not yet rendered.
-- 132263: no NPP Work navigation or update strategy.
-- 132264: status persistence and reload exist, but no NPP card/update path currently uses them.
-
-## 10. Must-not-change file list
-
-- `CreateAddTaskStrategy(Npp)` / `PafProcessingStrategyContext` NPP mapping unless specifically required by confirmed implementation evidence
-- Existing `AddTaskAddPractitionerToFacilityStrategy` behavior for `TaskType.AddPractitionerToFacility`
-- Existing Begin PAF task-selection behavior
-- ManageSpecialties internals
-- ManageAddresses internals
-- VA/PA, license, PSV, CVI, CPC, and 132600 synchronization surfaces
-- Existing MSP authorization model/policy
-- Existing task status enum and persistence pattern
-- Existing Delegate and Facility Specific Questions behavior for non-NPP PAF types
-
-## 11. Assumptions
-
-- Inspection was read-only. No files were edited, created, formatted, built, or executed.
-- The current workspace contains partial NPP task-selection changes: `TaskType.Npp`, MSP server filtering, and reuse of the existing Add Practitioner strategy.
-- The UAT screenshot is consistent with the repository: the current PAF card list has no visible NPP card, while existing task objects can still cause related cards to render.
-- `GetCredentialingTypeRtk()` was inspected only to confirm the stated missing NPP case; no processor internals were opened or proposed for change.
+RETURN (use these headings only):
+1. Files/classes confirmed
+2. Npp Work target today (none / which file)
+3. A–N answers (short quotes)
+4. STOP conditions hit? (yes/no + which)
+5. Ready to implement 132354 card body? (yes/no + blocker)
+6. Ready to implement VA/PA (132355/372)? (yes/no + blocker)
+7. Ready to implement license + PSV (132527/530/368–374)? (yes/no + blocker)
+8. Ready to implement routing 132531? (yes/no + blocker)
+9. Reuse vs new Tasks/Npp form (one sentence)
+10. Must-not-change file list
+11. Assumptions
