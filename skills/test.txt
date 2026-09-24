@@ -1,350 +1,799 @@
-## 1. Files/classes confirmed
+You are working on an existing multi-agent application where the Runtime Agent routes user queries to MCP tools.
 
-- `PafFormComponent.razor.cs`
-- `AddPractitionerToFacilitiesTask.razor`
-- `AddPractitionerToFacilitiesTask.razor.cs`
-- `AddPractitionerToFacilitiesTask.cs`
-- `RecruitmentPsvTask.razor`
-- `RecruitmentPsvTask.razor.cs`
-- `RecruitmentStateLicenseVerificationForm.razor`
-- `StateLicenseModal.razor.cs`
-- `RecruitmentPsvTask.cs`
-- `PractitionerLicenseClient.cs`
-- `LicenseClient.cs`
-- `PractitionerImagesClient.cs`
-- `PafFile.razor.cs`
-- `PafProcessingStrategyContext.cs`
-- `UpdateTaskAddPractitionerToFacilityStrategy.cs`
-- `SubmitPafStrategy.cs`
+CURRENT PROBLEM
+===============
 
-## 2. Npp Work target today (none / which file)
+The Runtime Agent is currently routing most/all user queries to the same MCP tool instead of dynamically selecting the correct MCP/tool based on the user's intent.
 
-**None.**
+We need to fix this using LIVE MCP metadata.
 
-`PafFormComponent.HandleRequestEditAsync()` has no `TaskType.Npp` branch. `TaskType.AddPractitionerToFacility` opens:
+IMPORTANT:
+Do NOT assume the existing MCP tool descriptions, schemas, parameters, or capabilities are correct.
 
-```csharp
-else if (taskType == TaskType.AddPractitionerToFacility)
-    SetViewState(PractitionerPafViewState.FacilitySpecificQuestions);
-```
+You MUST perform a LIVE MCP PROBE against the configured MCP server(s) and use the actual returned MCP metadata as the source of truth.
 
-The method ends after the existing `Perf` branch; there is no NPP fallback or default action. Therefore, NPP Work does nothing today.
+============================================================
+1. LIVE MCP PROBE
+============================================================
 
-## 3. A–N answers (short quotes)
+First identify the MCP server/client configuration used by the application.
 
-**A. Work routing**
+Then perform a live MCP discovery/probe and retrieve ALL available MCP information exposed by the MCP server.
 
-Current switch:
+Fetch, wherever supported:
 
-```csharp
-else if (taskType == TaskType.AddPractitionerToFacility)
-    SetViewState(PractitionerPafViewState.FacilitySpecificQuestions);
-```
+- All MCP servers
+- All available tools
+- Tool names
+- Tool descriptions
+- Tool input schemas
+- Required parameters
+- Optional parameters
+- Parameter types
+- Enum values
+- Nested object schemas
+- Tool output/response schemas
+- Resource information if relevant
+- Prompts if relevant
+- Any tool annotations/capability metadata
+- Any domain/entity information exposed by the MCP server
 
-There is no:
+Do NOT rely only on:
 
-```csharp
-TaskType.Npp
-```
+- Existing markdown skill files
+- Hard-coded tool descriptions
+- Old tool metadata
+- Existing routing assumptions
+- Tool names alone
 
-branch. NPP Work currently has no target.
+The LIVE MCP probe result must be treated as the authoritative runtime capability definition.
 
-**B. Existing facility / FSQ form**
+============================================================
+2. BUILD LIVE MCP CAPABILITY REGISTRY
+============================================================
 
-The existing facility target is:
+After probing the MCP server, create or update the runtime MCP capability model.
 
-```razor
-<TaskHeader Title="Facility Specific Questions" ... />
-<CorporateQuestions ... />
-<PerFacilityQuestions ... />
-```
+The capability model must allow the Runtime Agent to determine:
 
-The model is `AddPractitionerToFacilitiesTask.cs`, with `CorporateQuestionValues` and `FacilityQuestionValues`.
+"For this user query, which MCP tool is actually capable of fulfilling the request?"
 
-No NPP, VA, or PA-specific UI was found in the allowed PAF task surfaces.
+For every MCP tool capture information conceptually similar to:
 
-**C. Existing state-license capture**
-
-Recruitment PSV has an existing reusable state-license UI:
-
-```razor
-<Card Title="State License Verification">
-    <Button ... OnClick="ShowStateLicenseModal">Add License</Button>
-```
-
-The modal has:
-
-```razor
-<FieldLabel Required="true" For="stateLicense">State</FieldLabel>
-<InputHca @bind-Value="@context.LicenseNumber" />
-```
-
-The model contains only:
-
-```csharp
-public class RecruitmentStateLicenseVerificationDetail
 {
-    public string LicenseState { get; set; }
-    public string LicenseNumber { get; set; }
+  "toolName": "...",
+  "description": "...",
+  "purpose": "...",
+  "domain": "...",
+  "entities": [...],
+  "operations": [...],
+  "requiredParameters": [...],
+  "optionalParameters": [...],
+  "inputSchema": {...},
+  "outputSchema": {...},
+  "examples": [...],
+  "keywords": [...],
+  "capabilities": [...]
 }
-```
 
-The modal validation has:
+Do NOT invent values.
 
-```csharp
-[Required(ErrorMessage = "State is required")]
-public string LicenseState { get; set; }
+Derive them from the live MCP schema/description and existing implementation where appropriate.
 
-[MaxLength(20, ErrorMessage = "License number can not exceed 20 characters")]
-public string LicenseNumber { get; set; }
-```
+============================================================
+3. ANALYZE CURRENT RUNTIME AGENT
+============================================================
 
-Missing versus 132527:
+Trace the complete current routing flow:
 
-- Effective Date: missing
-- Status lookup: missing
-- Expiration: missing
-- Field of Licensure: missing
-- NPP-specific license task model: missing
+User Query
+    ↓
+Intent Detection
+    ↓
+Agent/Skill Selection
+    ↓
+MCP Selection
+    ↓
+Tool Invocation
+    ↓
+Response Processing
+    ↓
+Dynamic Response
 
-The repository contains generic database `STATUS_RTK` columns, including `PROVIDERLICENSES.STATUS_RTK` in license queries, but the ticket values are not defined in the PAF UI/model. `PROVIDERLICENSES_LICENSUREFIELD_RTK` was not found.
+Identify exactly why the same MCP tool is being selected repeatedly.
 
-Ticket values remain a gap and were not invented:
+Look specifically for:
 
-```text
-DRFB0IQ54S
-D2H11CCT3V
-D3UK1E0UF6
-M5890K2GGY
-```
+- Hard-coded MCP tool selection
+- Default tool fallback being triggered incorrectly
+- Tool name embedded in prompts
+- Incorrect intent classification
+- Static skill descriptions
+- MCP tool descriptions not being passed to the LLM
+- Tool schemas not being exposed to the router
+- Incorrect routing conditions
+- Incorrect tool registry
+- Incorrect agent-to-MCP mapping
+- Tool selection happening before intent classification
+- Fallback logic overriding valid tool selection
+- Tool ranking always returning the same tool
+- MCP tools being registered incorrectly
+- Tool metadata being cached incorrectly
+- Runtime skill configuration not being refreshed
+- Incorrect state propagation
+- Incorrect LangGraph routing
+- Incorrect retry/fallback behavior
 
-**D. License recall, add-new, duplicate checking**
+Do not fix symptoms only.
 
-Existing Recruitment PSV supports add, edit, and remove in memory:
+Identify the root cause of why routing always selects one MCP tool.
 
-```csharp
-_stateLicenses.Add(eventArgs.StateLicense);
-SortLicenses(_stateLicenses);
-```
+============================================================
+4. UPDATE RUNTIME AGENT SKILLS
+============================================================
 
-and:
+Update the Runtime Agent skills so they are based on the LIVE MCP probe.
 
-```csharp
-private void EditStateLicense(...)
-private void RemoveStateLicense(...)
-```
+The Runtime Agent must have a dynamic understanding of MCP capabilities.
 
-No existing PAF implementation was found for:
+Do NOT create a static skill such as:
 
-- Recall of existing Cactus licenses
-- Existing-license selection
-- “Add New” alongside recalled licenses
-- Inactive/expired license handling
-- Duplicate State + License Number validation
+"Use MCP tool X for all requests."
 
-`PractitionerLicenseClient` only exposes work-queue searches:
+Instead the skill must instruct:
 
-```csharp
-SearchExpiredLicensesAsync(...)
-SearchUnverifiedInstitutionsAsync(...)
-SearchUnverifiedPractitionersAsync(...)
-SearchVerifiedAsync(...)
-```
+"Based on the live MCP capability registry, determine which MCP tool is capable of satisfying the user's request."
 
-It does not expose a practitioner-license recall/select API.
+The generated runtime skill should contain:
 
-**E. PSV/image upload**
+### MCP Capability Registry
 
-The reusable upload component is `PafFile.razor.cs`.
+For every available tool:
 
-It accepts:
+- Tool name
+- Capability
+- Domain
+- Supported entities
+- Supported operations
+- Required inputs
+- Optional inputs
+- Output structure
+- When to use
+- When NOT to use
+- Example queries
 
-```csharp
-".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".tif", ".tiff"
-```
+============================================================
+5. DYNAMIC ROUTING
+============================================================
 
-It sends:
+Implement routing based on the user's actual query.
 
-```csharp
-FormType = FormType!.Value,
-TaskId = TaskId!.Value,
-PractitionerActionFormId = _currentPafId!.Value
-```
+Example:
 
-Recruitment uses:
+User:
+"Find scrap material with copper"
 
-```razor
-<PafFile
-    FormType="PractitionerActionFormAttachmentType.RecruitmentCv"
-    TaskId="@StateContainer.PafState.RecruitmentPsvTask.TaskId" />
-```
+Expected flow:
 
-Existing attachment types include `RecruitmentCv`, but no license, sanctions, or NPI PSV attachment types were found.
+Intent:
+SEARCH
 
-The Cactus image client exposes read operations:
+Entity:
+SCRAP_ITEM
 
-```csharp
-GetImageContentsAsync(...)
-GetImagesByImageTypeAsync(...)
-GetImageCountsByParentFileKAsync(...)
-```
+Operation:
+SEARCH
 
-`PractitionerImage` already has:
+Then:
 
-```csharp
-public string ParentFileK { get; set; }
-public string Type { get; set; }
-public string TypeRtk { get; set; }
-public bool Active { get; set; }
-```
+→ identify candidate MCP tools
+→ compare their capabilities
+→ select the correct MCP tool
+→ construct valid parameters
+→ validate parameters
+→ invoke selected tool
+→ process response
+→ generate dynamic response
 
-No PAF NPP upload mapping for Cactus image `ParentFile`, image type, or “Publish On Web” was found.
+Another example:
 
-**F. VA / PA questions**
+User:
+"Show details for scrap item ABC123"
 
-No existing PAF task model or form was found for:
+Expected:
 
-- Active duty military member
-- Practicing at the VA
-- Practitioner is a PA
+Intent:
+DETAIL_LOOKUP
 
-The existing facility-question model contains fields such as:
+Entity:
+SCRAP_ITEM
 
-```csharp
-public bool? IsTreatingMilitary { get; set; }
-```
+Operation:
+GET_DETAILS
 
-but this is a facility-question value, not the requested NPP VA/PA workflow. No existing PA routing or NPP-specific VA question was found.
+Select the MCP tool capable of retrieving scrap item details.
 
-**G. NPP update strategy**
+Do NOT route this request to a generic search tool if a dedicated detail tool exists.
 
-`CreateUpdateTaskStrategy()` has no NPP mapping:
+Another example:
 
-```csharp
-TaskType.Recruitment => new UpdateTaskRecruitmentPsvStrategy(...),
-TaskType.Mss18FacilitySpecificQuestions => new UpdateTaskMss18FacilitySpecificQuestionsStrategy(...),
-_ => throw new ArgumentException($"Task \"{task}\" does not have an update strategy"),
-```
+User:
+"List available locations"
 
-There is no `TaskType.Npp` update path.
+Expected:
 
-**H. Existing CPC routing**
+Intent:
+LIST
 
-Existing MSP submission routes task failures back to MSP:
+Entity:
+LOCATION
 
-```csharp
-if (pafProcessingResult.Status == PafProcessingResultStatus.Failure)
-{
-    FormData.SetStatus(PafStatus.ReturnedToMsp, "One or more tasks were invalid");
-}
-```
+Operation:
+LIST
 
-Successful MSP submission uses:
+Select the MCP tool capable of listing locations.
 
-```csharp
-FormData.SetStatus(
-    FormData.Status == PafStatus.SavedByMsp
-        ? PafStatus.SubmittedByMsp
-        : PafStatus.ResubmittedByMsp,
-    null);
-```
+============================================================
+6. TOOL SELECTION MUST BE CAPABILITY BASED
+============================================================
 
-CPC review supports existing statuses:
+Tool selection must NOT be based solely on tool name.
 
-```csharp
-FormData.SetStatus(PafStatus.RejectedToMsp, detail);
-FormData.SetStatus(PafStatus.ReturnedToMsp, detail);
-FormData.SetStatus(PafStatus.AcceptedByCpc, detail);
-```
+Use:
 
-No NPP-specific PA/inactive/expired routing rule exists. Existing statuses can represent CPC return paths, but the requested NPP decision logic is not present. No new RTK was invented.
+User Intent
++
+Entity
++
+Requested Operation
++
+Required Parameters
++
+Tool Capability
++
+Tool Input Schema
 
-**I. Auto-accept / CVI entry points**
+Conceptually:
 
-Existing submission enters:
+User Query
+    ↓
+Intent
+    ↓
+Entity
+    ↓
+Operation
+    ↓
+Candidate MCP Tools
+    ↓
+Capability Matching
+    ↓
+Schema Validation
+    ↓
+Selected MCP Tool
 
-```csharp
-await ProcessSubmitForMspAsync(pafProcessingResult);
-```
+Example:
 
-and later queues processing:
+Query:
+"Search scrap items for copper"
 
-```csharp
-await _pafProcessingService.QueuePafForProcessingAsync(FormData.FormId);
-```
+Router should determine:
 
-The repository also has existing CVI-related processing paths in `SubmitPafStrategy`, but no confirmed NPP PA=YES auto-accept/CVI strategy. Per instruction, that extra path is a STOP condition rather than an implementation proposal.
+Intent:
+SCRAP_SEARCH
 
-**J. Tests**
+Entity:
+SCRAP_ITEM
 
-No dedicated tests were found for:
+Operation:
+SEARCH
 
-- NPP license task
-- License recall/select/add-new
-- Duplicate State + License Number
-- VA/PA questions
-- PSV upload in this workflow
-- NPP CPC routing
+Candidate tools:
+- toolA
+- toolB
+- toolC
 
-## 4. STOP conditions hit? (yes/no + which)
+Select the tool whose LIVE capability/schema best matches:
 
-**Yes.**
+SCRAP_ITEM + SEARCH
 
-- No existing NPP/VA/PA task form exists.
-- Existing state-license UI is Recruitment PSV-only and lacks the required NPP fields.
-- No practitioner-license recall/select API exists in the inspected client surface.
-- No duplicate State + License Number validation exists.
-- No NPP-specific PSV attachment mapping exists.
-- No NPP PA=YES auto-accept/CVI strategy exists.
-- No NPP-specific inactive/expired routing rule exists.
-- `STATUS_RTK` appears as a generic Cactus database field, but the requested NPP status values and FOL RTK are not defined in the PAF implementation.
+============================================================
+7. SUPPORT MULTIPLE MCP TOOLS
+============================================================
 
-## 5. Ready to implement 132354 card body? (yes/no + blocker)
+The implementation must support multiple MCP tools.
 
-**Yes, for the card shell only.**
+Do NOT design the router around a single MCP tool.
 
-Existing PAF card chrome and task components can host the title/disclaimer. The actual NPP Work target remains missing.
+Remove or avoid patterns such as:
 
-## 6. Ready to implement VA/PA (132355/372)? (yes/no + blocker)
+const selectedTool = DEFAULT_MCP_TOOL;
 
-**No.**
+or:
 
-No existing NPP VA/PA form pattern exists. 132372’s PA=YES auto-accept/CVI behavior has no confirmed existing strategy.
+mcpTool = "search_scrap";
 
-## 7. Ready to implement license + PSV (132527/530/368–374)? (no + blocker)
+unless explicitly required as a controlled fallback.
 
-**No.**
+Instead use a dynamic capability registry.
 
-Recruitment PSV provides only a partial state/license form and generic file upload. Missing are license recall, add-new selection, status/effective/expiration/FOL fields, duplicate validation, Cactus license persistence, NPP PSV mappings, and existing-license routing.
+Conceptually:
 
-## 8. Ready to implement routing 132531? (no + blocker)
+MCP Capability Registry
+    |
+    +-- Tool A
+    |     ├── capabilities
+    |     ├── entities
+    |     ├── operations
+    |     └── schema
+    |
+    +-- Tool B
+    |     ├── capabilities
+    |     ├── entities
+    |     ├── operations
+    |     └── schema
+    |
+    +-- Tool C
+          ├── capabilities
+          ├── entities
+          ├── operations
+          └── schema
 
-**No.**
+The Runtime Agent must select from this registry.
 
-Existing PAF/CPC statuses can represent return/submission outcomes, but no NPP-specific PA/inactive/expired decision path exists. The requested routing behavior cannot be confirmed without a new NPP strategy; no new status or RTK should be invented.
+============================================================
+8. HARD RULES + LLM ROUTING
+============================================================
 
-## 9. Reuse vs new Tasks/Npp form (one sentence)
+Preserve existing hard-rule routing if it exists.
 
-Reuse the existing `PafTaskDisplay`, `PafFile`, state dropdown, and partial Recruitment PSV license controls where applicable, but use a dedicated `Tasks/Npp` form/model because the existing facility and Recruitment PSV forms do not represent the NPP VA/PA, license, recall, duplicate, and routing requirements.
+However, verify that hard rules do not incorrectly force every query to the same MCP tool.
 
-## 10. Must-not-change file list
+Use a routing hierarchy such as:
 
-- Existing `AddPractitionerToFacility` facility/FSQ form and strategy behavior
-- Existing `CreateAddTaskStrategy(Npp)` mapping unless explicitly revisited with confirmed requirements
-- Existing `UpdateTaskAddPractitionerToFacilityStrategy`
-- Existing Recruitment PSV behavior
-- `GetCredentialingTypeRtk()` existing cases
-- Existing Cactus image/license client contracts
-- Existing PAF/CPC status meanings
-- Practitioner Search and 131785 surfaces
-- 132600 synchronization internals
-- CVI, CPC, and unrelated PAF task internals
-- Existing RTK values and authorization policies
+1. Explicit deterministic rule when confidence is high
+2. Capability-based tool selection
+3. LLM reasoning using LIVE MCP schemas
+4. Safe fallback only when no suitable tool is found
 
-## 11. Assumptions
+The fallback must NOT be the normal routing path.
 
-- Inspection was read-only. No files were edited, created, formatted, built, or executed.
-- `STATUS_RTK` exists as a generic Cactus database column in existing processor/repository code, but the named NPP values are not implemented in the inspected PAF task model/UI.
-- `PROVIDERLICENSES_LICENSUREFIELD_RTK` was not found.
-- The existing Recruitment PSV state-license form is the closest reusable UI pattern, but it is not an NPP license workflow.
-- The requested PA=YES auto-accept/CVI behavior remains unconfirmed and was not proposed.
+============================================================
+9. TOOL INPUT VALIDATION
+============================================================
+
+Before invoking the selected MCP tool:
+
+Validate the generated arguments against the LIVE MCP input schema.
+
+Verify:
+
+- Required fields
+- Types
+- Enum values
+- Nested objects
+- Optional fields
+- Nullability
+
+If required information is missing:
+
+DO NOT call another MCP tool as a workaround.
+
+Ask the user for the required information.
+
+============================================================
+10. DYNAMIC RESPONSE HANDLING
+============================================================
+
+The response layer must NOT assume a fixed MCP response structure.
+
+Use the selected tool's live output schema and actual response.
+
+Do not hard-code:
+
+response.items
+
+unless the actual MCP response contract requires it.
+
+Conceptually:
+
+Selected MCP Tool
+    ↓
+Actual MCP Response
+    ↓
+Response Normalizer / Adapter
+    ↓
+Runtime Agent
+    ↓
+Dynamic User Response
+
+The final response must be based on the actual tool that was selected and the actual data returned.
+
+============================================================
+11. OBSERVABILITY
+============================================================
+
+Add or extend existing tracing/logging around routing.
+
+For every request capture:
+
+- User query
+- Detected intent
+- Detected entity
+- Detected operation
+- Candidate MCP tools
+- Selected MCP tool
+- Tool selection reason
+- Tool input
+- MCP response status
+- Response transformation
+- Final response
+
+DO NOT log:
+
+- Passwords
+- Tokens
+- API keys
+- Credentials
+- Sensitive data
+
+Example trace:
+
+Query:
+"Find copper scrap"
+
+Intent:
+SCRAP_SEARCH
+
+Entity:
+SCRAP_ITEM
+
+Operation:
+SEARCH
+
+Candidates:
+scrap_search
+scrap_detail
+scrap_location
+
+Selected:
+scrap_search
+
+Reason:
+Capability match:
+SCRAP_ITEM + SEARCH
+
+============================================================
+12. LANGSMITH / EXISTING TRACING
+============================================================
+
+If LangSmith tracing already exists:
+
+Reuse the existing tracing implementation.
+
+Add routing information to the existing trace:
+
+- Router input
+- Capability registry/version
+- Candidate tools
+- Selected tool
+- Tool arguments
+- Tool result
+- Routing errors
+
+Do NOT introduce another tracing framework.
+
+============================================================
+13. LANGGRAPH
+============================================================
+
+If the application uses LangGraph, inspect the existing graph.
+
+The routing flow should conceptually be:
+
+START
+ ↓
+Intent / Capability Analysis
+ ↓
+MCP Tool Selection
+ ↓
+Selected MCP Tool
+ ↓
+Response Processing
+ ↓
+END
+
+Do NOT create a second orchestration mechanism.
+
+Fix the existing LangGraph/orchestrator where possible.
+
+============================================================
+14. RUNTIME SKILL UPDATE
+============================================================
+
+Update the Runtime Agent skill/instructions so it explicitly follows:
+
+1. Understand the user query.
+2. Identify intent.
+3. Identify entity/domain.
+4. Identify requested operation.
+5. Inspect available LIVE MCP capabilities.
+6. Select the MCP tool whose capability matches the request.
+7. Validate parameters against the LIVE tool schema.
+8. Invoke the selected MCP tool.
+9. Process the actual response.
+10. Generate a dynamic response.
+11. Never default to a single MCP tool when another tool is a better match.
+
+============================================================
+15. PRESERVE EXISTING ARCHITECTURE
+============================================================
+
+Before making changes, understand and reuse the existing architecture.
+
+Reuse where applicable:
+
+- Agent Orchestrator
+- Runtime Agent
+- Intent Agent
+- Action Agent
+- MCP Client
+- MCP Tool Registry
+- Skill Loader
+- LangGraph
+- Configuration
+- LangSmith tracing
+- Checkpointer
+- State management
+- Existing retry/fallback mechanisms
+
+Do NOT create duplicate:
+
+- Orchestrators
+- MCP clients
+- Skill systems
+- Routing systems
+- Tool registries
+
+Fix the existing implementation instead.
+
+============================================================
+16. CONFIGURATION
+============================================================
+
+MCP server/tool configuration must remain configurable.
+
+Do NOT hard-code MCP tool selection into application code.
+
+If the project already uses YAML/configuration-based configuration, extend that existing mechanism.
+
+Do not introduce another configuration mechanism.
+
+============================================================
+17. TESTING
+============================================================
+
+Add/update tests for dynamic routing.
+
+At minimum cover:
+
+TEST 1:
+Query matches MCP Tool A.
+
+Expected:
+Tool A selected.
+
+TEST 2:
+Query matches MCP Tool B.
+
+Expected:
+Tool B selected.
+
+TEST 3:
+Query matches MCP Tool C.
+
+Expected:
+Tool C selected.
+
+TEST 4:
+Query does not match any MCP capability.
+
+Expected:
+Do not blindly call the default MCP tool.
+
+Return a controlled unsupported/clarification response.
+
+TEST 5:
+Two tools are plausible.
+
+Expected:
+Compare capabilities and select the best valid match.
+
+TEST 6:
+Required parameter is missing.
+
+Expected:
+Do not invoke the wrong tool.
+Ask for the missing parameter.
+
+TEST 7:
+MCP schema changes.
+
+Expected:
+Runtime capability model reflects the updated live schema after refresh.
+
+TEST 8:
+Verify that the router does not always select the same MCP tool.
+
+============================================================
+18. LIVE PROBE MUST BE REAL
+============================================================
+
+This is critical.
+
+DO NOT simulate the MCP probe.
+
+DO NOT create fake MCP schemas.
+
+DO NOT infer schemas from tool names.
+
+DO NOT assume existing static skill documentation represents the current MCP server.
+
+Actually inspect the configured MCP server using the existing MCP client/probe mechanism.
+
+If live MCP access is unavailable:
+
+STOP.
+
+Report exactly what MCP connection/configuration/access is missing.
+
+Do NOT fabricate MCP metadata.
+
+============================================================
+19. MCP CAPABILITY REFRESH
+============================================================
+
+Implement the capability discovery so that the runtime skill/capability registry can be refreshed when MCP tools change.
+
+Prefer:
+
+LIVE MCP
+    ↓
+Probe
+    ↓
+Tool Metadata
+    ↓
+Capability Registry
+    ↓
+Runtime Skill
+    ↓
+Router
+
+Avoid:
+
+Manual Tool List
+    ↓
+Static Prompt
+    ↓
+Hard-coded Routing
+
+The objective is that when a new MCP tool is added, the Runtime Agent can discover the new capability without requiring hard-coded routing logic for that specific tool.
+
+============================================================
+20. BEFORE CODING — ANALYZE FIRST
+============================================================
+
+Before modifying code, provide:
+
+### Current Architecture
+
+<actual discovered architecture>
+
+### Live MCP Servers
+
+<actual probe results>
+
+### Live MCP Tools
+
+| Tool | Capability | Required Inputs | Output |
+|------|------------|-----------------|--------|
+
+### Current Routing Flow
+
+<actual flow>
+
+### Root Cause
+
+<why one MCP tool is always selected>
+
+### Proposed Fix
+
+<exact implementation>
+
+### Runtime Skill Changes
+
+<files/content to update>
+
+### Files To Change
+
+<files>
+
+### Files To Add
+
+<files>
+
+### Tests
+
+<tests>
+
+### Risks / Compatibility
+
+<potential impact>
+
+DO NOT start implementation until this analysis is complete.
+
+============================================================
+21. FINAL ACCEPTANCE CRITERIA
+============================================================
+
+The implementation is complete only when:
+
+[ ] Live MCP server was probed.
+[ ] All available MCP tools were discovered.
+[ ] Live input/output schemas were retrieved.
+[ ] Runtime skill reflects live MCP capabilities.
+[ ] Current routing root cause was identified.
+[ ] Routing no longer defaults to one MCP tool.
+[ ] User intent determines MCP selection.
+[ ] Entity/domain is considered.
+[ ] Requested operation is considered.
+[ ] Tool capability is considered.
+[ ] Tool input is validated against the live schema.
+[ ] Correct MCP tool is invoked.
+[ ] Actual MCP response is dynamically processed.
+[ ] Existing architecture is preserved.
+[ ] Existing LangGraph/orchestrator is reused.
+[ ] Existing tracing is preserved.
+[ ] Multiple MCP routing tests are added.
+[ ] No fake MCP metadata is introduced.
+[ ] No unnecessary hard-coded tool mapping is introduced.
+[ ] No unrelated refactoring is performed.
+
+============================================================
+FINAL PRINCIPLE
+============================================================
+
+The LIVE MCP server is the source of truth for available capabilities.
+
+The Runtime Agent must work like this:
+
+USER QUERY
+    ↓
+UNDERSTAND INTENT
+    ↓
+IDENTIFY ENTITY + OPERATION
+    ↓
+READ LIVE MCP CAPABILITIES
+    ↓
+MATCH QUERY TO CAPABILITY
+    ↓
+SELECT CORRECT MCP TOOL
+    ↓
+VALIDATE INPUT AGAINST TOOL SCHEMA
+    ↓
+EXECUTE MCP TOOL
+    ↓
+PROCESS ACTUAL MCP RESPONSE
+    ↓
+DYNAMIC USER RESPONSE
+
+NEVER:
+
+USER QUERY
+    ↓
+DEFAULT MCP TOOL
+    ↓
+FORCE RESPONSE
+
+The objective is to fix the runtime routing architecture, not simply modify a prompt.
+
+The final system must dynamically route different user queries to the correct MCP tool based on the actual capabilities exposed by the live MCP server.
