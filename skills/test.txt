@@ -1,8 +1,86 @@
-READ ONLY first, then fix only this bug.
-VerifyExistingPractitionerForm.ValidateAsync throws NullReferenceException at line 72 when Start PAF is clicked for an existing practitioner with email (NPP / IsNppRequest). Modal stays on Validating...
-Likely: email is PropertyDescription (read-only) so the Email InputHca / form field used at line 72 is null.
-Fix:
-- Null-safe ValidateAsync. Do not validate a missing Email input when email is read-only.
-- ConfirmationWizardModal.SaveExistingPractitionerConfirmationAsync: always clear Validating (try/finally), stay on the modal, no ErrorPage.
-- Do not change Add New, Begin PAF, or 132255.
-RETURN: quote line 72 before/after, files changed, build result.
+You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
+
+ROLE:
+Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not ask for a follow-up inspect chat.
+
+TASK:
+Map the PAF Tasks Demographic Work form: required vs optional fields, validation when entered, CACTUS prepopulate, and isolation for TaskType.Npp / Begin NPP PAF. Answer A–N with file/class/method quotes. Then STOP.
+
+KNOWN STARTING POINTS (confirm or correct — do not glob the whole repo):
+- Client/Pages/Paf/Components/Tasks/ManagePractitionerInformation/ManagePractitionerInformationTask.razor + .razor.cs
+- ManagePractitionerInfoModel (code-behind / annotations) and required flags _emailRequired, _phoneNumberRequired, _dobRequired, _ssnRequired, _genderRequired
+- Shared/Data/Model/Paf/Form/PractitionerDemographicTask.cs
+- Shared/Validations/Paf/Form/PractitionerDemographicTaskValidation.cs
+- Client/Pages/Paf/Components/DemographicDisplay.razor + .razor.cs
+- Client/Pages/Paf/Components/PafFormComponent.razor — Demographic card + Work
+- How PAF Type / TaskType.Npp is known on the form (PafData.Type, IsNppRequest, or nothing)
+- CACTUS read: Hca.Credentialing.Cactus.Api PractitionerController GetPractitionerByIdAsync / GetPractitionerByKeyAsync — quote if used to load this form
+- Paf.Processor Cactus Operations CrudPractitionerOperation — this is WRITE. Quote only if it also seeds the form. Do not treat write as 132281.
+- Add New search card (131794) and Verify (132247) are DIFFERENT forms. Quote only to prove shared vs not shared.
+- If a path is wrong, search only under Client/Pages/Paf/Components/Tasks/ManagePractitionerInformation then Shared/Data/Model/Paf/Form/PractitionerDemographic. Quote real files.
+
+TICKETS (context only — do not implement):
+132277 host — PAF Tasks Demographic card: optional fields + CACTUS prepopulate. Begin NPP PAF / ADD NPP only. Begin PAF and non-NPP unchanged.
+132279 — Optional on NPP only: Email, Cell Phone, DOB, SSN, Gender. Blank save allowed; no required-field message. Other required demographic fields unchanged.
+132280 — When those fields are populated, use EXISTING Email / Cell / DOB / SSN / Gender validators. Blank = no error. Do not invent format rules.
+132281 — Prepopulate from Cactus mapping ONLY:
+  First Name = PROVIDERS.FIRSTNAME
+  Middle Name = PROVIDERS.MIDDLENAME
+  Last Name = PROVIDERS.LASTNAME
+  Suffix = PROVIDERS.SUFFIX
+  Degree = PROVIDERS.DISPLAYDEGREES_SHORT
+  Provider Category = PROVIDERS.CATEGORY_RTK
+  Individual NPI = PROVIDERS.NPI
+  Exists → populate. Null/blank → leave blank, no error. Cactus down → page still loads, fields editable, log. Malformed → existing validators.
+132282 — Inherit Add New Practitioner PAF Demographic rules except where 132279–132281 override. Report inherited rules; do not invent.
+
+STOP AND REPORT (do not invent):
+- If NPP optional flags cannot reuse existing _emailRequired / similar without a new validation framework.
+- If there is no PAF-type / TaskType.Npp / IsNew signal on this form and isolation would invent a new flag with no source.
+- If 132281 needs a new CACTUS table, column, or API beyond named PROVIDERS.* and an existing GetPractitioner*.
+- If this form IS the 131794 Add New search card (shared) — report shared surface; do not propose changing 131794 here.
+- If GetCredentialingTypeRtk Npp or a new RTK is required — STOP (out of scope).
+- If Cactus-down logging has no existing logger on this path — report gap; do not invent a log category.
+
+ANSWER (quote path + symbol + relevant lines):
+
+A. Which component opens from PAF Tasks Demographic Work. Confirm it is ManagePractitionerInformationTask or the real name.
+
+B. Field list on that form. Mark each: required today / optional today / read-only today. Call out Email, Cell, DOB, SSN, Gender, First, Last, Degree, Category, NPI, Suffix.
+
+C. How required flags are set (OnInitializedAsync / role / IsNew / PAF type). Is there already a TaskType.Npp or Begin NPP branch? Gap vs 132279.
+
+D. Save / complete path. Blank Email/Cell/DOB/SSN/Gender today: blocked or allowed? Quote.
+
+E. Validation when a value is entered: Email, Cell, DOB, SSN, Gender. Existing messages. Empty PractitionerDemographicTaskValidation — where do rules actually live? 132280 reuse vs gap.
+
+F. Is this form shared with 131794 Add New search card or 132247 Verify? Quote. If shared, what isolation exists today.
+
+G. CACTUS prepopulate TODAY when Demographic Work opens (existing practitioner vs net new). Quote load method + source properties. Map each 132281 row: already mapped / missing / different property name.
+
+H. Cactus unavailable / null source: does the page still load? Existing log? 132281 exception handling reuse vs gap.
+
+I. How the form knows this PAF is ADD NPP / TaskType.Npp vs Begin PAF. Isolation signal for 132279 AC3.
+
+J. Inherited Add New PAF Demographic rules that 132282 would keep (required First/Last/Degree/Category/NPI, etc.). Quote.
+
+K. Tests for ManagePractitionerInformation / PractitionerDemographicTask. Names only.
+
+L. Files that would change if we later implement 132279+132280 only (optional + validate-when-entered). Files that would change for 132281 (prepopulate). Do not edit them.
+
+M. Must-not-change list: Begin PAF Demographic, non-NPP types, 131794 search card, 132247 Verify, Address, Specialties, Delegate, FSQ, 132260/132352, GetCredentialingTypeRtk.
+
+N. Ready to implement?
+    - 132279 optional flags: Yes / No / STOP (why)
+    - 132280 validate-when-entered: Yes / No / STOP (why)
+    - 132281 CACTUS prepopulate: Yes / No / STOP (why)
+    - 132282 inherit: report-only
+
+RETURN format:
+1. A–N answers with quotes
+2. Ready table
+3. STOP items
+4. Files you opened
+5. Confirmation: no files modified
+
+Do not implement. Do not create Tasks/Npp. Do not hide Delegate/FSQ. Do not add ADD NPP card. Do not invent PROVIDERS columns. Do not invent AuditAction or RTK.
