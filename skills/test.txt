@@ -1,86 +1,454 @@
-You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
+## 1. A–N answers with quotes
 
-ROLE:
-Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not ask for a follow-up inspect chat.
+**A. Demographic Work component**
 
-TASK:
-Map the PAF Tasks Demographic Work form: required vs optional fields, validation when entered, CACTUS prepopulate, and isolation for TaskType.Npp / Begin NPP PAF. Answer A–N with file/class/method quotes. Then STOP.
+`PafFormComponent.razor` opens:
 
-KNOWN STARTING POINTS (confirm or correct — do not glob the whole repo):
-- Client/Pages/Paf/Components/Tasks/ManagePractitionerInformation/ManagePractitionerInformationTask.razor + .razor.cs
-- ManagePractitionerInfoModel (code-behind / annotations) and required flags _emailRequired, _phoneNumberRequired, _dobRequired, _ssnRequired, _genderRequired
-- Shared/Data/Model/Paf/Form/PractitionerDemographicTask.cs
-- Shared/Validations/Paf/Form/PractitionerDemographicTaskValidation.cs
-- Client/Pages/Paf/Components/DemographicDisplay.razor + .razor.cs
-- Client/Pages/Paf/Components/PafFormComponent.razor — Demographic card + Work
-- How PAF Type / TaskType.Npp is known on the form (PafData.Type, IsNppRequest, or nothing)
-- CACTUS read: Hca.Credentialing.Cactus.Api PractitionerController GetPractitionerByIdAsync / GetPractitionerByKeyAsync — quote if used to load this form
-- Paf.Processor Cactus Operations CrudPractitionerOperation — this is WRITE. Quote only if it also seeds the form. Do not treat write as 132281.
-- Add New search card (131794) and Verify (132247) are DIFFERENT forms. Quote only to prove shared vs not shared.
-- If a path is wrong, search only under Client/Pages/Paf/Components/Tasks/ManagePractitionerInformation then Shared/Data/Model/Paf/Form/PractitionerDemographic. Quote real files.
+```razor
+<ManagePractitionerInformationTask
+    OnComplete="@HandleManagePractitionerInformationComplete">
+</ManagePractitionerInformationTask>
+```
 
-TICKETS (context only — do not implement):
-132277 host — PAF Tasks Demographic card: optional fields + CACTUS prepopulate. Begin NPP PAF / ADD NPP only. Begin PAF and non-NPP unchanged.
-132279 — Optional on NPP only: Email, Cell Phone, DOB, SSN, Gender. Blank save allowed; no required-field message. Other required demographic fields unchanged.
-132280 — When those fields are populated, use EXISTING Email / Cell / DOB / SSN / Gender validators. Blank = no error. Do not invent format rules.
-132281 — Prepopulate from Cactus mapping ONLY:
-  First Name = PROVIDERS.FIRSTNAME
-  Middle Name = PROVIDERS.MIDDLENAME
-  Last Name = PROVIDERS.LASTNAME
-  Suffix = PROVIDERS.SUFFIX
-  Degree = PROVIDERS.DISPLAYDEGREES_SHORT
-  Provider Category = PROVIDERS.CATEGORY_RTK
-  Individual NPI = PROVIDERS.NPI
-  Exists → populate. Null/blank → leave blank, no error. Cactus down → page still loads, fields editable, log. Malformed → existing validators.
-132282 — Inherit Add New Practitioner PAF Demographic rules except where 132279–132281 override. Report inherited rules; do not invent.
+The card and Work button are:
 
-STOP AND REPORT (do not invent):
-- If NPP optional flags cannot reuse existing _emailRequired / similar without a new validation framework.
-- If there is no PAF-type / TaskType.Npp / IsNew signal on this form and isolation would invent a new flag with no source.
-- If 132281 needs a new CACTUS table, column, or API beyond named PROVIDERS.* and an existing GetPractitioner*.
-- If this form IS the 131794 Add New search card (shared) — report shared surface; do not propose changing 131794 here.
-- If GetCredentialingTypeRtk Npp or a new RTK is required — STOP (out of scope).
-- If Cactus-down logging has no existing logger on this path — report gap; do not invent a log category.
+```razor
+<Card Class="@(PafData?.PractitionerDemographicTask != null ? "paf-card" : "hide")">
+    <PafTaskDisplay
+        Task="@(PafData?.PractitionerDemographicTask)"
+        Type="@(TaskType.ManagePersonalInfo)" />
+    <Button ... OnClick="() =>
+        HandleRequestEditAsync(EditSource.Edit, TaskType.ManagePersonalInfo)">
+        Work
+    </Button>
+</Card>
+```
 
-ANSWER (quote path + symbol + relevant lines):
+This is `ManagePractitionerInformationTask`, not the Add New or Verify form.
 
-A. Which component opens from PAF Tasks Demographic Work. Confirm it is ManagePractitionerInformationTask or the real name.
+**B. Fields**
 
-B. Field list on that form. Mark each: required today / optional today / read-only today. Call out Email, Cell, DOB, SSN, Gender, First, Last, Degree, Category, NPI, Suffix.
+From `ManagePractitionerInformationTask.razor`:
 
-C. How required flags are set (OnInitializedAsync / role / IsNew / PAF type). Is there already a TaskType.Npp or Begin NPP branch? Gap vs 132279.
+- First Name: required
+- Middle Name: optional
+- Last Name: required
+- Suffix: optional
+- Degree: required
+- Category: required
+- NPI: visually optional today, but validated by `ShouldRequireNpi`
+- DOB: required for non-recruitment users
+- Gender: required for non-recruitment users
+- SSN: required for non-recruitment users
+- Email: required for non-recruitment users
+- Cell/Phone: required for non-recruitment users
+- Read-only behavior:
+  - DOB disabled for existing practitioners when Cactus DOB exists
+  - Gender disabled for existing practitioners when Cactus gender exists
+  - SSN disabled for existing practitioners when Cactus SSN exists
+  - Email disabled only for existing Recruitment roles when Cactus email exists
+  - Category disabled for existing practitioners when Cactus category exists
 
-D. Save / complete path. Blank Email/Cell/DOB/SSN/Gender today: blocked or allowed? Quote.
+Examples:
 
-E. Validation when a value is entered: Email, Cell, DOB, SSN, Gender. Existing messages. Empty PractitionerDemographicTaskValidation — where do rules actually live? 132280 reuse vs gap.
+```razor
+<FieldLabel Required="true" For="taskFirstName">First Name</FieldLabel>
+<FieldLabel Required="true" For="taskLastName">Last Name</FieldLabel>
+<FieldLabel Required="true" For="taskDegree">Degree</FieldLabel>
+<FieldLabel Required="true" For="taskCategory">Category</FieldLabel>
+<FieldLabel Required="false" For="taskNpi">NPI</FieldLabel>
+```
 
-F. Is this form shared with 131794 Add New search card or 132247 Verify? Quote. If shared, what isolation exists today.
+And conditional fields:
 
-G. CACTUS prepopulate TODAY when Demographic Work opens (existing practitioner vs net new). Quote load method + source properties. Map each 132281 row: already mapped / missing / different property name.
+```razor
+<FieldLabel Required="_dobRequired" For="taskDateOfBirth">Date of Birth</FieldLabel>
+<FieldLabel Required="_genderRequired" For="taskGender">Gender</FieldLabel>
+<FieldLabel Required="_ssnRequired" For="taskSSN">SSN</FieldLabel>
+<FieldLabel Required="_emailRequired" For="taskEmail">Email</FieldLabel>
+<FieldLabel Required="_phoneNumberRequired" For="taskCell">Cell</FieldLabel>
+```
 
-H. Cactus unavailable / null source: does the page still load? Existing log? 132281 exception handling reuse vs gap.
+**C. Required flags and NPP isolation**
 
-I. How the form knows this PAF is ADD NPP / TaskType.Npp vs Begin PAF. Isolation signal for 132279 AC3.
+`OnInitializedAsync()` currently changes required flags only for recruitment:
 
-J. Inherited Add New PAF Demographic rules that 132282 would keep (required First/Last/Degree/Category/NPI, etc.). Quote.
+```csharp
+_model.IsPsgRole = currentUser.IsInRole(nameof(HcoApplicationRole.Psg));
+_model.IsRecruitmentRole =
+    (StateContainer.PafState.RecruitmentPsvTask != null ||
+     currentUser.IsRecruitmentUser());
 
-K. Tests for ManagePractitionerInformation / PractitionerDemographicTask. Names only.
+if (_model.IsRecruitmentRole)
+{
+    _dobRequired = false;
+    _genderRequired = false;
+    _ssnRequired = false;
+    _emailRequired = false;
+    _phoneNumberRequired = false;
+}
+else
+{
+    _dobRequired = true;
+    _genderRequired = true;
+    _ssnRequired = true;
+    _emailRequired = true;
+    _phoneNumberRequired = true;
+}
+```
 
-L. Files that would change if we later implement 132279+132280 only (optional + validate-when-entered). Files that would change for 132281 (prepopulate). Do not edit them.
+There is no `TaskType.Npp`, `PafType`, or Begin NPP branch in this component. `PafFormComponent` passes no NPP parameter to it.
 
-M. Must-not-change list: Begin PAF Demographic, non-NPP types, 131794 search card, 132247 Verify, Address, Specialties, Delegate, FSQ, 132260/132352, GetCredentialingTypeRtk.
+**Gap:** NPP optional-field isolation does not currently exist on this form.
 
-N. Ready to implement?
-    - 132279 optional flags: Yes / No / STOP (why)
-    - 132280 validate-when-entered: Yes / No / STOP (why)
-    - 132281 CACTUS prepopulate: Yes / No / STOP (why)
-    - 132282 inherit: report-only
+**D. Save/complete path**
 
-RETURN format:
-1. A–N answers with quotes
-2. Ready table
-3. STOP items
-4. Files you opened
-5. Confirmation: no files modified
+`SaveAsync()` validates the form:
 
-Do not implement. Do not create Tasks/Npp. Do not hide Delegate/FSQ. Do not add ADD NPP card. Do not invent PROVIDERS columns. Do not invent AuditAction or RTK.
+```csharp
+if (!_form.Validate())
+{
+    _saving = false;
+    return;
+}
+```
+
+For non-recruitment users, blank Email, Cell, DOB, SSN, and Gender are currently blocked because `ShouldRequireField` returns errors:
+
+```csharp
+if (string.IsNullOrEmpty(value) && !model.IsRecruitmentRole)
+{
+    if (validationContext.MemberName == "Email")
+    {
+        return new ValidationResult(
+            "Please enter a valid email address",
+            new[] { validationContext.MemberName });
+    }
+
+    return new ValidationResult(
+        "Required field.",
+        new[] { validationContext.MemberName });
+}
+```
+
+**E. Validation when values are entered**
+
+The rules are not in `PractitionerDemographicTaskValidation`; that class is empty:
+
+```csharp
+public static class PractitionerDemographicTaskValidation
+{
+}
+```
+
+They live on `ManagePractitionerInfoModel` and shared validation routines.
+
+Email:
+
+```csharp
+[ExtendedEmailAddress]
+public string Email { get; set; }
+```
+
+Existing invalid-email behavior comes from `ExtendedEmailAddress`/`ValidationRoutines`, including:
+
+```text
+@ and . are required. White space is not valid
+```
+
+Cell:
+
+```csharp
+[Phone(AlternateLabel = "cell")]
+public string Phone
+```
+
+Existing partial/masked value message:
+
+```text
+Please enter a valid cell number
+```
+
+DOB:
+
+```csharp
+[AgeOlderThan]
+public DateTime? DateOfBirth { get; set; }
+```
+
+Existing value validation:
+
+```text
+Min age must be at least 18 years old
+```
+
+SSN:
+
+```csharp
+[Ssn]
+public string Ssn { get; set; }
+```
+
+Existing partial-mask message:
+
+```text
+Please enter a valid SSN number
+```
+
+Gender has only the required custom validation today:
+
+```csharp
+[CustomValidation(typeof(ManagePractitionerInfoModel),
+    nameof(ShouldRequireField))]
+public string Gender { get; set; }
+```
+
+There is no separate format validator for Gender.
+
+The existing validators already support blank optional values because their shared routines only return format errors when a nonblank value is malformed. Therefore 132280 can reuse the current validators once NPP requiredness is isolated.
+
+**F. Shared with Add New or Verify?**
+
+No. This is a separate component and model:
+
+```csharp
+public partial class ManagePractitionerInformationTask
+```
+
+with:
+
+```csharp
+public class ManagePractitionerInfoModel
+```
+
+The Add New form uses `AddNewPractitionerForm` and `NewPractitionerModel`. Verify uses `VerifyExistingPractitionerForm` and `VerifyPractitionerModel`.
+
+The only shared area is the general validation library and related field concepts. Changing this form will not directly change 131794 or 132247.
+
+**G. CACTUS prepopulate today**
+
+The demographic task is initialized server-side before the form opens. `StartExistingPractitionerPafStrategy` calls:
+
+```csharp
+FormData.PractitionerDemographicTask =
+    new PractitionerDemographicTask()
+        .InitializeFromPractitioner(
+            FormData.Practitioner,
+            _emailOverride,
+            StrategyContext.GetCurrentUser().IsInRole(
+                nameof(HcoApplicationRole.Psg)));
+```
+
+`InitializeFromPractitioner` maps:
+
+```csharp
+practitionerDemographicTask.Npi = practitioner.Npi;
+practitionerDemographicTask.Ssn = practitioner.Ssn;
+practitionerDemographicTask.FirstName = practitioner.FirstName;
+practitionerDemographicTask.MiddleName = practitioner.MiddleName;
+practitionerDemographicTask.LastName = practitioner.LastName;
+practitionerDemographicTask.Suffix = practitioner.Suffix;
+practitionerDemographicTask.Gender = practitioner.Gender;
+practitionerDemographicTask.Dob = practitioner.Dob;
+practitionerDemographicTask.Degrees = practitioner.Degrees;
+practitionerDemographicTask.Email = practitioner.EmailAddress;
+practitionerDemographicTask.Phone = practitioner.Phone;
+practitionerDemographicTask.Category = practitioner.Category;
+```
+
+Mapping against 132281:
+
+| Requirement | Current status |
+|---|---|
+| First Name ← `PROVIDERS.FIRSTNAME` | Already mapped through `Practitioner.FirstName` |
+| Middle Name ← `PROVIDERS.MIDDLENAME` | Already mapped through `Practitioner.MiddleName` |
+| Last Name ← `PROVIDERS.LASTNAME` | Already mapped through `Practitioner.LastName` |
+| Suffix ← `PROVIDERS.SUFFIX` | Already mapped through `Practitioner.Suffix` |
+| Degree ← `PROVIDERS.DISPLAYDEGREES_SHORT` | Already mapped through `Practitioner.Degrees` |
+| Category ← `PROVIDERS.CATEGORY_RTK` | Mapped through `Practitioner.Category`; raw Cactus property is not exposed here |
+| Individual NPI ← `PROVIDERS.NPI` | Already mapped through `Practitioner.Npi` |
+
+The form then copies the task into its model:
+
+```csharp
+_model.FirstName = task.FirstName;
+_model.MiddleName = task.MiddleName;
+_model.LastName = task.LastName;
+_model.Suffix = task.Suffix;
+_model.Gender = task.Gender;
+_model.Degree = task.Degrees;
+_model.Npi = task.Npi;
+_model.Ssn = task.Ssn;
+_model.DateOfBirth = task.Dob;
+_model.Email = task.Email;
+_model.Category = task.Category;
+_model.Phone = task.Phone;
+```
+
+For net-new practitioners, `StartNewPractitionerPafStrategy` initializes the demographic task from the net-new `FormData.Practitioner`; no client-side Cactus load occurs when the demographic form opens.
+
+**H. Cactus unavailable/null source**
+
+The demographic component itself does not call Cactus and has no Cactus exception handling or logger. It reads:
+
+```csharp
+StateContainer.PafState.PractitionerDemographicTask
+StateContainer.PafState.Practitioner
+```
+
+Existing Cactus loading occurs earlier in PAF loading/creation strategies. No existing demographic-path logging for a Cactus-down condition was found.
+
+**Gap:** 132281’s “Cactus down: page still loads, fields editable, log” behavior is not explicitly implemented in this component, and no dedicated fallback/logging path was confirmed.
+
+Null task/practitioner handling is not generally defensive here; `LoadModelFromTask()` assumes both exist.
+
+**I. How the form knows NPP versus Begin PAF**
+
+It does not currently know.
+
+`ManagePractitionerInformationTask` has no `TaskType` or `PafType` parameter. `PafFormComponent` renders it without either:
+
+```razor
+<ManagePractitionerInformationTask
+    OnComplete="@HandleManagePractitionerInformationComplete">
+</ManagePractitionerInformationTask>
+```
+
+The form only derives:
+
+```csharp
+_model.IsRecruitmentRole =
+    (StateContainer.PafState.RecruitmentPsvTask != null ||
+     currentUser.IsRecruitmentUser());
+```
+
+No `TaskType.Npp` branch exists. `PafData.Type` is used elsewhere in the parent and save logic, but is not passed into this component.
+
+**STOP condition hit:** NPP isolation would require using an existing source signal at this component boundary or passing one from the parent. The current component has no NPP signal.
+
+**J. Inherited Add New demographic rules**
+
+The required baseline remains:
+
+```csharp
+[Required(ErrorMessage = "Required field")]
+public string FirstName { get; set; }
+
+[Required(ErrorMessage = "Required field")]
+public string LastName { get; set; }
+
+[Required(ErrorMessage = "Required field")]
+public string Degree { get; set; }
+
+[Required(ErrorMessage = "Required field")]
+public string Category { get; set; }
+```
+
+NPI uses existing NPI validation:
+
+```csharp
+[CustomValidation(typeof(ManagePractitionerInfoModel),
+    nameof(ShouldRequireNpi))]
+public string Npi
+```
+
+Its current `ShouldRequireNpi` path calls:
+
+```csharp
+var error = ValidationRoutines.DoNpiValidation(value, false);
+```
+
+So NPI is format-validated but not currently visually required in this form. This differs from the Add New NPP model, where `ShouldRequireNpi` explicitly requires NPI for NPP/PSG.
+
+Suffix and Middle Name remain optional. The demographic form also retains existing duplicate practitioner/delegate checks and recruitment identifier behavior.
+
+**K. Tests**
+
+No dedicated tests were found for:
+
+- `ManagePractitionerInformationTask`
+- `ManagePractitionerInfoModel`
+- `PractitionerDemographicTask`
+- `PractitionerDemographicTaskValidation`
+
+The only matching result was unrelated packet processor test data containing a demographic-task JSON fragment.
+
+**L. Files that would change later**
+
+For 132279–132280 only:
+
+- `ManagePractitionerInformationTask.razor`
+- `ManagePractitionerInformationTask.razor.cs`
+
+Potentially the parent only if an existing NPP signal must be passed into the task component.
+
+The shared validation attributes/routines already support validate-when-entered behavior; no new validation framework is indicated.
+
+For 132281 prepopulation:
+
+- `StartExistingPractitionerPafStrategy.cs`
+- `StartNewPractitionerPafStrategy.cs`
+- `ModelExtensions.cs`, only if the existing mapping is insufficient
+- The relevant existing practitioner model/repository mapping, only if the named properties are not already populated
+
+No new Cactus table/API is currently indicated because existing `GetPractitionerByIdAsync`/`GetPractitionerByKeyAsync` paths and `Practitioner` properties already feed the task.
+
+**M. Must-not-change**
+
+- Begin PAF demographic behavior
+- Non-NPP PAF types
+- 131794 Add New search card
+- 132247 Verify form
+- Addresses
+- Specialties
+- Delegate
+- Facility Specific Questions
+- 132260/132352 task-card surfaces
+- `GetCredentialingTypeRtk`
+- No new Tasks/Npp folder
+- No new ADD NPP card
+- No new RTK or audit action
+
+**N. Current readiness**
+
+- **132279 optional flags:** **No / STOP** — the current demographic form has no NPP/PAF-type signal, so isolation cannot be confirmed without introducing or passing a source-backed signal.
+- **132280 validate-when-entered:** **Yes, conditionally** — existing validators already support blank optional values and validate populated values. It depends on first isolating 132279’s NPP requiredness.
+- **132281 CACTUS prepopulate:** **Yes, for the existing mapping** — the existing Cactus practitioner object already seeds the demographic task through `InitializeFromPractitioner`. **No** for the explicit Cactus-down logging/fallback requirement because no dedicated handling was found.
+- **132282 inherit:** Report-only. Existing First/Last/Degree/Category required annotations, NPI validation, duplicate checks, and shared field validators are the inherited baseline.
+
+## 2. Ready table
+
+| Scope | Ready? | Reason |
+|---|---|---|
+| 132279 optional flags | No / STOP | No NPP signal on the demographic component |
+| 132280 validate populated values | Yes, after isolation | Existing validators already handle nonblank values |
+| 132281 prepopulate | Yes for current mapping; No for explicit outage logging | Existing initialization maps the practitioner object; no dedicated fallback logger |
+| 132282 inherit | Report-only | Existing rules are identifiable |
+
+## 3. STOP items
+
+- NPP/Begin NPP is not passed to `ManagePractitionerInformationTask`; NPP-only requiredness cannot be isolated today.
+- `PractitionerDemographicTaskValidation` is empty, so rules live in `ManagePractitionerInfoModel` and shared validation attributes/routines.
+- No dedicated Cactus-down logging/fallback path exists on the demographic form.
+- No new Cactus table, column, RTK, audit action, or `GetCredentialingTypeRtk` case was invented.
+
+## 4. Files opened
+
+- `ManagePractitionerInformationTask.razor`
+- `ManagePractitionerInformationTask.razor.cs`
+- `PractitionerDemographicTask.cs`
+- `PractitionerDemographicTaskValidation.cs`
+- `DemographicDisplay.razor`
+- `DemographicDisplay.razor.cs`
+- `PafFormComponent.razor`
+- `PractitionerController.cs`
+- `ModelExtensions.cs`
+- `StartExistingPractitionerPafStrategy.cs`
+- `ValidationRoutines.cs`
+- `AgeOlderThan.cs`
+- `Ssn.cs`
+- `Phone.cs`
+
+## 5. Confirmation: no files modified
+
+Confirmed. This inspection was read-only. No files were modified, created, formatted, or built.
