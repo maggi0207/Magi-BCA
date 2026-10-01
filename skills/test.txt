@@ -1,78 +1,80 @@
-Implemented the NPP-only demographic optional-field change.
+You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
 
-1. **Files changed**
-- `PafFormComponent.razor`
-- `ManagePractitionerInformationTask.razor.cs`
+ROLE:
+Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not ask for a follow-up inspect chat.
 
-2. **NPP isolation source**
+TASK:
+Map the PAF Tasks Manage Address Work form for NPP: Primary-only display, affiliation lock, Add Address enable/disable, group-address note, existing Add Address fields/validation. Answer A–N with file/class/method quotes. Then STOP.
 
-`PafState` has no `Type` property, so the parent passes a boolean using the persisted selected task:
+KNOWN STARTING POINTS (confirm or correct — do not glob the whole repo):
+- Client/Pages/Paf/Components/Tasks/ManageAddresses/ManageAddressesTask.razor + .razor.cs
+- ManageAddresses.razor, ManageAlternateAddresses.razor
+- HomeAddressModal / PracticeAddressModal / SearchPracticeGroupAddressStep / SelectPracticeGroupAddressOptionStep / EditPracticeAddressStep
+- Shared/Data/Model/Paf/Form/AddressTask.cs (or AddressTask name you find)
+- PafFormComponent.razor — Manage Address card + Work (TaskType for addresses)
+- 132277 isolation: StateContainer.PafState.TaskSelected == TaskType.Npp → IsNppPaf on Demographic. Quote whether ManageAddressesTask already has that Parameter or can read TaskSelected the same way.
+- Affiliation / privileges: existing practitioner-facility or active-affiliation check only. Do NOT treat this PAF's SelectedFacilities (e.g. Alaska Surgery Center just saved) as "active affiliations / privileges".
+- If a path is wrong, search only under Client/Pages/Paf/Components/Tasks/ManageAddresses then Shared/Data/Model/Paf/Form address types. Quote real files.
 
-```razor
-IsNppPaf="@(StateContainer.PafState.TaskSelected == TaskType.Npp)"
-```
+TICKETS (context only — do not implement):
+132283 host — NPP / Begin NPP PAF only: Primary Address only + affiliation rules. Begin PAF unchanged.
+132288 — Hide Home, Credentialing, Alternate. Show active Primary. No data: exactly "No Primary Address on File". Retrieval fail: standard error.
+132308 — Active Primary AND one or more facility affiliations: show Primary; Add Address disabled; exact message:
+  The practitioner currently holds privileges at one or more HCA facilities. The primary address cannot be changed.
+  Affiliation unknown/unavailable: disable Add; standard error; no updates until confirmed.
+132327 — No Primary: "No Primary Address on File"; Add Address enabled. Lookup fail: standard error. No permission: hide Add.
+132341 — No active affiliations: show Primary if present; Add Address enabled. Affiliation unverified: no updates; standard processing error.
+132342 — On NPP Add Address, do NOT show: Note: Group addresses will not be available for selection in this specific PAF type.
+132343 — Reuse existing Add Address field rules (Contact optional max 60; Address required max 50; Line 2 optional max 50; City required max 40; State required dropdown; Zip required max 11; Country required dropdown; Phone required (nnn) nnn-nnnn; Phone Ext optional max 10; Fax required (nnn) nnn-nnnn; Fax Ext optional max 10). Existing save service. No second address API.
+132344 — Same validation UX as Add Practitioner to Facility (inline + summary). Framework down: generic error; block save.
 
-The task receives it as:
+STOP AND REPORT (do not invent):
+- If hiding Home/Credentialing would break ValidateAndSaveAddresses (still requires those groups) and you would invent a new save contract.
+- If "active affiliations / privileges" has no existing repository signal (do not use PAF SelectedFacilities; do not invent a privileges API).
+- If the 132308 sentence does not exist and you would invent a new notification type — report as new string on existing banner/alert only.
+- If Add Address is a new form rather than the existing modal.
+- If GetCredentialingTypeRtk Npp or a new RTK is required.
 
-```csharp
-[Parameter] public bool IsNppPaf { get; set; }
-```
+ANSWER (quote path + symbol + relevant lines):
 
-3. **Flags and validation**
+A. Which component opens from PAF Tasks Manage Address Work. Confirm ManageAddressesTask or the real name. TaskType used on the card.
 
-The model receives the signal:
+B. Address groups on the form today (Home / Primary / Credentialing / Alternate). How each is shown.
 
-```csharp
-_model.IsNppPaf = IsNppPaf;
-```
+C. Save / complete: ValidateAndSaveAddresses (or real name). Does complete require Home + Credentialing today? Gap vs 132288 hide-but-save.
 
-The five required flags become optional only for recruitment or NPP:
+D. Empty Primary copy today. Is "No Primary Address on File" already a string? 132327 / 132288 empty state.
 
-```csharp
-if (_model.IsRecruitmentRole || _model.IsNppPaf)
-{
-    _dobRequired = false;
-    _genderRequired = false;
-    _ssnRequired = false;
-    _emailRequired = false;
-    _phoneNumberRequired = false;
-}
-```
+E. Add Address button: where, enable/disable/hide rules today (permission, existing addresses).
 
-Blank-field validation is bypassed only for those modes:
+F. Affiliation / privileges: existing method that means "has active facility affiliations". Quote. Confirm it is NOT PafState.SelectedFacilities. Gap vs 132308 / 132341.
 
-```csharp
-if (string.IsNullOrEmpty(value)
-    && !model.IsRecruitmentRole
-    && !model.IsNppPaf)
-```
+G. Group-address note: exact current string. Where rendered. Can NPP hide it without a new framework? 132342.
 
-Existing populated-value validators remain unchanged. First Name, Last Name, Degree, Category, Suffix, Middle Name, and NPI behavior were not changed.
+H. Add Address form/modal: file + field requiredness vs 132343 table (especially Fax required, phone mask). Reuse vs gap. Save service name.
 
-4. **Confirmation**
+I. Validation UX (inline + summary) used by Add Practitioner to Facility address. Same component for NPP? 132344.
 
-Not edited:
-- 132281 mappings
-- Start PAF strategies
-- Cactus APIs
-- `GetCredentialingTypeRtk`
-- Add New
-- Verify
-- Begin PAF task behavior
-- Address, Specialties, Delegate, FSQ, or task-card code
+J. Isolation: does ManageAddressesTask see TaskSelected / IsNppPaf today? How Demographic got IsNppPaf — can Address reuse the same parent pass?
 
-5. **Build result**
+K. Tests for ManageAddresses / AddressTask. Names only.
 
-Build succeeded:
+L. Files that would change later for (1) Primary-only UI + empty copy (2) affiliation lock + exact 132308 message (3) hide group note. Do not edit them.
 
-```text
-Hca.Credentialing.Client net10.0 browser-wasm succeeded
-Hca.Credentialing.Server net10.0 succeeded
-Build succeeded in 15.6s
-```
+M. Must-not-change: Begin PAF Address, non-NPP types, 132277 Demographic, 132345, Delegate, FSQ, 132260/132352, GetCredentialingTypeRtk, SelectedFacilities as affiliation.
 
-The first build encountered a locked DLL from a running Server process; after stopping it, the clean build passed.
+N. Ready to implement?
+    - 132288 Primary-only UI: Yes / No / STOP (why)
+    - 132327 empty + Add enabled: Yes / No / STOP (why)
+    - 132308 / 132341 affiliation lock: Yes / No / STOP (why)
+    - 132342 hide group note: Yes / No / STOP (why)
+    - 132343 / 132344 reuse form+validation: Yes / No / STOP (why)
 
-6. **Remaining gaps**
+RETURN format:
+1. A–N answers with quotes
+2. Ready table
+3. STOP items
+4. Files you opened
+5. Confirmation: no files modified
 
-No known implementation gaps for this requested change. No dedicated tests were added, per instruction.
+Do not implement. Do not hide Delegate/FSQ. Do not add ADD NPP card. Do not invent a privileges API. Do not treat this PAF's SelectedFacilities as affiliations. Do not invent RTK or AuditAction.
