@@ -1,47 +1,8 @@
-Read and analyze these 3 repositories:
-
-1. UI repository
-2. UI Backend / Dashboard Service repository
-3. Runtime Agent repository
-
-Understand how they actually communicate and create a SIMPLE high-level architecture flow diagram.
-
-Show only the major components and their communication flow.
-
-Example:
-
-User
-  ↓
-UI
-  ↓
-Dashboard Service
-  ↓
-Runtime Agent
-  ↓
-MCP / External Services
-  ↓
-Response
-
-Do NOT assume this flow. Use the actual repository implementation and show the real flow.
-
-Keep it very simple and easy to read.
-
-Requirements:
-- Clearly separate all 3 repositories.
-- Show the main responsibility of each.
-- Show actual communication between them.
-- Label important communication such as REST API, HTTP, MCP, etc.
-- Do not show individual classes or every API.
-- Do not create a detailed class/sequence diagram.
-- Maximum 5–8 major boxes.
-- Use Mermaid flowchart.
-- Create `architecture-overview.md`.
-
-Before creating the diagram, briefly identify:
-- UI → what it does and what it calls
-- Dashboard Service → what it does and what it calls
-- Runtime Agent → what it does and what it calls
-
-Then create the simple architecture diagram based only on what you found in the repositories.
-
-Do not redesign the architecture. Document the architecture that currently exists.
+READ ONLY first, then fix only this bug.
+VerifyExistingPractitionerForm.ValidateAsync throws NullReferenceException at line 72 when Start PAF is clicked for an existing practitioner with email (NPP / IsNppRequest). Modal stays on Validating...
+Likely: email is PropertyDescription (read-only) so the Email InputHca / form field used at line 72 is null.
+Fix:
+- Null-safe ValidateAsync. Do not validate a missing Email input when email is read-only.
+- ConfirmationWizardModal.SaveExistingPractitionerConfirmationAsync: always clear Validating (try/finally), stay on the modal, no ErrorPage.
+- Do not change Add New, Begin PAF, or 132255.
+RETURN: quote line 72 before/after, files changed, build result.
