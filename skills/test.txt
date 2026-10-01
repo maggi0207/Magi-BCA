@@ -1,75 +1,78 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+Implemented the NPP-only demographic optional-field change.
 
-ROLE:
-Senior engineer. One session. Treat the 132277 inspect RETURN as fact unless you re-read and disprove. Then implement. Do not start a second chat.
+1. **Files changed**
+- `PafFormComponent.razor`
+- `ManagePractitionerInformationTask.razor.cs`
 
-TASK:
-On the PAF Tasks Demographic Work form only (ManagePractitionerInformationTask): when the PAF is TaskType.Npp, make Email, Cell, DOB, SSN, and Gender optional. Keep existing format validators when a value is entered. Begin PAF and non-NPP types unchanged.
+2. **NPP isolation source**
 
-Treat inspect as fact:
-- Form is ManagePractitionerInformationTask + ManagePractitionerInfoModel. Not Add New. Not Verify.
-- OnInitializedAsync sets _dobRequired / _genderRequired / _ssnRequired / _emailRequired / _phoneNumberRequired true unless IsRecruitmentRole.
-- ShouldRequireField blocks blank Email/Cell/DOB/SSN/Gender when !IsRecruitmentRole. Labels use the five flags.
-- PafFormComponent already has PafData.Type. After ADD NPP save, Type is TaskType.Npp (132255).
-- The task already reads StateContainer.PafState (RecruitmentPsvTask). Check whether PafState.Type exists first.
-- PractitionerDemographicTaskValidation is empty. Do not add rules there.
-- ExtendedEmailAddress, Phone, AgeOlderThan, Ssn already skip blank. Do not edit those attributes.
-- InitializeFromPractitioner already maps 132281. Do not change start strategies or CACTUS.
+`PafState` has no `Type` property, so the parent passes a boolean using the persisted selected task:
 
-COMMENTS:
-Almost none. No ticket-ID comments. No // 132277 / // NPP isolation banners.
+```razor
+IsNppPaf="@(StateContainer.PafState.TaskSelected == TaskType.Npp)"
+```
 
-STOP AND REPORT (do not invent):
-- If TaskType.Npp is not the saved PAF Type after ADD NPP and you would invent a new Type / flag / feature flag / auth policy.
-- If Type is not on PafState and not on PafFormComponent.PafData.
-- If you must set IsRecruitmentRole = true to make fields optional.
-- If you must edit GetCredentialingTypeRtk, 131794, 132247, Address, Specialties, Delegate, FSQ, or 132260/132352.
+The task receives it as:
 
-THEN IMPLEMENT (smallest reuse):
+```csharp
+[Parameter] public bool IsNppPaf { get; set; }
+```
 
-Isolation
-- Prefer: StateContainer.PafState.Type == TaskType.Npp (or the real Type property on that object). No new Parameter if Type is already reachable.
-- Else: PafFormComponent passes PafData.Type == TaskType.Npp into ManagePractitionerInformationTask as a bool. One name end-to-end (IsNppPaf).
-- Set ManagePractitionerInfoModel.IsNppPaf from that. Do NOT set IsRecruitmentRole for NPP.
+3. **Flags and validation**
 
-132279 labels + save
-- OnInitializedAsync: if IsNppPaf, set the five flags false (same block as recruitment, isolated).
-- ShouldRequireField: if IsNppPaf, blank Email / Cell / Phone / DOB / SSN / Gender = Success.
-- First, Last, Degree, Category stay [Required]. Do not change NPI / ShouldRequireNpi / NPI label.
-- Suffix and Middle Name stay optional.
+The model receives the signal:
 
-132280
-- No new validators. Entered values keep current Email / Cell / DOB / SSN messages. Gender has no extra format rule.
+```csharp
+_model.IsNppPaf = IsNppPaf;
+```
 
-132281 / 132282
-- Do not edit InitializeFromPractitioner, Start*PafStrategy, or Cactus APIs.
-- Do not add Cactus-down logging.
+The five required flags become optional only for recruitment or NPP:
 
-DO NOT CHANGE:
-- AddNewPractitionerForm, NewPractitionerModel, VerifyExistingPractitionerForm, VerifyPractitionerModel
-- ExtendedEmailAddress.cs, Phone, AgeOlderThan, Ssn, Npi.cs
-- GetCredentialingTypeRtk, TaskDeterminationService, CreateAddTaskStrategy
-- Address, Specialties, Delegate, FSQ, ADD NPP card
-- Begin PAF (Type != Npp): zero behavior change
+```csharp
+if (_model.IsRecruitmentRole || _model.IsNppPaf)
+{
+    _dobRequired = false;
+    _genderRequired = false;
+    _ssnRequired = false;
+    _emailRequired = false;
+    _phoneNumberRequired = false;
+}
+```
 
-IMPLEMENTATION REQUIREMENTS:
-1. Reuse existing Type + required-flag pattern.
-2. Non-NPP unchanged.
-3. No duplicate form.
-4. No invented Type, RTK, policy, or log category.
-5. Almost no new comments.
+Blank-field validation is bypassed only for those modes:
 
-TESTS:
-- Do not create a test project.
-- dotnet build the Client (or the project that hosts ManagePractitionerInformationTask).
-- If an existing test breaks, fix only that break.
+```csharp
+if (string.IsNullOrEmpty(value)
+    && !model.IsRecruitmentRole
+    && !model.IsNppPaf)
+```
 
-VALIDATION: build, inspect diff (comments near-zero).
+Existing populated-value validators remain unchanged. First Name, Last Name, Degree, Category, Suffix, Middle Name, and NPI behavior were not changed.
 
-RETURN:
-1. Files changed
-2. How IsNppPaf is sourced (PafState.Type vs Parameter) — quote
-3. ShouldRequireField + flag changes — quote
-4. Confirmation: 132281 / start strategies / CACTUS / GetCredentialingTypeRtk not edited
-5. Build result
-6. Remaining gaps
+4. **Confirmation**
+
+Not edited:
+- 132281 mappings
+- Start PAF strategies
+- Cactus APIs
+- `GetCredentialingTypeRtk`
+- Add New
+- Verify
+- Begin PAF task behavior
+- Address, Specialties, Delegate, FSQ, or task-card code
+
+5. **Build result**
+
+Build succeeded:
+
+```text
+Hca.Credentialing.Client net10.0 browser-wasm succeeded
+Hca.Credentialing.Server net10.0 succeeded
+Build succeeded in 15.6s
+```
+
+The first build encountered a locked DLL from a running Server process; after stopping it, the clean build passed.
+
+6. **Remaining gaps**
+
+No known implementation gaps for this requested change. No dedicated tests were added, per instruction.
