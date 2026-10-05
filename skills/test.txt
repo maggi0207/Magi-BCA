@@ -1,205 +1,80 @@
-## 1. A–N answers with quotes
+You are implementing a change in the HCA HCP Credentialing repository.
 
-**A. Work target**
+ROLE:
+Senior engineer. One session. Treat the 132283 inspect RETURN as fact unless you re-read and disprove. Then implement. Do not start a second chat.
 
-The PAF Tasks Demographic card’s address equivalent is `ManageAddressesTask`. Its host card uses `TaskType.ManageAddresses`, and `PafFormComponent.HandleRequestEditAsync()` routes that task to the Manage Addresses view. The parent renders:
+TASK:
+On PAF Tasks Manage Address Work only: when TaskSelected is TaskType.Npp, show Primary only, show "No Primary Address on File" when there is no Primary, and do not run the Practice Group address flow. Keep Home / Credentialing / Alternate data in the model. Begin PAF and non-NPP unchanged.
 
-```razor
-<ManageAddressesTask
-    OnComplete="@HandleManageAddressesComplete"
-    IsNewPractitioner="@(PafData?.Type == PafType.ManageNewPractitioner)">
-</ManageAddressesTask>
-```
+Treat inspect as fact:
+- ManageAddressesTask. Parent already passes IsNewPractitioner. No IsNppPaf yet.
+- Always renders Home, Primary, Credentialing. Alternate if !IsNewPractitioner.
+- ValidateAndSaveAddresses requires confirmed Home + Primary + Credentialing. Do NOT change that method.
+- No "No Primary Address on File" string today. Add Address is always enabled. Leave Add enabled.
+- No facility-privilege signal. Do NOT disable Add. Do NOT add the 132308 privileges sentence. Do NOT use SelectedFacilities or Sponsor affiliations (D26L0VNZT5).
+- Group UI is PracticeAddressModal (Practice Group question + search). Exact ticket note is not in the repo. Do not add that note.
+- PracticeAddressModal / EditPracticeAddressStep already match existing save. Fax is optional; FaxOrEmail required. Do not change field requiredness.
+- Demographic isolation: IsNppPaf="@(StateContainer.PafState.TaskSelected == TaskType.Npp)". Reuse that name. Do not use PafType as NPP.
 
-The component is currently given only `IsNewPractitioner`, not an NPP-specific parameter.
+COMMENTS:
+Almost none. No ticket-ID comments. No // 132283 banners.
 
-**B. Address groups shown today**
+STOP AND REPORT (do not invent):
+- If you must change ValidateAndSaveAddresses / skip Home or Credentialing to hide UI.
+- If you must add a privileges API, disable Add, or the 132308 sentence.
+- If you must make Fax required or change State/Zip/phone rules.
+- If you must edit GetCredentialingTypeRtk, Demographic, Specialties, Delegate, FSQ, 132260/132352.
 
-`ManageAddressesTask.razor` always renders Home, Primary, and Credentialing. It renders Alternate only for an existing practitioner:
+THEN IMPLEMENT (smallest reuse):
 
-```razor
-<ManageAddresses AddressType="@(AddressType.Home)" ... />
-<ManageAddresses AddressType="@(AddressType.Primary)" ... />
-<ManageAddresses AddressType="@(AddressType.Credentialing)" ... />
-@if (!IsNewPractitioner)
-{
-    <ManageAlternateAddresses ... />
-}
-```
+Isolation
+- Pass IsNppPaf the same way as Demographic: StateContainer.PafState.TaskSelected == TaskType.Npp (parent Parameter and/or read PafState in the task). One name end-to-end.
+- Pass IsNppPaf into PracticeAddressModal if needed to hide group UI. Do not invent a second flag.
 
-There is no Primary-only/NPP display branch.
+132288 display
+- If IsNppPaf: do not render Home, Credentialing, or Alternate sections.
+- Still load and keep _homeAddresses / _credentialingAddresses / _alternateAddresses so ValidateAndSaveAddresses is unchanged.
+- Render Primary as today when a Primary exists.
 
-**C. Save/complete**
+132327 empty copy
+- If IsNppPaf and no Primary: show exactly: No Primary Address on File
+- Add Address stays enabled. Do not hide it.
 
-`ValidateAndSaveAddresses()` requires confirmed Home, Primary, and Credentialing addresses:
+132342
+- If IsNppPaf: skip Practice Group question / group search / RecentGroups selection. Go to the existing manual address fields.
+- Do not insert the "Note: Group addresses will not be available..." string.
 
-```csharp
-if (GetConfirmedAddress(_homeAddresses) == null ||
-    GetConfirmedAddress(_primaryAddresses) == null ||
-    GetConfirmedAddress(_credentialingAddresses) == null ||
-    _alternateAddresses.Any(a => a.Status == AddressValue.AddressStatus.Unreviewed))
-{
-    _showSaveForLaterModal = true;
-}
-else
-{
-    await SaveAddressesToPaf(true);
-}
-```
+132343 / 132344
+- No field or validator edits. Existing Form + OnFailedSubmit stay.
 
-Therefore, simply hiding Home and Credentialing would still block complete save. Save-for-later is a separate incomplete save path.
+DO NOT CHANGE:
+- ValidateAndSaveAddresses complete vs save-for-later condition
+- Add Address enable/disable
+- Demographic IsNppPaf logic (except copy the same Parameter pattern)
+- Begin PAF (TaskSelected != Npp): Home / Credentialing / Alternate / group flow unchanged
+- GetCredentialingTypeRtk, CACTUS, start strategies
+- Fax requiredness, new address API, affiliation queries
 
-**D. Empty Primary copy**
+IMPLEMENTATION REQUIREMENTS:
+1. Reuse TaskSelected == Npp.
+2. Non-NPP unchanged.
+3. No duplicate form.
+4. No invented API, RTK, or privileges check.
+5. Almost no new comments.
 
-I found no `"No Primary Address on File"` string in the Manage Addresses flow. An empty address collection is passed to the table; there is no explicit Primary empty-state message. 132288/132327 copy is not implemented.
+TESTS:
+- Do not create a test project.
+- dotnet build the Client (or the project that hosts ManageAddressesTask).
+- If an existing test breaks, fix only that break.
 
-**E. Add Address button**
+VALIDATION: build, inspect diff (comments near-zero). Confirm ValidateAndSaveAddresses diff is empty.
 
-`ManageAddresses.razor` renders Add Address without a disabled or permission condition:
-
-```razor
-<Button Type="@ButtonType.Primary" OnClick="ShowAddAddressModal">
-    Add Address
-</Button>
-```
-
-`ShowAddAddressModal()` clears the edit target and opens the existing modal. No affiliation-aware enable/disable rule or permission-based hiding was found.
-
-**F. Affiliation / privileges signal**
-
-`Practitioner` has an `Affiliations` collection, but the queried type is not evidence of facility privileges. `PractitionerGetQueryBuilder` filters its affiliation query to:
-
-```sql
-AND PA.AFFILIATIONTYPE_RTK = 'D26L0VNZT5' -- Sponsor (aka Collaborating Physician)
-```
-
-The returned `PractitionerAffiliation` contains sponsor/institution fields, not a facility-assignment active/status field. The existing address task’s `SelectedFacilities` are the PAF’s requested facilities, not current practitioner affiliations.
-
-**STOP:** I found no confirmed existing active facility-affiliation/privilege signal suitable for 132308/132341. Do not use PAF `SelectedFacilities` as a substitute.
-
-**G. Group-address note**
-
-The requested exact note does not exist in the inspected Manage Addresses components. Group handling is present: `PracticeAddressModal` asks whether the address is a Practice Group and offers group search/reuse. The primary modal passes recent groups into the selection flow:
-
-```razor
-<PracticeAddressModal ... RecentGroups="@GroupCache.GetGroupAddresses()" />
-```
-
-Hiding group selection for NPP appears locally isolatable, but there is no existing disclaimer text to conditionally hide.
-
-**H. Add Address modal and fields**
-
-Practice addresses use the existing `PracticeAddressModal` and `EditPracticeAddressStep`; this is not a new form.
-
-Current form model rules:
-
-- Contact: optional, max 60
-- Address Line 1: required, max 50
-- Address Line 2: optional, max 50
-- City: required, max 40
-- State: required for USA
-- Zip: required for USA, max 11, USA format checked
-- Country: required
-- Phone: required with phone validator/mask
-- Phone Ext: optional, max 10
-- Fax: optional with phone-format validation when entered
-- Fax Ext: optional, max 10
-- Group Name: conditionally required
-- Email: optional format validation
-- `FaxOrEmail`: required, so at least one of Fax or Email must be supplied
-
-This differs from 132343: Fax itself is not required, and State/Zip are conditional on USA. Existing form/model are reusable, but not an exact match to the ticket’s listed rules.
-
-Save proceeds through `PafFormComponent.HandleManageAddressesComplete()` and:
-
-```csharp
-SavePafAsync(TaskType.ManageAddresses)
-```
-
-No second address API is involved in the UI save path.
-
-**I. Validation UX**
-
-`EditPracticeAddressStep` uses the existing Ant Design `Form` with `OnValidationStateChanged="...OnFailedSubmit()"`. `BaseForm.OnFailedSubmit()` scrolls to a validation error:
-
-```csharp
-await JSRuntime.InvokeAsync<bool>("scrollToValidationError", null);
-```
-
-`PracticeAddressModal.Save()` calls `_editPracticeAddressStepRef.Save()` and only completes when the form validates. This is the current modal validation path; I found no separate inline-plus-summary component or framework-down generic error/block-save path specific to NPP. The Add Practitioner to Facility task is not this address modal.
-
-**J. NPP isolation signal**
-
-`PafState` exposes both:
-
-```csharp
-public TaskType TaskSelected { get; set; }
-public PafType? Type { get; private set; }
-```
-
-`PafFormComponent` already passes `PafData.Type` to Manage Addresses for `IsNewPractitioner`. Manage Addresses currently has no `IsNppPaf` parameter, but it can read `StateContainer.PafState.TaskSelected` as the Demographic task does, or the parent can pass the same NPP discriminator. Neither is currently wired.
-
-**K. Tests**
-
-No dedicated ManageAddresses, `AddressesTask`, or `EditAddressModel` tests were found. The matching test hits were serialized task data in unrelated processor tests.
-
-**L. Later implementation file map (no changes made)**
-
-1. Primary-only UI and empty copy: `ManageAddressesTask.razor`, `ManageAddressesTask.razor.cs`, and likely `ManageAddresses.razor` for the Primary empty state.
-2. Affiliation lock/message: `ManageAddressesTask.razor.cs` plus a confirmed existing facility-affiliation source. The necessary source was not identified, so this part is blocked.
-3. Group note: the component that currently renders the note was not found; no such note exists in the inspected flow. Group UI currently lives in `PracticeAddressModal.razor` and its code-behind.
-
-**M. Must-not-change list**
-
-Begin PAF Address behavior; non-NPP PAF types; 132277 Demographic; 132345; Delegate; FSQ; 132260/132352; `GetCredentialingTypeRtk`; and PAF `SelectedFacilities` as an affiliation signal.
-
-**N. Readiness**
-
-| Scope | Ready? | Finding |
-|---|---|---|
-| 132288 Primary-only UI | **No / STOP** | Save currently requires Home and Credentialing as well as Primary; hiding those groups would prevent complete save. |
-| 132327 empty + Add enabled | **No / STOP** | Empty copy is absent, and enabling Add based on no affiliations depends on an unconfirmed affiliation signal; hidden-group save issue also applies. |
-| 132308 / 132341 affiliation lock | **No / STOP** | No confirmed active facility affiliation/privilege signal was found. |
-| 132342 hide group note | **Yes, with qualification** | The exact note is not present; existing group UI is in `PracticeAddressModal` and can be isolated by NPP. |
-| 132343 / 132344 reuse form + validation | **No, not as specified** | Existing modal/save path is reusable, but Fax is optional and State/Zip requirements are country-conditional; the requested exact validation UX/error behavior was not confirmed. |
-
-## 2. Ready table
-
-The table above is the readiness result: **132288, 132327, 132308/132341, and exact 132343/132344 behavior are blocked or not ready; 132342 is locally isolatable, with no existing note to hide.**
-
-## 3. STOP items
-
-- Complete save currently requires Home + Primary + Credentialing, so Primary-only hiding needs a corresponding save-contract path; no such path was confirmed.
-- No confirmed existing active facility-affiliation/privileges signal was found. The loaded `PractitionerAffiliation` query is specifically Sponsor/Collaborating Physician.
-- Exact 132308 sentence and “No Primary Address on File” copy are absent.
-- Current address fields differ from the 132343 rules for Fax, State, and Zip.
-- No NPP-specific generic framework-down error behavior was found.
-
-No affiliation API, privileges API, notification type, RTK, or audit action was invented.
-
-## 4. Files you opened
-
-- `ManageAddressesTask.razor`
-- `ManageAddressesTask.razor.cs`
-- `ManageAddresses.razor`
-- `ManageAddresses.razor.cs`
-- `ManageAlternateAddresses.razor`
-- `PracticeAddressModal.razor`
-- `PracticeAddressModal.razor.cs`
-- `HomeAddressModal.razor`
-- `EditPracticeAddressStep.razor`
-- `EditPracticeAddressStep.razor.cs`
-- `AddressTask.cs`
-- `Practitioner.cs`
-- `PractitionerAffiliation.cs`
-- `PractitionerRepository.cs`
-- `PractitionerGetQueryBuilder.cs`
-- `PafFormComponent.razor`
-- `PafFormComponent.razor.cs`
-- `StateContainer.cs`
-- `BaseForm.cs`
-- `ModelExtensions.cs`
-
-## 5. Confirmation: no files modified
-
-Confirmed. Read-only inspection only; no files were modified, created, formatted, built, or executed.
+RETURN:
+1. Files changed
+2. How IsNppPaf is sourced — quote
+3. What is hidden vs still loaded — quote
+4. Empty-state string location — quote
+5. How group UI is skipped — quote
+6. Confirmation: ValidateAndSaveAddresses / affiliation / Fax / GetCredentialingTypeRtk not edited
+7. Build result
+8. Remaining gaps
