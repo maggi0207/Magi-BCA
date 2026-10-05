@@ -1,74 +1,71 @@
-Implemented NPP-only Manage Address display and group-flow behavior.
+You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
 
-1. **Files changed**
-- `PafFormComponent.razor`
-- `ManageAddressesTask.razor`
-- `ManageAddressesTask.razor.cs`
-- `ManageAddresses.razor`
-- `ManageAddresses.razor.cs`
-- `PracticeAddressModal.razor.cs`
+ROLE:
+Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not ask for a follow-up inspect chat.
 
-2. **NPP signal**
+TASK:
+Map the PAF Tasks Specialties Work form for NPP: Primary-only display, lock when active, professional practice interest comment, Primary-OR-interest validation. Answer A–N with file/class/method quotes. Then STOP.
 
-The parent passes the selected task as requested:
+KNOWN STARTING POINTS (confirm or correct — do not glob the whole repo):
+- Client/Pages/Paf/Components/Tasks/ManageSpecialties/ManageSpecialtiesTask.razor + .razor.cs
+- SelectSpecialtyModal
+- Shared/Data/Model/Paf/Form/SpecialtyTask.cs
+- Shared/Data/Model/Practitioner/PractitionerSpecialty.cs
+- PafFormComponent.razor — Specialties card + Work (TaskType)
+- Isolation: StateContainer.PafState.TaskSelected == TaskType.Npp → IsNppPaf (already on Demographic and ManageAddresses). Quote whether ManageSpecialtiesTask has that Parameter.
+- PROVIDERSPECIALTIES.SPECIALTY_RTK and PROVIDERSPECIALTIES_ACTIVE — map to existing PractitionerSpecialty properties only. Do not invent columns.
+- Professional practice interest / PPI / comment: search this form and SpecialtyTask only. Earlier full-repo “PPI” was zero hits.
+- If a path is wrong, search only under Client/Pages/Paf/Components/Tasks/ManageSpecialties then SpecialtyTask / PractitionerSpecialty. Quote real files.
 
-```razor
-IsNppPaf="@(StateContainer.PafState.TaskSelected == TaskType.Npp)"
-```
+TICKETS (context only — do not implement):
+132345 host — Begin NPP PAF / ADD NPP only. Reuse existing specialty management. Begin PAF unchanged. Secondary/Alternate not shown on NPP.
+132346 — Net new: card displayed and required. Existing: optional unless no Primary OR ACTIVE = False (then required). Active Primary True: read-only; suppress Select Specialty. Hide Secondary/Alternate. Source SPECIALTY_RTK. Load fail: user-friendly error; no partial update. Missing attributes: treat required; block save.
+132347 — NPP only. Prompt below Primary: Please list non-specialty/board areas of professional practice interest or focus (HIV/AIDS, etc.). Comment max 500. Instruction: If you are unable to locate the specialty under Primary Specialty, please enter the professional practice interest in the comment box below. Begin PAF must not show this. Spaces-only = blank.
+132348 — At least one of Primary Specialty OR interest. If both blank, exact: A Primary Specialty or Professional Practice Interest or Focus is required. Please provide either a Primary Specialty or a Professional Practice Interest or Focus. Client-side before backend. Begin PAF unchanged.
+132349 — When Primary populated and ACTIVE = True: read-only. Hover exact: The practitioner currently holds privileges at one or more HCA facilities. The primary specialty cannot be changed. Tooltip only when disabled. If tooltip fails, field still disabled.
 
-3. **Hidden versus still loaded**
+STOP AND REPORT (do not invent):
+- If professional practice interest has no existing field and you would invent a CACTUS/PPI table or new API.
+- If ACTIVE / SPECIALTY_RTK cannot map to PractitionerSpecialty (or the real type) without new columns.
+- If SaveSpecialties hard-requires Primary and interest-only save would need a new save contract — report; do not invent.
+- If GetCredentialingTypeRtk Npp or a new RTK is required.
+- Do not treat PAF SelectedFacilities as “privileges” for the 132349 tooltip.
 
-NPP hides Home, Credentialing, and Alternate sections with conditional CSS classes. Their component refs and address collections remain loaded so existing save behavior can still access them. Primary remains displayed, and Add Address remains enabled.
+ANSWER (quote path + symbol + relevant lines):
 
-```razor
-<SpaceItem Class="@(IsNppPaf ? "hide" : "")">
-    <ManageAddresses ... Addresses="@_homeAddresses" />
-</SpaceItem>
-```
+A. Which component opens from PAF Tasks Specialties Work. Confirm ManageSpecialtiesTask or the real name. TaskType on the card.
 
-4. **Empty-state string**
+B. Primary / Secondary / Alternate on the form today. How each is shown. SaveSpecialties (or real name): does complete require Primary today?
 
-Rendered beside the Primary section when the NPP Primary collection is empty:
+C. How Primary is loaded (existing practitioner vs net new). Map PROVIDERSPECIALTIES.SPECIALTY_RTK and PROVIDERSPECIALTIES_ACTIVE to real properties. Gap vs 132346 / 132349.
 
-```razor
-@if (IsNppPaf && !_primaryAddresses.Any())
-{
-    <Text>No Primary Address on File</Text>
-}
-```
+D. Select Specialty control: where; when disabled today (IsDisabled). Gap vs suppress when active Primary on NPP.
 
-5. **Group UI skipped**
+E. Professional practice interest / PPI / comment on this form or SpecialtyTask. Exists? Max length? If missing, say so — do not propose a new Cactus table.
 
-The Primary editor forwards `IsNppPaf` to the existing modal. For a new address, the modal selects its existing manual-entry path instead of the Practice Group question:
+F. Current requiredness (card vs Primary). Net new vs existing. Gap vs 132346 required/optional matrix and 132348 OR-rule.
 
-```csharp
-if (IsNppPaf)
-{
-    IsEditingPracticeGroupAddress = "No";
-}
-else
-{
-    _viewState = PracticeAddressModalViewState.PracticeQuestion;
-}
-```
+G. Existing tooltip / disabled-field pattern on this form or nearby PAF tasks (reuse for 132349 string). Do not invent a new tooltip framework.
 
-No group disclaimer was added.
+H. Isolation: does ManageSpecialtiesTask see IsNppPaf / TaskSelected today? Can it reuse the same parent pass as Address?
 
-6. **Unchanged behavior confirmation**
+I. Tests for ManageSpecialties / SpecialtyTask. Names only.
 
-`ValidateAndSaveAddresses()` was not changed. No affiliation check, privileges API, Add Address disabling, Fax rule, `GetCredentialingTypeRtk`, CACTUS, or other PAF task flow was edited. Begin PAF remains unchanged.
+J. Files that would change later for (1) hide Secondary/Alternate display (2) interest prompt+500 box (3) OR validation message (4) read-only + hover. Do not edit them.
 
-7. **Build result**
+K. Must-not-change: Begin PAF Specialties, non-NPP types, 132277, 132283, Delegate, FSQ, 132260/132352, GetCredentialingTypeRtk, inventing SPECIALTY RTKs.
 
-Client project build succeeded:
+L. Ready to implement?
+    - 132346 hide Secondary/Alternate display (keep data): Yes / No / STOP (why)
+    - 132346/132349 lock + suppress Select when ACTIVE: Yes / No / STOP (why)
+    - 132347 interest UI: Yes / No / STOP (why)
+    - 132348 Primary OR interest save: Yes / No / STOP (why)
 
-```text
-Hca.Credentialing.Client net10.0 browser-wasm succeeded
-Build succeeded in 28.6s
-```
+RETURN format:
+1. A–L answers with quotes
+2. Ready table
+3. STOP items
+4. Files you opened
+5. Confirmation: no files modified
 
-Final diagnostics report no errors in all six changed files.
-
-8. **Remaining gaps**
-
-The requested Primary-only display is implemented, but unchanged `ValidateAndSaveAddresses()` still requires confirmed Home and Credentialing addresses for completion. Since the instruction was not to change that method, a PAF without those confirmed address groups may still be offered Save for Later rather than complete.
+Do not implement. Do not hide Delegate/FSQ. Do not add ADD NPP card. Do not invent PPI/CACTUS columns. Do not invent RTK or AuditAction. Do not use SelectedFacilities as privileges.
