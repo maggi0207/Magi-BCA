@@ -1,80 +1,74 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+Implemented NPP-only Manage Address display and group-flow behavior.
 
-ROLE:
-Senior engineer. One session. Treat the 132283 inspect RETURN as fact unless you re-read and disprove. Then implement. Do not start a second chat.
+1. **Files changed**
+- `PafFormComponent.razor`
+- `ManageAddressesTask.razor`
+- `ManageAddressesTask.razor.cs`
+- `ManageAddresses.razor`
+- `ManageAddresses.razor.cs`
+- `PracticeAddressModal.razor.cs`
 
-TASK:
-On PAF Tasks Manage Address Work only: when TaskSelected is TaskType.Npp, show Primary only, show "No Primary Address on File" when there is no Primary, and do not run the Practice Group address flow. Keep Home / Credentialing / Alternate data in the model. Begin PAF and non-NPP unchanged.
+2. **NPP signal**
 
-Treat inspect as fact:
-- ManageAddressesTask. Parent already passes IsNewPractitioner. No IsNppPaf yet.
-- Always renders Home, Primary, Credentialing. Alternate if !IsNewPractitioner.
-- ValidateAndSaveAddresses requires confirmed Home + Primary + Credentialing. Do NOT change that method.
-- No "No Primary Address on File" string today. Add Address is always enabled. Leave Add enabled.
-- No facility-privilege signal. Do NOT disable Add. Do NOT add the 132308 privileges sentence. Do NOT use SelectedFacilities or Sponsor affiliations (D26L0VNZT5).
-- Group UI is PracticeAddressModal (Practice Group question + search). Exact ticket note is not in the repo. Do not add that note.
-- PracticeAddressModal / EditPracticeAddressStep already match existing save. Fax is optional; FaxOrEmail required. Do not change field requiredness.
-- Demographic isolation: IsNppPaf="@(StateContainer.PafState.TaskSelected == TaskType.Npp)". Reuse that name. Do not use PafType as NPP.
+The parent passes the selected task as requested:
 
-COMMENTS:
-Almost none. No ticket-ID comments. No // 132283 banners.
+```razor
+IsNppPaf="@(StateContainer.PafState.TaskSelected == TaskType.Npp)"
+```
 
-STOP AND REPORT (do not invent):
-- If you must change ValidateAndSaveAddresses / skip Home or Credentialing to hide UI.
-- If you must add a privileges API, disable Add, or the 132308 sentence.
-- If you must make Fax required or change State/Zip/phone rules.
-- If you must edit GetCredentialingTypeRtk, Demographic, Specialties, Delegate, FSQ, 132260/132352.
+3. **Hidden versus still loaded**
 
-THEN IMPLEMENT (smallest reuse):
+NPP hides Home, Credentialing, and Alternate sections with conditional CSS classes. Their component refs and address collections remain loaded so existing save behavior can still access them. Primary remains displayed, and Add Address remains enabled.
 
-Isolation
-- Pass IsNppPaf the same way as Demographic: StateContainer.PafState.TaskSelected == TaskType.Npp (parent Parameter and/or read PafState in the task). One name end-to-end.
-- Pass IsNppPaf into PracticeAddressModal if needed to hide group UI. Do not invent a second flag.
+```razor
+<SpaceItem Class="@(IsNppPaf ? "hide" : "")">
+    <ManageAddresses ... Addresses="@_homeAddresses" />
+</SpaceItem>
+```
 
-132288 display
-- If IsNppPaf: do not render Home, Credentialing, or Alternate sections.
-- Still load and keep _homeAddresses / _credentialingAddresses / _alternateAddresses so ValidateAndSaveAddresses is unchanged.
-- Render Primary as today when a Primary exists.
+4. **Empty-state string**
 
-132327 empty copy
-- If IsNppPaf and no Primary: show exactly: No Primary Address on File
-- Add Address stays enabled. Do not hide it.
+Rendered beside the Primary section when the NPP Primary collection is empty:
 
-132342
-- If IsNppPaf: skip Practice Group question / group search / RecentGroups selection. Go to the existing manual address fields.
-- Do not insert the "Note: Group addresses will not be available..." string.
+```razor
+@if (IsNppPaf && !_primaryAddresses.Any())
+{
+    <Text>No Primary Address on File</Text>
+}
+```
 
-132343 / 132344
-- No field or validator edits. Existing Form + OnFailedSubmit stay.
+5. **Group UI skipped**
 
-DO NOT CHANGE:
-- ValidateAndSaveAddresses complete vs save-for-later condition
-- Add Address enable/disable
-- Demographic IsNppPaf logic (except copy the same Parameter pattern)
-- Begin PAF (TaskSelected != Npp): Home / Credentialing / Alternate / group flow unchanged
-- GetCredentialingTypeRtk, CACTUS, start strategies
-- Fax requiredness, new address API, affiliation queries
+The Primary editor forwards `IsNppPaf` to the existing modal. For a new address, the modal selects its existing manual-entry path instead of the Practice Group question:
 
-IMPLEMENTATION REQUIREMENTS:
-1. Reuse TaskSelected == Npp.
-2. Non-NPP unchanged.
-3. No duplicate form.
-4. No invented API, RTK, or privileges check.
-5. Almost no new comments.
+```csharp
+if (IsNppPaf)
+{
+    IsEditingPracticeGroupAddress = "No";
+}
+else
+{
+    _viewState = PracticeAddressModalViewState.PracticeQuestion;
+}
+```
 
-TESTS:
-- Do not create a test project.
-- dotnet build the Client (or the project that hosts ManageAddressesTask).
-- If an existing test breaks, fix only that break.
+No group disclaimer was added.
 
-VALIDATION: build, inspect diff (comments near-zero). Confirm ValidateAndSaveAddresses diff is empty.
+6. **Unchanged behavior confirmation**
 
-RETURN:
-1. Files changed
-2. How IsNppPaf is sourced — quote
-3. What is hidden vs still loaded — quote
-4. Empty-state string location — quote
-5. How group UI is skipped — quote
-6. Confirmation: ValidateAndSaveAddresses / affiliation / Fax / GetCredentialingTypeRtk not edited
-7. Build result
-8. Remaining gaps
+`ValidateAndSaveAddresses()` was not changed. No affiliation check, privileges API, Add Address disabling, Fax rule, `GetCredentialingTypeRtk`, CACTUS, or other PAF task flow was edited. Begin PAF remains unchanged.
+
+7. **Build result**
+
+Client project build succeeded:
+
+```text
+Hca.Credentialing.Client net10.0 browser-wasm succeeded
+Build succeeded in 28.6s
+```
+
+Final diagnostics report no errors in all six changed files.
+
+8. **Remaining gaps**
+
+The requested Primary-only display is implemented, but unchanged `ValidateAndSaveAddresses()` still requires confirmed Home and Credentialing addresses for completion. Since the instruction was not to change that method, a PAF without those confirmed address groups may still be offered Save for Later rather than complete.
