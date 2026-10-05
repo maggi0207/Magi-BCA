@@ -1,71 +1,22 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+Implemented the NPP-only Professional Practice Interest field and save behavior. Existing Secondary and Alternate hiding remains in place.
 
-ROLE:
-Senior engineer. One session. Treat 132345 inspect + TASK 1-SHOT as fact unless you re-read and disprove. Then implement. Do not start a second chat.
+1. **Files changed**
+   - `SpecialtyTask.cs`
+   - `ManageSpecialtiesTask.razor`
+   - `ManageSpecialtiesTask.razor.cs`
+   - `PafFormComponent.razor.cs`
 
-TASK:
-On PAF Tasks Specialties Work, when IsNppPaf: show professional practice interest UI and allow save if Primary Specialty OR that comment is present. Persist on the PAF SpecialtyTask only. Begin PAF unchanged. Do not write visualCactus.Credentialing / CVI Notes.
+2. **`SpecialtyTask` property:** `ProfessionalPracticeInterest`
 
-Laura Avila (2026-10-06): "PAF is enough and agree with Ashley, add to notes but only if the CVI is created."
-This shot = PAF only. CVI Notes is later (132537) when a CVI exists. Do not add that write now.
+3. **NPP-only UI strings:**
+   - “If you are unable to locate the specialty under Primary Specialty, please enter the professional practice interest in the comment box below.”
+   - “Please list non-specialty/board areas of professional practice interest or focus (HIV/AIDS, etc.).”
+   - The comment box enforces a 500-character maximum and binds to the PAF `SpecialtyTask`.
 
-Treat inspect as fact:
-- ManageSpecialtiesTask already has IsNppPaf from TaskSelected == TaskType.Npp.
-- SpecialtyTask has Primary, Secondary, Alternate only. Adding one string on SpecialtyTask is the allowed PAF persist. Do not add a Cactus table/column/API.
-- SaveSpecialties() currently blocks when Primary is null ("Primary Specialty needed."). For IsNppPaf only, change that guard to Primary OR non-blank interest.
-- Secondary/Alternate stay hidden on NPP (TASK 1). Do not undo that.
-- Spaces-only interest = blank.
+4. **NPP save guard:** `GetSpecialty(SpecialtyTarget.Primary) == null && (!IsNppPaf || string.IsNullOrWhiteSpace(_specialtyTask.ProfessionalPracticeInterest))`. The NPP validation notification uses the exact requested message. Non-NPP retains its existing Primary-only validation.
 
-COMMENTS:
-Almost none. No ticket-ID comments.
+5. **Scope confirmation:** The comment is carried through the existing Specialty completion and PAF save path. No Cactus, CVI, `GetCredentialingTypeRtk`, or API changes.
 
-STOP AND REPORT (do not invent):
-- If you must write Cactus / CVI Notes / GetCredentialingTypeRtk / a new API.
-- If SpecialtyTask cannot carry a string through the existing SavePafAsync / SaveSpecialties path without a new service.
-- If you must show this UI when !IsNppPaf.
+6. **Builds:** Client and Shared both succeeded. `git diff --check` passed.
 
-THEN IMPLEMENT (smallest reuse):
-
-132347 UI (IsNppPaf only)
-- Instruction under existing specialty instructions, exact:
-  If you are unable to locate the specialty under Primary Specialty, please enter the professional practice interest in the comment box below.
-- Prompt below Primary, exact:
-  Please list non-specialty/board areas of professional practice interest or focus (HIV/AIDS, etc.).
-- Comment box max 500 (block extra input or existing max-length). Bind to the new SpecialtyTask string. Keep value if other validation fails.
-
-132348 save (IsNppPaf only)
-- If Primary is missing AND interest is blank/whitespace: block save. Exact message:
-  A Primary Specialty or Professional Practice Interest or Focus is required. Please provide either a Primary Specialty or a Professional Practice Interest or Focus.
-- If Primary exists OR interest has non-whitespace: existing save path. Do not require both.
-- !IsNppPaf: keep current Primary-only required notification.
-
-Persist
-- One string on SpecialtyTask (name it like existing properties). Include it in whatever object SaveSpecialties already saves. No Cactus mapping.
-
-DO NOT CHANGE:
-- Cactus specialty query, CrudPractitionerSpecialtiesOperation, visualCactus.Credentialing
-- GetCredentialingTypeRtk, 132537 CVI
-- Demographic, Address, Delegate, FSQ, 132260/132352
-- Begin PAF specialties (no prompt, no box, Primary still required)
-
-IMPLEMENTATION REQUIREMENTS:
-1. Reuse IsNppPaf.
-2. Non-NPP unchanged.
-3. No Cactus/CVI write.
-4. Almost no new comments.
-
-TESTS:
-- Do not create a test project.
-- dotnet build Client (and Shared if SpecialtyTask lives there).
-- If an existing test breaks, fix only that break.
-
-VALIDATION: build, inspect diff. No Cactus/CVI files.
-
-RETURN:
-1. Files changed
-2. Property name on SpecialtyTask — quote
-3. UI strings — quote
-4. SaveSpecialties OR-guard — quote
-5. Confirmation: no Cactus/CVI/GetCredentialingTypeRtk edits
-6. Build result
-7. Remaining gaps
+7. **Remaining gaps:** CVI Notes remain out of scope for this PAF-only change; no tests were added.
