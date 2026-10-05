@@ -1,76 +1,15 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+Implemented the NPP-only Specialty Work changes.
 
-ROLE:
-Senior engineer. One session. Treat the 132345 inspect RETURN as fact unless you re-read and disprove. Then implement. Do not start a second chat.
+1. **Files changed for this task:** `PafFormComponent.razor`, `ManageSpecialtiesTask.razor`, and `ManageSpecialtiesTask.razor.cs`. The parent file already contains unrelated uncommitted demographic and address changes; I left them intact.
 
-TASK:
-On PAF Tasks Specialties Work only: when TaskSelected is TaskType.Npp, hide Secondary and Alternate, and show the exact lock tooltip on an already-disabled existing Primary. Keep Secondary/Alternate data in the model. Begin PAF unchanged.
+2. **NPP flag source:** `IsNppPaf="@(StateContainer.PafState.TaskSelected == TaskType.Npp)"`
 
-Treat inspect as fact:
-- ManageSpecialtiesTask. TaskType.ManageSpecialities (keep that spelling). No IsNppPaf yet.
-- _specialtyTargets = Primary, Secondary. Alternate is a separate card. All shown today.
-- SaveSpecialties() requires Primary ("Primary Specialty needed."). Do NOT change that method.
-- Cactus practitioner specialties: WHERE s.ACTIVE = 1. Key = SPECIALTY_RTK. No raw ACTIVE on PractitionerSpecialty.
-- IsDisabled already true when the selected specialty is in _existingSpecialties. No tooltip today.
-- Other PAF tasks use Ant Design Tooltip. Reuse that. Do not invent a tooltip framework.
-- No professional practice interest field. Do NOT add one. Do NOT change Primary-only save to OR-interest.
-- Address isolation: IsNppPaf="@(StateContainer.PafState.TaskSelected == TaskType.Npp)". Reuse that name. Do not use PafType as NPP.
+3. **Display behavior:** For NPP, Secondary and Alternate sections are hidden; Primary remains visible. Specialty values remain loaded in the existing model and collections, so save behavior is unchanged.
 
-COMMENTS:
-Almost none. No ticket-ID comments. No // 132345 banners.
+4. **Tooltip condition and text:** Rendered only when `IsNppPaf && target == SpecialtyTarget.Primary && IsDisabled(target)`. Exact text: “The practitioner currently holds privileges at one or more HCA facilities. The primary specialty cannot be changed.”
 
-STOP AND REPORT (do not invent):
-- If you must add a SpecialtyTask comment / PPI field / Cactus column / new API.
-- If you must change SaveSpecialties() (skip Primary or OR-interest).
-- If you must add PROVIDERSPECIALTIES_ACTIVE to the model.
-- If you must edit GetCredentialingTypeRtk, Demographic, Address, Delegate, FSQ, 132260/132352.
+5. **Unchanged paths:** `SaveSpecialties()`, `SpecialtyTask`, the Cactus specialty query, and `GetCredentialingTypeRtk` were not edited. The Primary-required check remains. Non-NPP controls retain their original markup and behavior.
 
-THEN IMPLEMENT (smallest reuse):
+6. **Validation:** Client build succeeded; `git diff --check` reported no whitespace issues.
 
-Isolation
-- Pass IsNppPaf the same way as Address: StateContainer.PafState.TaskSelected == TaskType.Npp. One name end-to-end.
-
-132346 display
-- If IsNppPaf: do not show Secondary or Alternate sections (hide class is OK, same as Address).
-- Still keep Primary, Secondary, Alternate values loaded so SaveSpecialties is unchanged.
-- Primary section still shown.
-
-132349
-- If IsNppPaf and Primary Select is already disabled (existing membership / IsDisabled): wrap with existing Tooltip.
-- Exact title/text: The practitioner currently holds privileges at one or more HCA facilities. The primary specialty cannot be changed.
-- Tooltip only when that control is disabled. Do not show it when Primary is editable.
-- Do not use SelectedFacilities. Do not change IsDisabled logic unless a one-line IsNppPaf guard is required to keep Begin PAF identical.
-
-132347 / 132348
-- Do not add interest UI, instruction text, or OR validation.
-
-DO NOT CHANGE:
-- SaveSpecialties() Primary required check
-- SpecialtyTask model shape
-- Cactus specialty query / GetAllSpecialtiesAsync
-- Begin PAF (TaskSelected != Npp): Secondary, Alternate, no tooltip
-- GetCredentialingTypeRtk, CACTUS write path, start strategies
-- Demographic / Address IsNppPaf logic except copying the Parameter pattern
-
-IMPLEMENTATION REQUIREMENTS:
-1. Reuse TaskSelected == Npp.
-2. Non-NPP unchanged.
-3. No duplicate form.
-4. No invented API, RTK, PPI field, or privileges query.
-5. Almost no new comments.
-
-TESTS:
-- Do not create a test project.
-- dotnet build the Client (or the project that hosts ManageSpecialtiesTask).
-- If an existing test breaks, fix only that break.
-
-VALIDATION: build, inspect diff (comments near-zero). Confirm SaveSpecialties() diff is empty.
-
-RETURN:
-1. Files changed
-2. How IsNppPaf is sourced — quote
-3. What is hidden vs still loaded — quote
-4. Tooltip condition + exact string — quote
-5. Confirmation: SaveSpecialties / SpecialtyTask / Cactus query / GetCredentialingTypeRtk not edited
-6. Build result
-7. Remaining gaps
+7. **Remaining gaps:** No professional-practice-interest field or OR-interest validation was added, as requested.
