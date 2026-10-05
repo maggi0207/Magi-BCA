@@ -1,71 +1,167 @@
-You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
+## 1. A–L answers with quotes
 
-ROLE:
-Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not ask for a follow-up inspect chat.
+**A. Specialty Work target**
 
-TASK:
-Map the PAF Tasks Specialties Work form for NPP: Primary-only display, lock when active, professional practice interest comment, Primary-OR-interest validation. Answer A–N with file/class/method quotes. Then STOP.
+The PAF Tasks card uses `TaskType.ManageSpecialities`:
 
-KNOWN STARTING POINTS (confirm or correct — do not glob the whole repo):
-- Client/Pages/Paf/Components/Tasks/ManageSpecialties/ManageSpecialtiesTask.razor + .razor.cs
-- SelectSpecialtyModal
-- Shared/Data/Model/Paf/Form/SpecialtyTask.cs
-- Shared/Data/Model/Practitioner/PractitionerSpecialty.cs
-- PafFormComponent.razor — Specialties card + Work (TaskType)
-- Isolation: StateContainer.PafState.TaskSelected == TaskType.Npp → IsNppPaf (already on Demographic and ManageAddresses). Quote whether ManageSpecialtiesTask has that Parameter.
-- PROVIDERSPECIALTIES.SPECIALTY_RTK and PROVIDERSPECIALTIES_ACTIVE — map to existing PractitionerSpecialty properties only. Do not invent columns.
-- Professional practice interest / PPI / comment: search this form and SpecialtyTask only. Earlier full-repo “PPI” was zero hits.
-- If a path is wrong, search only under Client/Pages/Paf/Components/Tasks/ManageSpecialties then SpecialtyTask / PractitionerSpecialty. Quote real files.
+```razor
+<ManageSpecialtiesTask OnComplete="@HandleManageSpecialtiesComplete" />
+```
 
-TICKETS (context only — do not implement):
-132345 host — Begin NPP PAF / ADD NPP only. Reuse existing specialty management. Begin PAF unchanged. Secondary/Alternate not shown on NPP.
-132346 — Net new: card displayed and required. Existing: optional unless no Primary OR ACTIVE = False (then required). Active Primary True: read-only; suppress Select Specialty. Hide Secondary/Alternate. Source SPECIALTY_RTK. Load fail: user-friendly error; no partial update. Missing attributes: treat required; block save.
-132347 — NPP only. Prompt below Primary: Please list non-specialty/board areas of professional practice interest or focus (HIV/AIDS, etc.). Comment max 500. Instruction: If you are unable to locate the specialty under Primary Specialty, please enter the professional practice interest in the comment box below. Begin PAF must not show this. Spaces-only = blank.
-132348 — At least one of Primary Specialty OR interest. If both blank, exact: A Primary Specialty or Professional Practice Interest or Focus is required. Please provide either a Primary Specialty or a Professional Practice Interest or Focus. Client-side before backend. Begin PAF unchanged.
-132349 — When Primary populated and ACTIVE = True: read-only. Hover exact: The practitioner currently holds privileges at one or more HCA facilities. The primary specialty cannot be changed. Tooltip only when disabled. If tooltip fails, field still disabled.
+Its Work button calls:
 
-STOP AND REPORT (do not invent):
-- If professional practice interest has no existing field and you would invent a CACTUS/PPI table or new API.
-- If ACTIVE / SPECIALTY_RTK cannot map to PractitionerSpecialty (or the real type) without new columns.
-- If SaveSpecialties hard-requires Primary and interest-only save would need a new save contract — report; do not invent.
-- If GetCredentialingTypeRtk Npp or a new RTK is required.
-- Do not treat PAF SelectedFacilities as “privileges” for the 132349 tooltip.
+```razor
+HandleRequestEditAsync(EditSource.Edit, TaskType.ManageSpecialities)
+```
 
-ANSWER (quote path + symbol + relevant lines):
+`HandleRequestEditAsync` routes that type to `PractitionerPafViewState.ManageSpecialties`.
 
-A. Which component opens from PAF Tasks Specialties Work. Confirm ManageSpecialtiesTask or the real name. TaskType on the card.
+**B. Primary / Secondary / Alternate and save**
 
-B. Primary / Secondary / Alternate on the form today. How each is shown. SaveSpecialties (or real name): does complete require Primary today?
+The component’s `_specialtyTargets` contains Primary and Secondary. Alternate is rendered in a separate card. All three are shown today; no NPP visibility condition exists.
 
-C. How Primary is loaded (existing practitioner vs net new). Map PROVIDERSPECIALTIES.SPECIALTY_RTK and PROVIDERSPECIALTIES_ACTIVE to real properties. Gap vs 132346 / 132349.
+```csharp
+private readonly ICollection<SpecialtyTarget> _specialtyTargets = new List<SpecialtyTarget>
+{
+    SpecialtyTarget.Primary,
+    SpecialtyTarget.Secondary
+};
+```
 
-D. Select Specialty control: where; when disabled today (IsDisabled). Gap vs suppress when active Primary on NPP.
+`SaveSpecialties()` currently requires Primary:
 
-E. Professional practice interest / PPI / comment on this form or SpecialtyTask. Exists? Max length? If missing, say so — do not propose a new Cactus table.
+```csharp
+if (GetSpecialty(SpecialtyTarget.Primary) == null)
+{
+    NotificationService.Open(new NotificationConfig()
+    {
+        Message = "Primary Specialty needed.",
+        Description = "Please define a Primary Specialty.",
+```
 
-F. Current requiredness (card vs Primary). Net new vs existing. Gap vs 132346 required/optional matrix and 132348 OR-rule.
+It then reports `TaskStatus.Complete` and saves Primary, Secondary, and Alternate specialties.
 
-G. Existing tooltip / disabled-field pattern on this form or nearby PAF tasks (reuse for 132349 string). Do not invent a new tooltip framework.
+**C. Load source and active mapping**
 
-H. Isolation: does ManageSpecialtiesTask see IsNppPaf / TaskSelected today? Can it reuse the same parent pass as Address?
+`ManageSpecialtiesTask.OnInitialized()` loads the PAF specialty task and existing practitioner specialties:
 
-I. Tests for ManageSpecialties / SpecialtyTask. Names only.
+```csharp
+_specialtyTask = StateContainer.PafState.SpecialtyTask;
+_existingSpecialties = StateContainer.PafState.Practitioner.Specialties;
+```
 
-J. Files that would change later for (1) hide Secondary/Alternate display (2) interest prompt+500 box (3) OR validation message (4) read-only + hover. Do not edit them.
+`InitializeFromPractitioner()` seeds the task’s Primary/Secondary/Alternate values from `Practitioner.Specialties`.
 
-K. Must-not-change: Begin PAF Specialties, non-NPP types, 132277, 132283, Delegate, FSQ, 132260/132352, GetCredentialingTypeRtk, inventing SPECIALTY RTKs.
+Cactus maps the specialty RTK to `PractitionerSpecialty.Key`:
 
-L. Ready to implement?
-    - 132346 hide Secondary/Alternate display (keep data): Yes / No / STOP (why)
-    - 132346/132349 lock + suppress Select when ACTIVE: Yes / No / STOP (why)
-    - 132347 interest UI: Yes / No / STOP (why)
-    - 132348 Primary OR interest save: Yes / No / STOP (why)
+```sql
+SELECT DISTINCT s.SPECIALTY_RTK AS [Key],
+    RTRIM(r.[DESCRIPTION]) AS [Name],
+    RTRIM(r2.[DESCRIPTION]) AS [Status],
+    RTRIM(r3.[DESCRIPTION]) AS [Type]
+...
+WHERE s.ACTIVE = 1
+  AND s.PROVIDER_K = @practitionerKey
+```
 
-RETURN format:
-1. A–L answers with quotes
-2. Ready table
-3. STOP items
-4. Files you opened
-5. Confirmation: no files modified
+Thus active specialties are included in the practitioner collection, but the raw `PROVIDERSPECIALTIES_ACTIVE` value is not returned as a model property. `PractitionerSpecialty.Status` maps the description for `SPECIALTYSTATUS_RTK`, not the row’s `ACTIVE` bit.
 
-Do not implement. Do not hide Delegate/FSQ. Do not add ADD NPP card. Do not invent PPI/CACTUS columns. Do not invent RTK or AuditAction. Do not use SelectedFacilities as privileges.
+**D. Selector and current lock**
+
+The “Select Specialty” button uses `Disabled="IsDisabled(target)"`. For a selected existing specialty, `IsDisabled` checks whether it is present in `_existingSpecialties`:
+
+```csharp
+return ((target != SpecialtyTarget.Alternate) &&
+        (GetSpecialty(target + 1) != null)) ||
+       (_existingSpecialties?.Contains(GetSpecialty(target)) ?? false);
+```
+
+The modal is `SelectSpecialtyModal`; it loads choices using `Cactus.PractitionerSpecialties.GetAllSpecialtiesAsync()`.
+
+This means a selected Primary found in the active-filtered Cactus practitioner-specialty list is already disabled from being cleared. The form does not expose an explicit active boolean or an NPP-specific lock. No tooltip is shown for this disabled state.
+
+**E. Professional practice interest**
+
+No professional-practice-interest/comment field exists in the Manage Specialties form or `SpecialtyTask`. The `SpecialtyTask` model contains Primary, Secondary, and Alternate specialties only. No PPI table/API is established here.
+
+**F. Current requiredness**
+
+Primary has a Required badge in the form and `SaveSpecialties()` blocks saving without it. Net-new vs existing influences whether the task itself is required:
+
+```csharp
+practitionerSpecialtyTask.IsRequired = practitioner.IsNew;
+```
+
+There is no existing Primary-OR-interest rule or NPP-specific requiredness. Interest-only save would fail the Primary check and there is no interest field in the save event/model.
+
+**G. Tooltip pattern**
+
+No tooltip exists in `ManageSpecialtiesTask` for the disabled selected Primary. Other PAF task components do use Ant Design `Tooltip`, but this task has no current tooltip or privilege message. The active lock can reuse the existing disabled-selection pattern when the specialty is in `_existingSpecialties`; the requested exact hover text would still need to be added to this form.
+
+**H. NPP isolation**
+
+`ManageSpecialtiesTask` has no `IsNppPaf` parameter and does not read `TaskSelected`. The parent currently renders it without an NPP discriminator:
+
+```razor
+<ManageSpecialtiesTask OnComplete="@HandleManageSpecialtiesComplete" />
+```
+
+The parent can pass the same discriminator used by the other task forms:
+
+```razor
+IsNppPaf="@(StateContainer.PafState.TaskSelected == TaskType.Npp)"
+```
+
+**I. Tests**
+
+No dedicated ManageSpecialties, `SpecialtyTask`, or `PractitionerSpecialty` tests were found.
+
+**J. Files that would change later**
+
+1. Hide Secondary/Alternate display while retaining data: `ManageSpecialtiesTask.razor`; likely its code-behind to conditionally build/render the view.
+2. Interest prompt and 500-character box: `ManageSpecialtiesTask.razor`, `ManageSpecialtiesTask.razor.cs`, and `SpecialtyTask.cs` plus its completion event/save path.
+3. Primary OR interest validation: `ManageSpecialtiesTask.razor.cs`; the current Primary-only save guard and event/model would need a confirmed persistence contract for the interest text.
+4. Read-only behavior and hover text: `ManageSpecialtiesTask.razor` and its code-behind. The existing `_existingSpecialties` membership check provides an active-filtered source for a selected practitioner specialty.
+
+**K. Must-not-change**
+
+Begin PAF specialties; non-NPP types; 132277 Demographic; 132283 Address; Delegate; FSQ; 132260/132352; `GetCredentialingTypeRtk`; specialty RTK definitions; and PAF `SelectedFacilities` as a privileges signal.
+
+**L. Readiness**
+
+| Requirement | Ready? | Finding |
+|---|---|---|
+| 132346 hide Secondary/Alternate, keep data | **Yes** | The task keeps all specialty values in `_practitionerSpecialties`; the view can selectively omit those sections. |
+| 132346/132349 lock active Primary and suppress selector | **Yes, with qualification** | Cactus loads practitioner specialties with `s.ACTIVE = 1`, and the existing membership check already disables an existing selected specialty. The model lacks a raw Active property; there is no NPP-specific tooltip today. |
+| 132347 professional practice interest UI | **STOP** | No interest field exists on `SpecialtyTask`; adding UI alone would not persist it. Do not invent a table/API or save contract. |
+| 132348 Primary OR interest save | **STOP** | `SaveSpecialties()` hard-requires Primary, and the interest value has no current model/event persistence path. |
+
+## 2. Ready table
+
+See the readiness table under **L**. The display-only Secondary/Alternate adjustment and active-existing-Primary lock have existing reuse points. Interest capture and Primary-or-interest save are blocked by missing model/persistence support.
+
+## 3. STOP items
+
+- **132347/132348:** no professional-practice-interest field exists in `SpecialtyTask`; `SaveSpecialties()` requires Primary. Implementing an interest-only save would require a new persistence contract, which I will not invent.
+- `PractitionerSpecialty` does not expose raw `PROVIDERSPECIALTIES_ACTIVE`; active rows are filtered by the Cactus query. The existing specialty collection can indicate that a selected specialty is active, but there is no separate boolean property.
+- No existing tooltip text or tooltip implementation exists in this task.
+
+No API, table, column, RTK, audit action, or privileges rule was invented.
+
+## 4. Files opened
+
+- `ManageSpecialtiesTask.razor`
+- `ManageSpecialtiesTask.razor.cs`
+- `SelectSpecialtyModal.razor`
+- `SelectSpecialtyModal.razor.cs`
+- `SpecialtyTask.cs`
+- `PractitionerSpecialty.cs`
+- `PafFormComponent.razor`
+- `ModelExtensions.cs`
+- `PractitionerSpecialtyRepository.cs`
+- `AddTaskAddPractitionerToFacilityStrategy.cs`
+- `RecruitmentBoardVerificationForm.razor`
+
+## 5. Confirmation: no files modified
+
+Confirmed. Read-only inspection only; no files were modified, created, formatted, built, or executed.
