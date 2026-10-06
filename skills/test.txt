@@ -1,14 +1,44 @@
-READ ONLY. Do not edit files.
+> `FacilityRepository.cs`: `public async Task<IEnumerable<Shared.Data.Model.Facility.Facility>> GetFacilitiesPractitionerAddedToAndActiveAtAsync(string userId, string practitionerKey)`  
+> Parameters: `string userId`, `string practitionerKey`. Return type: `Task<IEnumerable<Shared.Data.Model.Facility.Facility>>`.
 
-Find GetFacilitiesPractitionerAddedToAndActiveAt in the facility repository (Ashley, 132308/132341).
+> “`WITH all_user_facilities_cte ...`  
+> `FROM VisualCACTUS.USERENTITY ue (NOLOCK)`  
+> `JOIN VisualCACTUS.ENTITIES e (NOLOCK) ON e.ENTITY_K = ue.ENTITY_K ...`  
+> `JOIN VisualCACTUS.USERS u (NOLOCK) ON u.USERGROUP_K = ue.USERGROUP_K`  
+> `JOIN VisualCACTUS.USERS u2 (NOLOCK) ON u2.USERGROUP_K = u.USERGROUP_K`  
+> `WHERE u.USERGROUPFLAG = 1`  
+> `AND u.ACTIVE = 1`  
+> `AND e.ACTIVE = 1`  
+> `AND ue.ACTIVE = 1`  
+> `AND u2.SYSTEMINITIALS = @userid`”
 
-Quote:
-- File + method + parameters + return type
-- SQL / CTE, especially any "user facilities" / current-user CTE
-- Client or PAF API wrapper already used (like GetUserFacilitiesNotAddedToOrInactiveAtAsync)
+> “`FROM all_user_facilities_cte a JOIN (...) b ON a.[KEY] = b.[KEY]`”  
+> “`AND ea.ACTIVE = 1`”  
+> “`AND ea.PROVIDER_K = @practitionerKey`”  
+> “`AND p.ACTIVE = 1`”  
+> The method starts with `${AllUserFacilitiesCte}`, so active practitioner assignments are intersected with the requesting user’s facility CTE.
 
-Ashley: this lock is practitioner-only. They may be active at a facility the MSP user cannot see. Do not change the shared query if other callers need the user CTE — report an existing overload or a safe practitioner-only call path.
+> `TaskDeterminationService.cs`:  
+> “`private async Task<IList<Facility>> GetUserFacilitiesPractitionerAddedToAndActiveAtAsync(string userId, string practitionerKey)`”  
+> “`var facilities = await _cactusClient.Facilities.GetFacilitiesPractitionerAddedToAndActiveAtAsync(userId, practitionerKey);`”  
+> “`private async Task<IList<Facility>> GetUserFacilitiesNotAddedToOrInactiveAtAsync(string userId, string practitionerKey)`”  
+> “`var facilities = await _cactusClient.Facilities.GetFacilitiesPractitionerNotAddedToOrInactiveAtAsync(userId, practitionerKey);`”
 
-Also quote how ManageAddressesTask would call it (existing Cactus/Paf client?).
+> `FacilityClient.cs`:  
+> “`public async Task<IEnumerable<Facility>> GetFacilitiesPractitionerAddedToAndActiveAtAsync(string userId, string practitionerKey)`”  
+> “`$"{ApiBasePath}/{userId}/PractitionerAddedToAndActiveAt/{HttpUtility.UrlEncode(practitionerKey.Trim())}"`”
 
-RETURN quotes only. Do not implement. Do not strip the CTE. Do not use SelectedFacilities or Sponsor Affiliations.
+> `FacilityController.cs`:  
+> “`[HttpGet("{userId}/PractitionerAddedToAndActiveAt/{practitionerKey}")]`”  
+> “`GetFacilitiesPractitionerAddedToAndActiveAtAsync(string userId, string practitionerKey)`”
+
+> “No existing general practitioner-only overload or safe call path was found. `GetPSGFacilitiesPractitionerAddedToAndActiveAtAsync` omits the user CTE but restricts results to six hard-coded facility keys, so it is PSG-specific rather than a general substitute.”
+
+> `ManageAddressesTask.razor.cs`:  
+> “`[Inject] private IStateContainer StateContainer { get; set; }`”  
+> “`[Inject] private NotificationService NotificationService { get; set; }`”
+
+> `SearchPracticeGroupAddressStep.razor.cs`:  
+> “`[Inject] private ICactusClient CactusClient { get; set; }`”
+
+> “`ManageAddressesTask` has no current facility-client call. The existing Cactus wrapper requires `userId` and `practitionerKey`; calling it from the task would retain the user-facility restriction. The PAF client has `GetAvailableFacilityListAsync(TaskFacilityListParameters listParameters)`, not a practitioner-only active-facility lookup.”
