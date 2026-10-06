@@ -1,22 +1,14 @@
-Implemented the NPP-only Professional Practice Interest field and save behavior. Existing Secondary and Alternate hiding remains in place.
+READ ONLY. Do not edit files.
 
-1. **Files changed**
-   - `SpecialtyTask.cs`
-   - `ManageSpecialtiesTask.razor`
-   - `ManageSpecialtiesTask.razor.cs`
-   - `PafFormComponent.razor.cs`
+Find GetFacilitiesPractitionerAddedToAndActiveAt in the facility repository (Ashley, 132308/132341).
 
-2. **`SpecialtyTask` property:** `ProfessionalPracticeInterest`
+Quote:
+- File + method + parameters + return type
+- SQL / CTE, especially any "user facilities" / current-user CTE
+- Client or PAF API wrapper already used (like GetUserFacilitiesNotAddedToOrInactiveAtAsync)
 
-3. **NPP-only UI strings:**
-   - “If you are unable to locate the specialty under Primary Specialty, please enter the professional practice interest in the comment box below.”
-   - “Please list non-specialty/board areas of professional practice interest or focus (HIV/AIDS, etc.).”
-   - The comment box enforces a 500-character maximum and binds to the PAF `SpecialtyTask`.
+Ashley: this lock is practitioner-only. They may be active at a facility the MSP user cannot see. Do not change the shared query if other callers need the user CTE — report an existing overload or a safe practitioner-only call path.
 
-4. **NPP save guard:** `GetSpecialty(SpecialtyTarget.Primary) == null && (!IsNppPaf || string.IsNullOrWhiteSpace(_specialtyTask.ProfessionalPracticeInterest))`. The NPP validation notification uses the exact requested message. Non-NPP retains its existing Primary-only validation.
+Also quote how ManageAddressesTask would call it (existing Cactus/Paf client?).
 
-5. **Scope confirmation:** The comment is carried through the existing Specialty completion and PAF save path. No Cactus, CVI, `GetCredentialingTypeRtk`, or API changes.
-
-6. **Builds:** Client and Shared both succeeded. `git diff --check` passed.
-
-7. **Remaining gaps:** CVI Notes remain out of scope for this PAF-only change; no tests were added.
+RETURN quotes only. Do not implement. Do not strip the CTE. Do not use SelectedFacilities or Sponsor Affiliations.
