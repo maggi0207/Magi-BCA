@@ -1,44 +1,75 @@
-> `FacilityRepository.cs`: `public async Task<IEnumerable<Shared.Data.Model.Facility.Facility>> GetFacilitiesPractitionerAddedToAndActiveAtAsync(string userId, string practitionerKey)`  
-> Parameters: `string userId`, `string practitionerKey`. Return type: `Task<IEnumerable<Shared.Data.Model.Facility.Facility>>`.
+You are implementing a change in the HCA HCP Credentialing repository.
 
-> “`WITH all_user_facilities_cte ...`  
-> `FROM VisualCACTUS.USERENTITY ue (NOLOCK)`  
-> `JOIN VisualCACTUS.ENTITIES e (NOLOCK) ON e.ENTITY_K = ue.ENTITY_K ...`  
-> `JOIN VisualCACTUS.USERS u (NOLOCK) ON u.USERGROUP_K = ue.USERGROUP_K`  
-> `JOIN VisualCACTUS.USERS u2 (NOLOCK) ON u2.USERGROUP_K = u.USERGROUP_K`  
-> `WHERE u.USERGROUPFLAG = 1`  
-> `AND u.ACTIVE = 1`  
-> `AND e.ACTIVE = 1`  
-> `AND ue.ACTIVE = 1`  
-> `AND u2.SYSTEMINITIALS = @userid`”
+ROLE:
+Senior engineer. One session. Treat the 132308 query inspect as fact unless you re-read and disprove. Then implement. Do not start a second chat.
 
-> “`FROM all_user_facilities_cte a JOIN (...) b ON a.[KEY] = b.[KEY]`”  
-> “`AND ea.ACTIVE = 1`”  
-> “`AND ea.PROVIDER_K = @practitionerKey`”  
-> “`AND p.ACTIVE = 1`”  
-> The method starts with `${AllUserFacilitiesCte}`, so active practitioner assignments are intersected with the requesting user’s facility CTE.
+TASK:
+On PAF Tasks Manage Address Work, when IsNppPaf: disable Add Address and show the exact lock message if the practitioner is already added-to-and-active at any HCA facility AND a Primary exists. Empty list → Add stays enabled. Begin PAF unchanged.
 
-> `TaskDeterminationService.cs`:  
-> “`private async Task<IList<Facility>> GetUserFacilitiesPractitionerAddedToAndActiveAtAsync(string userId, string practitionerKey)`”  
-> “`var facilities = await _cactusClient.Facilities.GetFacilitiesPractitionerAddedToAndActiveAtAsync(userId, practitionerKey);`”  
-> “`private async Task<IList<Facility>> GetUserFacilitiesNotAddedToOrInactiveAtAsync(string userId, string practitionerKey)`”  
-> “`var facilities = await _cactusClient.Facilities.GetFacilitiesPractitionerNotAddedToOrInactiveAtAsync(userId, practitionerKey);`”
+Ashley: use GetFacilitiesPractitionerAddedToAndActiveAt, practitioner-only, no all-user-facilities CTE. They may be active at a facility the current MSP user cannot see.
 
-> `FacilityClient.cs`:  
-> “`public async Task<IEnumerable<Facility>> GetFacilitiesPractitionerAddedToAndActiveAtAsync(string userId, string practitionerKey)`”  
-> “`$"{ApiBasePath}/{userId}/PractitionerAddedToAndActiveAt/{HttpUtility.UrlEncode(practitionerKey.Trim())}"`”
+Treat inspect as fact:
+- Existing FacilityRepository.GetFacilitiesPractitionerAddedToAndActiveAtAsync(userId, practitionerKey) ALWAYS uses AllUserFacilitiesCte. TaskDeterminationService and FacilityClient GET {userId}/PractitionerAddedToAndActiveAt/{practitionerKey} use that. Do NOT edit that SQL or that route.
+- No general practitioner-only overload. GetPSGFacilitiesPractitionerAddedToAndActiveAtAsync is six hard-coded keys — do NOT use.
+- ManageAddressesTask already has IsNppPaf. Add Address is a Button OnClick=ShowAddAddressModal with no Disabled today. Primary-only display already shipped.
+- No facility call on ManageAddressesTask today. SearchPracticeGroupAddressStep already injects ICactusClient.
+- Do not use SelectedFacilities or Sponsor Affiliations (D26L0VNZT5).
 
-> `FacilityController.cs`:  
-> “`[HttpGet("{userId}/PractitionerAddedToAndActiveAt/{practitionerKey}")]`”  
-> “`GetFacilitiesPractitionerAddedToAndActiveAtAsync(string userId, string practitionerKey)`”
+COMMENTS:
+Almost none. No ticket-ID comments.
 
-> “No existing general practitioner-only overload or safe call path was found. `GetPSGFacilitiesPractitionerAddedToAndActiveAtAsync` omits the user CTE but restricts results to six hard-coded facility keys, so it is PSG-specific rather than a general substitute.”
+STOP AND REPORT (do not invent):
+- If you must change AllUserFacilitiesCte / the existing user-scoped method or route.
+- If you must use a fake/system userId on the existing API.
+- If you must use the PSG six-key method.
+- If you must edit GetCredentialingTypeRtk, ValidateAndSaveAddresses, Demographic, Specialties, 132260/132352.
 
-> `ManageAddressesTask.razor.cs`:  
-> “`[Inject] private IStateContainer StateContainer { get; set; }`”  
-> “`[Inject] private NotificationService NotificationService { get; set; }`”
+THEN IMPLEMENT (smallest reuse):
 
-> `SearchPracticeGroupAddressStep.razor.cs`:  
-> “`[Inject] private ICactusClient CactusClient { get; set; }`”
+1) Sibling query
+- New FacilityRepository method: practitionerKey only. Same active-assignment join as the existing method (ea.ACTIVE = 1, ea.PROVIDER_K = @practitionerKey, p.ACTIVE = 1 / whatever that query already uses after the CTE). NO AllUserFacilitiesCte. NO USERENTITY filter.
+- New Cactus API route + FacilityClient + interface method without userId. Follow existing FacilityController style. Name it so it cannot be confused with the user-scoped method.
+- Leave GetFacilitiesPractitionerAddedToAndActiveAtAsync(userId, practitionerKey) and TaskDeterminationService callers untouched.
 
-> “`ManageAddressesTask` has no current facility-client call. The existing Cactus wrapper requires `userId` and `practitionerKey`; calling it from the task would retain the user-facility restriction. The PAF client has `GetAvailableFacilityListAsync(TaskFacilityListParameters listParameters)`, not a practitioner-only active-facility lookup.”
+2) ManageAddressesTask (IsNppPaf only)
+- Inject the same Cactus facilities client pattern as SearchPracticeGroupAddressStep.
+- Practitioner key from StateContainer.PafState.Practitioner (real key property).
+- On load: call the new practitioner-only method.
+- If Primary exists AND returned list is non-empty: disable Add Address. Show exact:
+  The practitioner currently holds privileges at one or more HCA facilities. The primary address cannot be changed.
+  Use an existing alert/text/banner on this form or a nearby PAF task. Do not invent a notification type.
+- If list is empty: Add Address stays enabled (132341). No lock message.
+- If Primary is missing: Add stays enabled (132327). Do not lock.
+- If the call throws / cannot be determined: disable Add; existing standard error / NotificationService pattern already on this task. Do not allow address updates until it succeeds.
+- !IsNppPaf: do not call; Add stays as today.
+
+3) Pass Disabled (and message) into ManageAddresses if Add lives there. Primary-only hide from TASK 1 stays.
+
+DO NOT CHANGE:
+- AllUserFacilitiesCte, existing AddedToAndActiveAt(userId, ...) method/route
+- GetFacilitiesPractitionerNotAddedToOrInactiveAtAsync / 132257
+- ValidateAndSaveAddresses, group-hide, Demographic, Specialties
+- GetCredentialingTypeRtk, SelectedFacilities, Sponsor Affiliations
+- Begin PAF Address
+
+IMPLEMENTATION REQUIREMENTS:
+1. Reuse IsNppPaf + existing Cactus client DI.
+2. Non-NPP unchanged.
+3. Shared user-scoped query untouched.
+4. Almost no new comments.
+
+TESTS:
+- Do not create a test project.
+- dotnet build Cactus.Api (or the project that hosts FacilityRepository), Shared client, and Client.
+- If an existing test breaks, fix only that break.
+
+VALIDATION: build; diff must not change the existing user-scoped SQL.
+
+RETURN:
+1. Files changed
+2. New method + route — quote (no CTE)
+3. Confirmation: existing GetFacilitiesPractitionerAddedToAndActiveAtAsync(userId, ...) SQL unchanged
+4. Lock condition + exact message — quote
+5. Error path — quote
+6. Build result
+7. Remaining gaps
