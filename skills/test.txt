@@ -1,25 +1,69 @@
-Implemented the NPP-only Primary Address lock.
+You are implementing a change in the HCA HCP Credentialing repository.
 
-1. **Files changed for this implementation**
-   - `FacilityRepository.cs`
-   - `FacilityController.cs`
-   - `FacilityClient.cs`
-   - `ManageAddressesTask.razor.cs`
-   - `ManageAddressesTask.razor`
-   - `ManageAddresses.razor.cs`
-   - `ManageAddresses.razor`
+ROLE:
+Senior engineer. One session. Treat the 132260 inspect RETURN as fact unless you re-read and disprove. Then implement. Do not start a second chat.
 
-2. **Practitioner-only method and route**
-   - Method: `GetPractitionerFacilitiesAddedToAndActiveAtAsync(string practitionerKey)`
-   - Route: `[HttpGet("PractitionerFacilitiesAddedToAndActiveAt/{practitionerKey}")]`
-   - The new SQL selects active assignment facility keys and applies the existing facility eligibility filters, with no `AllUserFacilitiesCte`, `USERENTITY`, user ID, or fake user ID.
+TASK:
+On the PAF Tasks page only: when the PAF action is TaskType.Npp, do not display the Delegate card or the Facility Specific Questions card. Other PAF types unchanged. Do not add an ADD NPP Work card. Do not change submit.
 
-3. **Existing query unchanged:** `GetFacilitiesPractitionerAddedToAndActiveAtAsync(userId, practitionerKey)` and its user-scoped SQL were not edited. Existing `TaskDeterminationService` callers and routes remain untouched.
+Treat inspect as fact:
+- Cards show when the task object is non-null:
+  PafData?.ManageDelegateTask != null → Delegate
+  PafData?.Mss18FacilitySpecificQuestionsTask != null → MSS-18 FSQ
+  PafData?.AddPractitionerToFacilitiesTask != null → live UAT "Facility Specific Questions" after ADD NPP save (CreateAddTaskStrategy(Npp) reuses AddTaskAddPractitionerToFacilityStrategy and sets AddPractitionerToFacilitiesTask { IsRequired = true })
+- Isolation already used on this page: StateContainer.PafState.TaskSelected == TaskType.Npp (IsNppPaf). TaskSelected is the persisted PAF action, not the card being edited.
+- Prefer UI hide. Do not change CreateAddTaskStrategy(Npp). Do not null task objects if that would change save.
 
-4. **Lock condition and message:** For NPP, Add Address is disabled and the message shown only when `_primaryAddresses.Any() && activeFacilities.Any()`. Exact message: “The practitioner currently holds privileges at one or more HCA facilities. The primary address cannot be changed.” An empty result or missing Primary leaves Add enabled. Non-NPP does not call the new method.
+COMMENTS:
+Almost none. No ticket-ID comments. No // 132268 / // NPP hide banners.
 
-5. **Error path:** Missing practitioner key, null result, or request exception disables Add Address and shows the existing `NotificationService` error notification pattern. The check is performed before the task finishes initialization; after an error, reopening the task is needed to retry.
+STOP AND REPORT (do not invent):
+- If TaskSelected is not TaskType.Npp after ADD NPP Save Facilities and you would invent a new Type / flag / feature flag / auth policy.
+- If you must edit GetCredentialingTypeRtk, CreateAddTaskStrategy, TaskDeterminationService, or add Tasks/Npp.
+- If hide would require deleting AddPractitionerToFacilitiesTask from the saved PAF (report; do not delete).
+- If you cannot tell which card is titled Facility Specific Questions — quote both card titles, then hide every card whose title is Delegate or Facility Specific Questions. Do not hide Demographic, Manage Addresses, or Specialties.
 
-6. **Builds:** Cactus API, Shared, and Client builds all succeeded. `git diff --check` passed.
+THEN IMPLEMENT (smallest reuse):
 
-7. **Remaining gaps:** No automatic retry is provided after a failed check. No change was made to `ValidateAndSaveAddresses`, the existing user-scoped query/route, or other PAF flows.
+Isolation
+- On PafFormComponent, reuse TaskSelected == TaskType.Npp (same as IsNppPaf). Local bool is fine. Do not invent PafType.Npp.
+
+132268 hide
+- Delegate card: keep existing null check AND hide when Npp.
+- Facility Specific Questions: hide the card that renders that title when Npp. If both AddPractitionerToFacilitiesTask and Mss18FacilitySpecificQuestionsTask can render for Npp, hide both.
+- Prefer existing "hide" CSS class already used on these cards. Do not remove the components from the tree if that is the current hide pattern (Address/Specialties already hide groups this way).
+- Keep task objects in the model. Do not set ManageDelegateTask / FSQ / AddPractitionerToFacilitiesTask to null unless the inspect already proves those objects are never saved for Npp.
+
+132260 / 132352 / 132267
+- Do not add an ADD NPP card.
+- Do not add HandleRequestEditAsync Npp.
+- Do not add CreateUpdateTaskStrategy Npp.
+- Do not touch Review & Submit / IsSubmittable / GetCredentialingTypeRtk.
+
+DO NOT CHANGE:
+- CreateAddTaskStrategy, AddTaskAddPractitionerToFacilityStrategy, TaskDeterminationService
+- GetCredentialingTypeRtk, PafReviewForm
+- Demographic / Address / Specialties Work forms (IsNppPaf flags, lock, interest) except if PafFormComponent already has a shared IsNppPaf you can reuse
+- Begin PAF (TaskSelected != Npp): Delegate and FSQ stay as today
+- 131785, 131794, 132247, 132255 radio
+
+IMPLEMENTATION REQUIREMENTS:
+1. Reuse existing card Class hide + TaskSelected == Npp.
+2. Non-NPP unchanged.
+3. No new suppression framework / feature flag / RTK.
+4. Almost no new comments.
+
+TESTS:
+- Do not create a test project.
+- dotnet build the Client (or the project that hosts PafFormComponent).
+- If an existing test breaks, fix only that break.
+
+VALIDATION: build, inspect diff (comments near-zero).
+
+RETURN:
+1. Files changed
+2. Hide conditions — quote Delegate + FSQ card Class / if
+3. Confirmation: which object is the live FSQ card (AddPractitionerToFacilitiesTask vs Mss18)
+4. Confirmation: CreateAddTaskStrategy / GetCredentialingTypeRtk / ADD NPP card not edited
+5. Build result
+6. Remaining gaps
