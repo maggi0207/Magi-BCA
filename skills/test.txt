@@ -1,98 +1,32 @@
-## 1. Files Confirmed
+You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
 
- PafFormComponent.razor.cs, `PafFormComponent.razor`, `PafProcessingStrategyContext.cs`, `PafExtensions.cs`, `SubmitPafStrategy.cs`, `PafReviewForm.razor.cs`, `CactusUpdater.cs`, `CrudEntityCredentialingOperation.cs`, `RecruitmentPsvTask.cs`, `StateLicenseModal.razor`, `PractitionerLicenseClient.cs`, `PractitionerLicenseController.cs`, and `PafFile.razor.cs`.
+ROLE:
+Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not invent an RTK.
 
-## 2. A–P
+TASK:
+Find the CACTUS / HCP key for CVI type description "Facility Undefined Practitioner". Quote file + symbol + value. Then STOP.
 
-**A. Edit routing.** In `PafFormComponent.razor.cs`, `HandleRequestEditAsync(EditSource source, TaskType taskType)` is an `if`/`else if` chain, not a switch. It has no `TaskType.Npp` branch.
+KNOWN STARTING POINTS (confirm or correct):
+- CommonCactusRtks.cs (Paf.Processor and Packet.Processor copies if both exist)
+- CrudEntityCredentialingOperation.cs — CREDENTIALINGTYPE_RTK / due-date map
+- PafExtensions.GetCredentialingTypeRtk() — confirm still no Npp; do not add one
+- Any UDP / FacilityUndefined / UndefinedPractitioner constant
+- Cactus lookup/SQL for CREDENTIALINGTYPE description (only if already in this repo). Do not query production DBs you cannot access; if only in Cactus and not in code, say NOT IN CODE.
+- Ticket 131725 added this CVI type in Cactus. Description to match exactly: Facility Undefined Practitioner
+- Also report STATUS_RTK if present for: UDP Facility Request / UDP Facility Request Complete
 
-**B. Work target.** There is no `Tasks/Npp` component. NPP still has shared Demographic, Manage Address, and Specialties Work cards, so FSQ is not its only Work target. For the requested VA/PA, license, and PSV work, the target is `Tasks/Npp`; FSQ must not be reused. `PerFacilityQuestions.razor` is the existing facility-specific questionnaire.
+STOP AND REPORT:
+- If the description is not in CommonCactusRtks and not in any Cactus SQL in this repo — say NOT IN CODE. Do not propose a new string.
+- Do not edit GetCredentialingTypeRtk.
 
-**C. VA/PA.** No separate VA/PA work form was found. The existing FSQ includes `IsTreatingMilitary`; Recruitment PSV also has an NCCPA certification option, but neither is an NPP VA/PA workflow.
+ANSWER:
+A. Exact constant name + RTK value for Facility Undefined Practitioner, or NOT IN CODE
+B. File path(s)
+C. UDP Facility Request / UDP Facility Request Complete RTKs or NOT IN CODE
+D. GetCredentialingTypeRtk still has no Npp? (yes/no + quote default)
+E. Files opened. Confirm none modified.
 
-**D. License capture.** PAF Recruitment license detail contains only `LicenseState` and `LicenseNumber`; its modal has a required State and License Number capped at 20 characters. No issue/expiration dates, status, or FOL are in that PAF detail. `PROVIDERLICENSES.STATUS_RTK` is read in the expired-license query; the named `PROVIDERLICENSES_LICENSUREFIELD_RTK` string was not found.
-
-**E. Recall/duplicate.** No PAF state-license recall or duplicate State+Number API was found. The existing `PractitionerLicenseClient` exposes only `SearchExpiredLicensesAsync`, `SearchUnverifiedInstitutionsAsync`, `SearchUnverifiedPractitionersAsync`, and `SearchVerifiedAsync`; its controller exposes the corresponding search routes.
-
-**F. PSV uploads.** `PafFile.razor.cs` accepts `.pdf`, `.doc`, `.docx`, `.jpg`, `.jpeg`, `.tif`, and `.tiff`. `PractitionerActionFormAttachmentType` has no distinct License, Sanctions, or NPI attachment types. Recruitment PSV stores NPI and OIG/EPLS details, not separate named upload types.
-
-**G. Update strategy.** In `PafProcessingStrategyContext.cs`, `CreateUpdateTaskStrategy(TaskType task, bool reloadAndRevalidate)` has no NPP case and its default throws `ArgumentException`. Existing sibling mapping: `TaskType.ManageSpecialities => new UpdateTaskManageSpecialtiesStrategy(...)`.
-
-**H. Credentialing RTK.** The full `GetCredentialingTypeRtk` switch in `PafExtensions.cs` is:
-
-```csharp
-switch (paf.TaskSelected)
-{
-    case TaskType.ManagePersonalInfo:
-        result = CommonCactusRtks.ChangeInfoCredentialingTypeRtk;
-        break;
-    case TaskType.AddPractitionerToFacility:
-        result = paf.GetAddPractitionerToFacilitiesRequestTypeRtk();
-        break;
-    case TaskType.RequestProcessingChange:
-        result = paf.GetProcessingChangeRtk();
-        break;
-    case TaskType.ManageCollaboratingPractitioners:
-        result = CommonCactusRtks.AddSponsorCredentialingTypeRtk;
-        break;
-    case TaskType.OffCyclePsv:
-        result = CommonCactusRtks.OffCyclePsvCredentialingTypeRtk;
-        break;
-    case TaskType.OffCycleRrfc:
-        result = CommonCactusRtks.OffCycleRfcCredentialingTypeRtk;
-        break;
-    case TaskType.AddPrivilegesMss18:
-        result = CommonCactusRtks.PrivilegesCredentialingTypeRtk;
-        break;
-    case TaskType.SSPBriefEnrollment:
-        result = CommonCactusRtks.SSPBriefEnrollmentCredentialingTypeRtk;
-        break;
-    case TaskType.Recruitment:
-        result = CommonCactusRtks.RecruitmentPsvCredentialingTypeRtk;
-        break;
-    case TaskType.ManageAddresses:
-    case TaskType.ManageDelegate:
-    case TaskType.ManageSpecialities:
-    case TaskType.Perf:
-    case TaskType.Unknown:
-    default:
-        throw new ArgumentOutOfRangeException();
-}
-```
-
-The mappings are Change Info `HCART93549`; Add Practitioner to Facility dynamically maps Initial `D2850Y27PK`, Accelerated `D2CD0MGH9B`, Temporary `D2FH0NY1SH`, or SSP Brief `R39W0V7EJO`; Processing Change maps Locum Long `D2IK0LNV2O` or Locum Short `D2IJ1F112R`; Add Sponsor `HCART93548`; Off-Cycle PSV `HCART93550`; Off-Cycle RFC `DS680QA1VZ`; Privileges `D2LC0YR0AR`; SSP Brief `R39W0V7EJO`; Recruitment PSV `REC0000001`. No NPP RTK is listed.
-
-**I. Submit caller.** `PafClient.SubmitPafAsync` calls `PUT api/Paf/SubmitPaf`; `PafController.SubmitPafAsync` creates the submit strategy. Queued processing reaches `PafProcessorFunction.RunAsync` → `CactusUpdater.UpdateCactusFromPafAsync`. `CreateStandardCviRecordsAsync` calls `GetCredentialingTypeRtk()` with no override by default, so NPP reaches the missing switch arm and throws `ArgumentOutOfRangeException`.
-
-**J. Review gate.** `PafReviewForm.IsSubmittable()` checks view mode, PAF lock, user role, and allowed status; it does not check credentialing RTK. The UI gate can be reused without an NPP RTK, but that does not resolve the downstream processor gap.
-
-**K. Submit outcomes.** In `SubmitPafStrategy.cs`, MSP submit sets `SubmittedByMsp` or `ResubmittedByMsp`; CPC acceptance sets `AcceptedByCpc`, manual processing sets `ProcessedManually`, and deny/return set rejection/return statuses. Accepted/manual actions queue processing. There is no separate `PafStatus.Complete` transition in these branches.
-
-**L. Auto-accept.** The existing direct processing path is `SubmitPafStrategy.ProcessSubmitForSSPBrief()`: it is selected only for `TaskType.SSPBriefEnrollment` when `HasDemographicsChangedSSPBrief` is false; changed demographics go through MSP/CPC review. It sets `SubmittedByMsp` and queues processing. It is not a general NPP auto-accept path and cannot be reused as-is for NPP VA/PA.
-
-**M. CVI.** `CactusUpdater.CreateStandardCviRecordsAsync()` is reached from new/existing practitioner processing and task-specific processing after the PAF is queued. `CrudEntityCredentialingOperation.cs` writes `VISUALCACTUS.CREDENTIALING`. Existing processing includes accepted CPC actions and the SSP Brief direct path. NPP cannot use the default CVI path until its missing RTK mapping is resolved; no RTK is proposed here.
-
-**N. Tests.** `CactusUpdaterIntegrationTests.TestCactusUpdater_NewNew`; `CactusUpdaterIntegrationTests.TestCactusUpdater_NewExisting` (stub); `CactusApiIntegrationTests.TestWithdrawCviAsync`. No dedicated PAF submit, auto-accept, license-recall, or license-task test was found.
-
-**O. Isolation.** `CreateAddTaskStrategy(TaskType.Npp)` currently reuses `AddTaskAddPractitionerToFacilityStrategy`; keep that and the Add Practitioner/FSQ behavior unchanged. The existing facility query is user-scoped through `AllUserFacilitiesCte`, including `AND u2.SYSTEMINITIALS = @userid`; preserve it and its callers.
-
-**P. Readiness.** 132354 card chrome: **Yes**, existing PAF cards provide the chrome. 132355–372 VA/PA UI: **No**, NPP work surface required. 132527 license: **No**, PAF capture lacks the requested fields. 132368 recall: **STOP**, no PAF recall API. 132267 gate: **Yes**, existing status/role gate is RTK-independent. Auto-accept: **No for NPP**; existing direct path is SSP Brief only. CVI: **STOP for NPP** because `GetCredentialingTypeRtk` has no NPP case. NPP RTK: **STOP**, absent; do not invent one.
-
-## 3. STOP Hits
-
-> “`GetCredentialingTypeRtk()` has no `TaskType.Npp` arm and defaults to `throw new ArgumentOutOfRangeException()`.”
-
-> “No state-license recall or duplicate State+Number API is exposed through the PAF API.”
-
-The specified “FSQ is the only Work target” condition is **not** met: shared Demographic, Address, and Specialties Work cards exist. The dedicated NPP work form is nevertheless absent.
-
-## 4–11. Return Summary
-
-4. **Work target:** `Tasks/Npp`; do not reuse FSQ.
-5. **Auto-accept entry:** `SubmitPafStrategy.ProcessSubmitForSSPBrief()` only; SSP Brief Enrollment with unchanged demographics.
-6. **CVI-on-submit entry:** `PafProcessorFunction.RunAsync` → `CactusUpdater.UpdateCactusFromPafAsync` → `CreateStandardCviRecordsAsync`; NPP is blocked by the RTK gap.
-7. **NPP RTK gap:** Yes.
-8. **License-recall API:** None.
-9. **Ready to implement any slice:** Yes, card chrome and the independent `IsSubmittable()` status gate only. NPP VA/PA, license recall, auto-accept, and CVI are not ready.
-10. **Must not change:** Begin PAF, existing Add Practitioner strategy/FSQ, user-scoped facility query, submit behavior, or `GetCredentialingTypeRtk` values.
-11. **Files modified:** None.
+RETURN:
+1. A–E
+2. RTK value to wire later (or NONE)
+3. Status RTKs (or NONE)
