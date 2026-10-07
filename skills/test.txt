@@ -1,32 +1,13 @@
-You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
+A. **Exact constant/value:** `NOT IN CODE`. “Facility Undefined Practitioner” is absent from the PAF Processor, Packet Processor, and Client `CommonCactusRtks` copies and the targeted Cactus API/PAF Processor source searches. No RTK value is evidenced here.
 
-ROLE:
-Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not invent an RTK.
+B. **Files checked:**  
+- PAF Processor CommonCactusRtks.cs  
+- Packet Processor CommonCactusRtks.cs  
+- Client CommonCactusRtks.cs  
+- Both PAF Processor and Packet Processor `CrudEntityCredentialingOperation.cs` files were located; no matching description was found in the targeted Cactus API/PAF Processor source search.
 
-TASK:
-Find the CACTUS / HCP key for CVI type description "Facility Undefined Practitioner". Quote file + symbol + value. Then STOP.
+C. **UDP status RTKs:** `UDP Facility Request` and `UDP Facility Request Complete` are `NOT IN CODE`.
 
-KNOWN STARTING POINTS (confirm or correct):
-- CommonCactusRtks.cs (Paf.Processor and Packet.Processor copies if both exist)
-- CrudEntityCredentialingOperation.cs — CREDENTIALINGTYPE_RTK / due-date map
-- PafExtensions.GetCredentialingTypeRtk() — confirm still no Npp; do not add one
-- Any UDP / FacilityUndefined / UndefinedPractitioner constant
-- Cactus lookup/SQL for CREDENTIALINGTYPE description (only if already in this repo). Do not query production DBs you cannot access; if only in Cactus and not in code, say NOT IN CODE.
-- Ticket 131725 added this CVI type in Cactus. Description to match exactly: Facility Undefined Practitioner
-- Also report STATUS_RTK if present for: UDP Facility Request / UDP Facility Request Complete
+D. **NPP switch:** Yes, `GetCredentialingTypeRtk()` still has no NPP case. Its default is `throw new ArgumentOutOfRangeException();`
 
-STOP AND REPORT:
-- If the description is not in CommonCactusRtks and not in any Cactus SQL in this repo — say NOT IN CODE. Do not propose a new string.
-- Do not edit GetCredentialingTypeRtk.
-
-ANSWER:
-A. Exact constant name + RTK value for Facility Undefined Practitioner, or NOT IN CODE
-B. File path(s)
-C. UDP Facility Request / UDP Facility Request Complete RTKs or NOT IN CODE
-D. GetCredentialingTypeRtk still has no Npp? (yes/no + quote default)
-E. Files opened. Confirm none modified.
-
-RETURN:
-1. A–E
-2. RTK value to wire later (or NONE)
-3. Status RTKs (or NONE)
+**Summary:** RTK value to wire later: **NONE**. Status RTKs: **NONE**. No files were modified.
