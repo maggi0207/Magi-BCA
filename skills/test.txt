@@ -1,16 +1,62 @@
-1. **File changed for this request:** `PafFormComponent.razor`. It also has earlier, unrelated uncommitted `IsNppPaf` parameter wiring; I left that intact.
+You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
 
-2. **Hide conditions:**
-   - Delegate: `PafData?.ManageDelegateTask != null && StateContainer.PafState.TaskSelected != TaskType.Npp ? "paf-card" : "hide"`
-   - ADD NPP Facility Specific Questions: `PafData?.AddPractitionerToFacilitiesTask != null && StateContainer.PafState.TaskSelected != TaskType.Npp ? "paf-card" : "hide"`
-   - MSS-18 Facility Specific Questions: `PafData?.Mss18FacilitySpecificQuestionsTask != null && StateContainer.PafState.TaskSelected != TaskType.Npp ? "paf-card" : "hide"`
+ROLE:
+Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not ask for a follow-up inspect chat.
 
-   Each condition retains its null check. The card components and task objects remain in place.
+TASK:
+One map for completing ADD NPP PAF Tasks: (1) Work target / VA-PA / license / PSV, (2) Review & Submit / GetCredentialingTypeRtk / auto-accept / CVI. Answer A–P with quotes. Then STOP.
 
-3. **Live UAT Facility Specific Questions card:** `AddPractitionerToFacilitiesTask`. The MSS-18 card is separately rendered from `Mss18FacilitySpecificQuestionsTask`; both are hidden for NPP.
+KNOWN STARTING POINTS (confirm or correct):
+- PafFormComponent.HandleRequestEditAsync — no TaskType.Npp (132260/132352 inspect)
+- CreateAddTaskStrategy(Npp) => AddTaskAddPractitionerToFacilityStrategy
+- CreateUpdateTaskStrategy — no Npp; default throws
+- PafExtensions.GetCredentialingTypeRtk() — no Npp
+- SubmitPafStrategy / Paf.Processor submit
+- PafReviewForm / IsSubmittable()
+- Recruitment StateLicenseModal — State + Number max 20 only
+- PractitionerLicenseClient — work-queues, not PAF recall
+- PafFile — pdf/doc/docx/jpg/tif
+- CVI: whatever live PAF submit already writes (visualCactus.Credentialing or real name)
+- STATUS_RTK / PROVIDERLICENSES_LICENSUREFIELD_RTK — report if already in code; do not invent
+- If a path is wrong, search Client/Pages/Paf/Components/Tasks/, Paf.Api, Paf.Processor, Shared PafExtensions, Cactus license/credentialing ops. Quote real files.
 
-4. **Scope confirmation:** No ADD NPP Work card was added. `CreateAddTaskStrategy`, `GetCredentialingTypeRtk`, submit logic, and task objects were not edited.
+TICKETS (context only):
+132354 card chrome. 132355 VA. 132372 PA + Laura auto-accept+CVI. 132365 hide license + Sanctions/NPI PSV. 132366/367 license+PSV. 132368–374 recall/duplicate. 132527 fields + named STATUS_RTK only. 132530 PafFile types. 132267 Review & Submit. 132531 inactive/expired → CPC.
 
-5. **Build:** Client build succeeded. `git diff --check` passed.
+STOP AND REPORT (do not invent):
+- No Npp Work page AND FSQ is the only Work target — say dedicated Tasks/Npp still required; do not design the form.
+- GetCredentialingTypeRtk has no Npp and no unused RTK labeled NPP in code — gap; do NOT propose a new RTK string.
+- Auto-accept or CVI has no existing PAF submit operation — STOP; do not design it.
+- License recall has no PAF API — gap; do not invent PractitionerLicenseClient usage.
 
-6. **Remaining gaps:** None for the requested card visibility change.
+ANSWER (quote path + symbol):
+
+A. HandleRequestEditAsync switch. Npp today?
+B. Smallest Work target: still new Tasks/Npp? Confirm FSQ must not be reused.
+C. VA/PA anywhere in PAF besides FSQ IsTreatingMilitary?
+D. License capture today vs 132527 (State, dates, Status, FOL). STATUS_RTK in code?
+E. License recall / duplicate State+Number for PAF?
+F. PSV upload types vs License/Sanctions/NPI named types.
+G. CreateUpdateTaskStrategy — Npp throw. Sibling pattern for a new case (name only).
+H. GetCredentialingTypeRtk full switch. Default/throw. List RTKs. None is NPP?
+I. Who calls it on submit? Missing type = ?
+J. IsSubmittable() vs that RTK. 132267 gate without new RTK?
+K. Submit flow: where status becomes CPC vs complete vs auto-accept.
+L. Existing auto-accept: file + method + which PAF types. Reuse for Npp VA+PA Yes?
+M. Existing CVI-on-submit: file + method + when. Reuse?
+N. Tests (names only) for submit, auto-accept, CVI, license task.
+O. Isolation: Begin PAF / AddPractitionerToFacility / FSQ / GetFacilities user-scoped query must not change.
+P. Ready table: 132354 chrome / 132355-372 VA-PA UI / 132527 license / 132368 recall / 132267 gate / auto-accept / CVI / Npp RTK. Yes/No/STOP each.
+
+RETURN:
+1. Files confirmed
+2. A–P
+3. STOP hits
+4. Work target (NONE / Tasks/Npp)
+5. Auto-accept entry or NONE
+6. CVI-on-submit entry or NONE
+7. GetCredentialingTypeRtk Npp gap (yes)
+8. License-recall API or NONE
+9. Ready to implement ANY slice today? (yes/no + which only)
+10. Must-not-change
+11. No files modified
