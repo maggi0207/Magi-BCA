@@ -1,47 +1,68 @@
-You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
+**A. Practitioner license queries**
 
-ROLE:
-Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not invent RTKs.
+A private practitioner-keyed list helper exists in `CrudPractitionerLicensesOperation.cs`:
 
-TASK:
-Find an existing Cactus query we can reuse (or sibling) for: (1) practitioner state licenses, (2) where CVI create writes type/status. Answer A–L with quotes. Then STOP.
+> `private async Task<ICollection<Providerlicenses>> GetExistingLicensesAsync(string licenseTypeRtk)`
 
-TEAM FACTS (do not re-decide):
-- Ashley: table ProviderLicenses / PROVIDERLICENSES; state licenses License RTK = NPDBSTATEx; return ALL rows for the practitioner; CPC vs continue is submit logic, not SQL Active-only.
-- Laura: CVI CREDENTIALINGGROUP_TYPE_RTK = HCA0095563; statuses UDP0000001 and UDP0000002. Display name Facility Undefined Practitioner. Do not guess which UDP is Request vs Complete.
+> `SELECT * FROM VisualCactus.PROVIDERLICENSES (NOLOCK) WHERE PROVIDER_K = @ProviderK AND LICENSE_RTK = @LicenseTypeRtk`
 
-KNOWN STARTING POINTS (confirm or correct):
-- PractitionerLicenseClient — work-queue search only (prior inspect)
-- Any Cactus repo method on PROVIDERLICENSES / NPDBSTATEx / LICENSE_RTK
-- LoadActiveLicenseRecordsAsync / CrudPractitionerLicensesOperation (architecture notes — confirm)
-- CactusUpdater.CreateStandardCviRecordsAsync / CrudEntityCredentialingOperation
-- PafExtensions.GetCredentialingTypeRtk() — no Npp; do not add one
-- CommonCactusRtks — prior inspect: Facility Undefined not in code
-- Facility sibling pattern: GetPractitionerFacilitiesAddedToAndActiveAtAsync (practitioner-only, no user CTE)
+It uses the operation’s `PractitionerKey` and returns rows for the specified license RTK; it has no `ACTIVE` or `STATUS_RTK` filter.
 
-STOP AND REPORT:
-- If no PROVIDERLICENSES list-by-practitioner method exists — say NONE; do not design SQL beyond quoting closest query.
-- If HCA0095563 is not in code — say NONE. Quote whether CVI uses CREDENTIALINGTYPE_RTK vs CREDENTIALINGGROUP_TYPE_RTK.
-- Do not map UDP0000001 vs UDP0000002 unless descriptions are already in code.
+The other helper, `LoadActiveLicenseRecordsAsync(string practitionerKey, string licenseRtk, string institutionK)`, filters `PROVIDER_K = @PractitionerKey`, `LICENSE_RTK = @LicenseRtk`, `ACTIVE = 1`, and `State IS NOT NULL`. Its SQL does not filter by `institutionK`. Neither helper is a public repository/API list method.
 
-ANSWER:
-A. Existing method that lists PROVIDERLICENSES for a practitioner key? Quote SQL/filter (LICENSE_RTK, ACTIVE, STATUS).
-B. NPDBSTATEx already in code? Where?
-C. Closest reuse for “all state licenses for practitioner” (sibling vs new). Parameters.
-D. PractitionerLicenseClient — still queues only?
-E. CreateStandardCviRecordsAsync: which column gets the type from GetCredentialingTypeRtk? TYPE vs GROUP?
-F. Is HCA0095563 / UDP0000001 / UDP0000002 in CommonCactusRtks or SQL? Quote or NONE.
-G. GetCredentialingTypeRtk still no Npp?
-H. Tests for license-by-practitioner or CVI type map. Names only.
-I. Isolation: do not change expired-license work queues or user-scoped facility CTE.
-J. Smallest later implement (no code): license list API sibling files; CVI constant files. Must not change.
-K. Ready to implement license list API sibling? Yes/No/STOP
-L. Ready to add HCA0095563 to GetCredentialingTypeRtk? Yes/No/STOP (GROUP vs TYPE)
+The closest public license search is `PractitionerExpiredLicenseQueryBuilder.GetCoreQuery(...)`. It filters by practitioner key, excludes listed license RTKs, and requires `PERSISTENTVERIFICATIONS = 1` and non-null expiration date; it is an expired/work-queue query, not an all-licenses list.
 
-RETURN:
-1. A–L
-2. License list: existing method or NONE
-3. CVI write column (TYPE vs GROUP)
-4. HCA0095563 / UDP* in code or NONE
-5. Ready slices
-6. No files modified
+**B. State-license RTK**
+
+`NPDBSTATEx` is present in `CrudPractitionerLicensesOperation.cs`, both in the state-license processing list and the `InsertLicenseAsync("NPDBSTATEx", ...)` call.
+
+**C. Closest reuse**
+
+The private `GetExistingLicensesAsync(string licenseTypeRtk)` helper can return all practitioner rows for the supplied license RTK without Active/Status filtering. It is not a Cactus API method, however. The API repository currently exposes search/work-queue operations rather than a list-by-practitioner operation, so a public list endpoint is not already available.
+
+**D. PractitionerLicenseClient**
+
+Yes. `PractitionerLicenseClient.cs` exposes `SearchExpiredLicensesAsync`, `SearchUnverifiedInstitutionsAsync`, `SearchUnverifiedPractitionersAsync`, and `SearchVerifiedAsync`; there is no list-by-practitioner client method.
+
+**E. CVI type and status columns**
+
+ CactusUpdater.cs resolves the type with:
+
+> `var credentialingTypeRtk = credentialingTypeRtkOverride ?? pafDataContext.Paf.GetCredentialingTypeRtk();`
+
+It passes that value as both `GroupTypeRtk` and `CredentialingTypeRtk`. The group operation writes `CREDENTIALINGGROUP.TYPE_RTK`; `CrudEntityCredentialingOperation.cs` writes `CREDENTIALING.TYPE_RTK`.
+
+The credentialing operation writes status separately:
+
+> `parameters.Add("@CREDENTIALINGSTATUS_RTK", auditRecord.CredentialingstatusRtk = CredentialingStatusRtk ?? await ResolveCviStatusRtkAsync());`
+
+**F. Supplied CVI and UDP values**
+
+`HCA0095563`, `UDP0000001`, and `UDP0000002` were not found in the checked CommonCactusRtks copies or credentialing-operation SQL. Repository evidence for these values: **NONE**. I did not map either UDP value to a description.
+
+**G. NPP RTK switch**
+
+Yes, `PafExtensions.cs` still has no `TaskType.Npp` case. Its default is:
+
+> `throw new ArgumentOutOfRangeException();`
+
+**H. Tests**
+
+No direct license-by-practitioner or CVI type-map test was found. Related test names: `TestCactusUpdater_NewNew`, `TestCactusUpdater_NewExisting` (stub), and `TestWithdrawCviAsync`.
+
+**I. Isolation**
+
+Do not change the expired-license work-queue query/client behavior or the user-scoped facility CTE.
+
+**J. Smallest later implementation scope**
+
+For a public license-list API sibling, the relevant existing files are `PractitionerLicenseRepository.cs`, `PractitionerLicenseController.cs`, and `PractitionerLicenseClient.cs`. Keep the expired-license query/work queues unchanged.
+
+The PAF Processor and Packet Processor each have a `CommonCactusRtks.cs` copy. The RTK supplied for the group type does not establish whether it is also valid for `CREDENTIALING.TYPE_RTK`.
+
+**K. Ready decisions**
+
+- Practitioner license-list API sibling: **Yes**, as a separate list operation; no public all-rows list exists today.
+- Add `HCA0095563` to `GetCredentialingTypeRtk`: **STOP**. The supplied fact identifies a `CREDENTIALINGGROUP_TYPE_RTK`, while this helper’s value is also written to `CREDENTIALING.TYPE_RTK`; whether the same RTK belongs in both columns is not established by repository evidence.
+
+**Summary:** License list API: **NONE public**; private filtered helper exists. CVI type writes: **both TYPE_RTK columns**. Supplied HCA/UDP values: **NONE in checked code**. Files modified: **none**.
