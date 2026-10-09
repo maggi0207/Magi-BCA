@@ -1,54 +1,18 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+Implemented the public practitioner state-license listing path.
 
-ROLE:
-Senior engineer. One session. Treat the 132368/CVI inspect RETURN as fact unless you re-read and disprove. Then implement. Do not start a second chat.
+1. **Files changed**
+   - `PractitionerLicenseRepository.cs`
+   - `PractitionerLicenseController.cs`
+   - `PractitionerLicenseClient.cs`
 
-TASK:
-Add a public Cactus API + client to list a practitioner's state licenses. SQL must match the private helper: PROVIDER_K + LICENSE_RTK, no ACTIVE/STATUS filter. LICENSE_RTK = NPDBSTATEx (already in CrudPractitionerLicensesOperation). Do not add Tasks/Npp. Do not edit GetCredentialingTypeRtk.
+2. **Method, route, and SQL**
+   - Repository/client method: `GetPractitionerStateLicensesAsync(string practitionerKey)`
+   - Route: `[HttpGet("{practitionerKey}/StateLicenses")]`
+   - SQL filter: `WHERE pl.PROVIDER_K = @PractitionerKey AND pl.LICENSE_RTK = @LicenseRtk`, with `LicenseRtk = "NPDBSTATEx"`.
+   - The query has no `ACTIVE` or `STATUS_RTK` filter. It maps selected existing license columns into the shared `PractitionerLicense` DTO.
 
-Treat inspect as fact:
-- GetExistingLicensesAsync(licenseTypeRtk): SELECT * FROM VisualCactus.PROVIDERLICENSES (NOLOCK) WHERE PROVIDER_K = @ProviderK AND LICENSE_RTK = @LicenseTypeRtk
-- NPDBSTATEx already used in that file
-- PractitionerLicenseRepository / Controller / Client exist; client is work-queue search only
-- Facility sibling pattern: GetPractitionerFacilitiesAddedToAndActiveAtAsync(practitionerKey) + GET route + client method — copy that shape, not that SQL
+3. **Scope confirmation:** Expired/unverified/verified queue methods, `GetCredentialingTypeRtk`, and `Tasks/Npp` were not edited.
 
-COMMENTS:
-Almost none. No ticket-ID comments.
+4. **Builds:** Cactus API Release build succeeded. Client Release build succeeded and built Shared. The initial Debug API build could not copy outputs because the running API process held those files; I left that process running. `git diff --check` passed, and diagnostics reported no errors.
 
-STOP AND REPORT (do not invent):
-- If you must change GetExistingLicensesAsync / LoadActiveLicenseRecordsAsync / expired-license queue SQL.
-- If NPDBSTATEx is not already a literal/constant in CrudPractitionerLicensesOperation.
-- If you must edit GetCredentialingTypeRtk, CommonCactusRtks, CactusUpdater, CreateAddTaskStrategy, PafFormComponent, or add Tasks/Npp.
-
-THEN IMPLEMENT (smallest reuse):
-
-- New public repository method: practitionerKey in, list PROVIDERLICENSES where LICENSE_RTK is the existing NPDBSTATEx value. No ACTIVE filter. No STATUS filter. No user CTE.
-- Controller GET sibling (practitionerKey in route). Follow PractitionerLicenseController conventions.
-- PractitionerLicenseClient method. Do not add it to the four Search* queue methods' behavior.
-- Do not call this from PAF UI yet (no Work form).
-- Reuse existing Providerlicenses / DTO if the repo already maps that table. Do not invent columns.
-
-DO NOT CHANGE:
-- PractitionerExpiredLicenseQueryBuilder, SearchExpired/Unverified/Verified
-- LoadActiveLicenseRecordsAsync, GetExistingLicensesAsync (keep private)
-- User-scoped facility query / AllUserFacilitiesCte
-- GetCredentialingTypeRtk, CommonCactusRtks, SubmitPafStrategy, FSQ, Begin PAF
-
-IMPLEMENTATION REQUIREMENTS:
-1. Reuse existing NPDBSTATEx token and PROVIDERLICENSES mapping.
-2. Work-queue searches unchanged.
-3. Almost no new comments.
-
-TESTS:
-- Do not create a test project.
-- dotnet build Cactus.Api + Shared/Client as needed.
-- If an existing test breaks, fix only that break.
-
-VALIDATION: build, git diff --check (comments near-zero).
-
-RETURN:
-1. Files changed
-2. Method + route + SQL — quote
-3. Confirmation: queues / GetCredentialingTypeRtk / Tasks/Npp not edited
-4. Build result
-5. Remaining gaps
+5. **Remaining gaps:** No integration test was run for the new endpoint. The client method is available but is not wired into a PAF form.
