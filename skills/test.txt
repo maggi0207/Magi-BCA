@@ -1,18 +1,94 @@
-Implemented the public practitioner state-license listing path.
+You are implementing a change in the HCA HCP Credentialing repository.
 
-1. **Files changed**
-   - `PractitionerLicenseRepository.cs`
-   - `PractitionerLicenseController.cs`
-   - `PractitionerLicenseClient.cs`
+ROLE:
+Senior engineer. One session. Treat 132260/132352/132368 inspects as fact unless you re-read and disprove. Then implement. Do not start a second chat.
 
-2. **Method, route, and SQL**
-   - Repository/client method: `GetPractitionerStateLicensesAsync(string practitionerKey)`
-   - Route: `[HttpGet("{practitionerKey}/StateLicenses")]`
-   - SQL filter: `WHERE pl.PROVIDER_K = @PractitionerKey AND pl.LICENSE_RTK = @LicenseRtk`, with `LicenseRtk = "NPDBSTATEx"`.
-   - The query has no `ACTIVE` or `STATUS_RTK` filter. It maps selected existing license columns into the shared `PractitionerLicense` DTO.
+TASK:
+On ADD NPP PAF Tasks (TaskSelected == Npp): show a Required ADD NPP to Facility card. Work opens a new Tasks/Npp form (not FSQ). VA/PA radios per tickets. Load state licenses via GetPractitionerStateLicensesAsync. Save must not throw. Do not submit. Do not create CVI. Do not edit GetCredentialingTypeRtk.
 
-3. **Scope confirmation:** Expired/unverified/verified queue methods, `GetCredentialingTypeRtk`, and `Tasks/Npp` were not edited.
+Treat inspect as fact:
+- HandleRequestEditAsync has no TaskType.Npp. AddPractitionerToFacility opens FSQ. Do not send Npp Work to FSQ.
+- CreateAddTaskStrategy(Npp) currently uses AddTaskAddPractitionerToFacilityStrategy — KEEP that (facilities already saved). Do not replace it.
+- CreateUpdateTaskStrategy has no Npp; default throws. Add a sibling like UpdateTaskManageSpecialtiesStrategy.
+- Cards use PafTaskDisplay. 132268 already hides Delegate/FSQ when TaskSelected == Npp.
+- GetPractitionerStateLicensesAsync(practitionerKey) / GET {practitionerKey}/StateLicenses — NPDBSTATEx, all rows.
+- Do not reuse FSQ IsTreatingMilitary as the VA question.
+- Recruitment StateLicenseModal is State+Number max 20 only. Do not build full 132527 STATUS/FOL in this shot.
 
-4. **Builds:** Cactus API Release build succeeded. Client Release build succeeded and built Shared. The initial Debug API build could not copy outputs because the running API process held those files; I left that process running. `git diff --check` passed, and diagnostics reported no errors.
+EXACT COPY:
+- Card title: ADD NPP to Facility
+- Card description: Upload and complete required Non-Privileged Practitioner (NPP) verification information and supporting PSV documentation.
+- Work body: You have requested to ADD a Non Privileged Practitioner (NPP) at this facility, please upload the following primary source verifications (PSV) requested below.
+- Disclaimer: DISCLAIMER: ADD Non Privileged Practitioner (NPP) Provider Action Form (PAF) should only be used when the CPC is not currently performing the NPP verifications for this provider at your facility.
+- Practitioner Type: Select Practitioner Type. NPP only, preselected, required. Message: This field is required.
+- VA: Is the practitioner an active duty military member or practicing at the VA? Yes/No, single select.
+- PA (only if VA=Yes): Is the Practitioner a PA? Yes/No, required. This field is required.
+- Recall: State, License Number, Expiration Date. Plus: None of these apply. Add New State License Instead.
 
-5. **Remaining gaps:** No integration test was run for the new endpoint. The client method is available but is not wired into a PAF form.
+COMMENTS:
+Almost none. No ticket-ID comments.
+
+STOP AND REPORT (do not invent):
+- If Work would open FSQ / PerFacilityQuestions / RecruitmentPsvTask.
+- If you must replace CreateAddTaskStrategy(Npp) facility mapping.
+- If you must edit GetCredentialingTypeRtk, SubmitPafStrategy, CommonCactusRtks, CactusUpdater.
+- If STATUS_RTK / FOL dropdowns / PSV upload types are required for this shot — skip those; recall list + VA/PA only.
+- If practitioner key for the license client is not already on PAF state — quote where other tasks read it; do not invent a new id source.
+
+THEN IMPLEMENT (smallest reuse):
+
+Card (132261 / 132354 / 132265)
+- Show when TaskSelected == Npp (same signal as 132268). Required. Work button. Existing PafTaskDisplay chrome.
+- Existing saved NPP PAFs (no new task object) must still see the card.
+
+Work (132263)
+- HandleRequestEditAsync: TaskType.Npp → new Client/Pages/Paf/Components/Tasks/Npp (or equivalent) form. Not FSQ.
+- Keep PAF context. On error stay on PAF Tasks.
+
+VA/PA (132355 / 132372 UI only)
+- VA radios. VA=Yes → show PA; hide license section until PA answered.
+- VA=No → hide PA; show license section.
+- VA=Yes and PA=Yes → hide State License section (132365 UI).
+- VA=Yes and PA=No → show license section.
+- Do not auto-accept, create CVI, or route CPC in this shot.
+
+Licenses (132368)
+- On Work load, call GetPractitionerStateLicensesAsync with the existing practitioner key.
+- Show State, License Number, Expiration Date. Select one or Add New option (label only is enough if new-license fields would need STATUS/FOL).
+- Empty list: still show Add New option. API fail: existing NotificationService error; do not invent a log category.
+- Do not filter Active in the client.
+
+Save
+- CreateUpdateTaskStrategy Npp case so save does not throw. Persist VA/PA (+ selected license key if you already have a model field).
+- Do not change Begin PAF FSQ save.
+
+DO NOT CHANGE:
+- 132268 hide conditions, Demographic/Address/Specialties IsNppPaf
+- GetCredentialingTypeRtk, SubmitPafStrategy, CactusUpdater, CommonCactusRtks
+- CreateAddTaskStrategy(Npp) → facility strategy
+- PractitionerExpiredLicenseQueryBuilder / Search* queues
+- GetPractitionerStateLicensesAsync SQL
+- Begin PAF (TaskSelected != Npp)
+
+IMPLEMENTATION REQUIREMENTS:
+1. New Tasks/Npp only. Do not extend FSQ.
+2. Non-NPP unchanged.
+3. Almost no new comments.
+
+TESTS:
+- Do not create a test project.
+- dotnet build Client (and Server/Paf.Api if update strategy lives there).
+- If an existing test breaks, fix only that break.
+
+VALIDATION: build, git diff --check (comments near-zero).
+
+RETURN:
+1. Files changed
+2. How the card is shown (quote)
+3. HandleRequestEditAsync Npp target (quote)
+4. VA/PA + license hide rules (quote)
+5. License client call (quote)
+6. Update strategy Npp (quote)
+7. Confirmation: GetCredentialingTypeRtk / SubmitPaf / FSQ / facility add strategy not replaced
+8. Build result
+9. Remaining gaps
