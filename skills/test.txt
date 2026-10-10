@@ -1,9 +1,42 @@
-1. **File changed:** `NppTaskForm.razor`
+You are implementing a change in the HCA HCP Credentialing repository.
 
-2. **Why `Form` was null:** The component had `FormItem`s outside any Ant Design `Form`; the PA `FormItem` was conditional but likewise had no parent `Form`. Ant Design `FormItem.OnInitialized` therefore threw because its Form context was null.
+ROLE:
+Senior engineer. One session. Fix NPP Work crash + UI in one pass. Do not start a second chat.
 
-3. **Form wrapper:** Added `<Form Model="@_task" ...><ChildContent> ... </ChildContent></Form>` around Practitioner Type, VA, conditional PA, and the conditional state-license selector. The VA/PA and license visibility rules remain intact.
+TASK:
+1) Specialties Work after ADD NPP Work shows Unexpected Error: Form is null. FormItem should be child content of Form.
+2) NppTaskForm UI must match other PAF Work pages (ManagePractitionerInformationTask / ManageAddressesTask / ManageSpecialtiesTask): same title row, same spacing, ONE Cancel/Save toolbar (not top and bottom). Keep Cancel/Save — they persist the NPP task. Same Form + FormItem pattern.
+3) Keep VA/PA hide rules, license list, disclaimer, NPP type, exact ticket copy.
+Do not submit. Do not edit GetCredentialingTypeRtk. Do not add PSV or STATUS/FOL.
 
-4. **Unchanged behavior:** Submit, CVI, and FSQ were not edited.
+THEN IMPLEMENT:
 
-5. **Validation:** Client Release build succeeded. `git diff --check` returned clean. The component is untracked in the worktree, so it does not appear in `git diff`.
+Crash
+- Quote why FormItem runs when view is Specialties (NppTaskForm still mounted, Form behind @if, FormItems not).
+- Only render Npp Form and FormItems when the user is on NPP Work. Do not leave Npp FormItems in the PAF Tasks / Specialties tree.
+
+UI
+- Open ManageSpecialtiesTask.razor or ManagePractitionerInformationTask.razor. Copy that chrome (title, single button row, Form wrapper, field/label layout).
+- NppTaskForm: one Form, one Cancel/Save in that same place. Remove the extra Cancel/Save pair.
+- Reuse existing PAF Work CSS classes. No new design system.
+
+DO NOT CHANGE:
+- GetCredentialingTypeRtk, SubmitPafStrategy, CreateAddTaskStrategy(Npp), 132268 hide
+- Specialties lock/interest logic except a shared wrapper if it was broken
+- GetPractitionerStateLicensesAsync SQL
+- Begin PAF FSQ
+- Ticket strings (ADD NPP to Facility, disclaimer, VA/PA, Add New)
+
+COMMENTS: almost none.
+
+TESTS:
+- dotnet build Client.
+- git diff --check.
+
+RETURN:
+1. Files changed
+2. Why Specialties Form was null — quote
+3. How Npp FormItems are excluded when not on NPP Work — quote
+4. Which Work page you copied for layout/buttons
+5. Confirmation: submit/CVI/FSQ not edited
+6. Build result
