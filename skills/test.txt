@@ -1,31 +1,9 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+1. **File changed:** `NppTaskForm.razor`
 
-ROLE:
-Senior engineer. One session. Fix the NPP Work blank screen only. Do not start a second chat.
+2. **Why `Form` was null:** The component had `FormItem`s outside any Ant Design `Form`; the PA `FormItem` was conditional but likewise had no parent `Form`. Ant Design `FormItem.OnInitialized` therefore threw because its Form context was null.
 
-TASK:
-NppTaskForm crashes on Work: System.InvalidOperationException: Form is null. FormItem should be child content of Form (AntDesign.FormItem.OnInitialized). Wrap every FormItem in an AntDesign Form the same way other PAF Work tasks do (e.g. ManagePractitionerInformationTask). Keep VA/PA/license behavior. Do not submit. Do not edit GetCredentialingTypeRtk.
+3. **Form wrapper:** Added `<Form Model="@_task" ...><ChildContent> ... </ChildContent></Form>` around Practitioner Type, VA, conditional PA, and the conditional state-license selector. The VA/PA and license visibility rules remain intact.
 
-THEN IMPLEMENT:
-- Open NppTaskForm.razor / .razor.cs.
-- Quote why Form is null (FormItem outside Form, Form behind an @if, or Form not created yet).
-- Fix with the existing PAF Form + Model pattern. Practitioner Type, VA, and PA FormItems must be children of that Form.
-- Do not remove VA/PA hide rules or the license client call.
-- Do not open FSQ. Do not add PSV / STATUS/FOL / CVI.
+4. **Unchanged behavior:** Submit, CVI, and FSQ were not edited.
 
-DO NOT CHANGE:
-- GetCredentialingTypeRtk, SubmitPafStrategy, CreateAddTaskStrategy(Npp), 132268 hide, Demographic/Address/Specialties
-- GetPractitionerStateLicensesAsync SQL
-
-COMMENTS: almost none.
-
-TESTS:
-- dotnet build Client.
-- git diff --check.
-
-RETURN:
-1. Files changed
-2. Why Form was null — quote
-3. How Form wraps FormItems — quote
-4. Confirmation: submit/CVI/FSQ not edited
-5. Build result
+5. **Validation:** Client Release build succeeded. `git diff --check` returned clean. The component is untracked in the worktree, so it does not appear in `git diff`.
