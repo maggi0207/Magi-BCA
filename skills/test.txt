@@ -1,42 +1,63 @@
 You are implementing a change in the HCA HCP Credentialing repository.
 
 ROLE:
-Senior engineer. One session. Fix NPP Work crash + UI in one pass. Do not start a second chat.
+Senior engineer. One session. Add New license fields on NppTaskForm only. Do not start a second chat.
 
 TASK:
-1) Specialties Work after ADD NPP Work shows Unexpected Error: Form is null. FormItem should be child content of Form.
-2) NppTaskForm UI must match other PAF Work pages (ManagePractitionerInformationTask / ManageAddressesTask / ManageSpecialtiesTask): same title row, same spacing, ONE Cancel/Save toolbar (not top and bottom). Keep Cancel/Save — they persist the NPP task. Same Form + FormItem pattern.
-3) Keep VA/PA hide rules, license list, disclaimer, NPP type, exact ticket copy.
-Do not submit. Do not edit GetCredentialingTypeRtk. Do not add PSV or STATUS/FOL.
+When the user selects Add New State License on ADD NPP Work, show the new-license fields and validate them. Recalled license selection still bypasses those fields. Do not add PSV. Do not edit GetCredentialingTypeRtk. Do not submit.
 
-THEN IMPLEMENT:
+Treat as fact:
+- NppTaskForm already lists GetPractitionerStateLicensesAsync rows + Add New option.
+- VA+PA Yes hides the whole license section — keep that.
+- Recruitment State dropdown + License Number max 20 exist. Reuse those controls if they are already on a PAF form.
+- STATUS_RTK allowed values ONLY (do not invent others):
+  Active DRFB0IQ54S
+  Temporary Permit D2H11CCT3V
+  Active Military D3UK1E0UF6
+  Active-Compact M5890K2GGY
+- Active Military hover: Use this type for civilian practitioners working for the VA.
+- FOL: reuse an existing Field of Licensure / LICENSUREFIELD lookup if one exists in HCP. If NONE, use only the Word list below as dropdown options (do not add extra codes; do not create a new table).
+- Word FOL (value = code): Physician (MD) 10; Physician Resident (MD) 15; Audiologist 400; Chiropractor 603; Dentist 30; Midwife, Lay (Non-Nurse) 624; Naturopath 627; Nurse Anesthetist 110; Nurse Midwife 120; Nurse Practitioner 130; Occupational Therapist 410; Optometrist 636; Osteopathic Physician (DO) 20; Osteopathic Physician Resident (DO) 25; Pharmacist 50; Physician Assistant 642; Podiatrist 350; Speech/Language Pathologist 460; Psychologist 371; Clinical Nurse Specialist 141.
 
-Crash
-- Quote why FormItem runs when view is Specialties (NppTaskForm still mounted, Form behind @if, FormItems not).
-- Only render Npp Form and FormItems when the user is on NPP Work. Do not leave Npp FormItems in the PAF Tasks / Specialties tree.
+FIELDS (Add New only):
+- State: required dropdown, max 2. This field is required.
+- Effective Date: required MM/DD/YYYY. Before today: Date must be greater than or equal to today.
+- License Number: required, max 20. Over 20: License Number cannot exceed 20 characters.
+- Status: required. Only the four STATUS_RTKs above.
+- Expiration Date: required MM/DD/YYYY.
+- Field of Licensure: required dropdown.
 
-UI
-- Open ManageSpecialtiesTask.razor or ManagePractitionerInformationTask.razor. Copy that chrome (title, single button row, Form wrapper, field/label layout).
-- NppTaskForm: one Form, one Cancel/Save in that same place. Remove the extra Cancel/Save pair.
-- Reuse existing PAF Work CSS classes. No new design system.
+132374: if Add New State + Number matches a row already in the recalled list (same practitioner), block save and:
+A license with this State and License Number already exists for this practitioner. Please select the existing license record displayed above.
+
+Selecting an existing recalled license: do not require the Add New fields.
+
+Add New option label: prefer exact None of these apply. Add New State License Instead. if you can change it without a new framework.
+
+Same Form / one Cancel-Save toolbar as other PAF Work pages. Keep FormItems inside Form (Specialties crash).
+
+STOP AND REPORT:
+- If you must edit GetCredentialingTypeRtk, SubmitPaf, CactusUpdater, CreateAddTaskStrategy, FSQ.
+- If you must invent a STATUS_RTK not in the four above.
+- If FOL requires a new Cactus API — use the Word list locally; do not add an endpoint.
 
 DO NOT CHANGE:
-- GetCredentialingTypeRtk, SubmitPafStrategy, CreateAddTaskStrategy(Npp), 132268 hide
-- Specialties lock/interest logic except a shared wrapper if it was broken
-- GetPractitionerStateLicensesAsync SQL
-- Begin PAF FSQ
-- Ticket strings (ADD NPP to Facility, disclaimer, VA/PA, Add New)
+- GetPractitionerStateLicensesAsync SQL / queues
+- GetCredentialingTypeRtk, submit/CVI
+- Demographic / Address / Specialties rules
+- 132268 hide
 
 COMMENTS: almost none.
 
 TESTS:
-- dotnet build Client.
+- dotnet build Client (+ Paf.Api if NppTask model lives there).
 - git diff --check.
 
 RETURN:
 1. Files changed
-2. Why Specialties Form was null — quote
-3. How Npp FormItems are excluded when not on NPP Work — quote
-4. Which Work page you copied for layout/buttons
-5. Confirmation: submit/CVI/FSQ not edited
+2. Add New field show/hide — quote
+3. Status + FOL sources (existing lookup vs Word list)
+4. Duplicate check — quote
+5. Confirmation: PSV / GetCredentialingTypeRtk / submit not edited
 6. Build result
+7. Remaining gaps
