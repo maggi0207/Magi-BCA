@@ -1,29 +1,43 @@
 You are implementing a change in the HCA HCP Credentialing repository.
 
 ROLE:
-Senior engineer. One session. Clear NppTaskForm field errors when the user enters a value. Do not start a second chat.
+Senior engineer. One session. Add PSV uploads on NppTaskForm only. Do not start a second chat.
 
 TASK:
-On ADD NPP Add New, This field is required. stays after State / Status / FOL / dates / License Number are filled. Match Demographic Work: validate or clear that FormItem on change. Keep two-column layout, four STATUS_RTKs, FOL list, duplicate message. Do not submit. Do not edit GetCredentialingTypeRtk.
+On ADD NPP Work, add License / Sanctions / NPI PSV uploads using existing PafFile. Persist on NppTask. Do not write Cactus images. Do not edit GetCredentialingTypeRtk. Do not submit.
 
-THEN IMPLEMENT:
-- Open ManagePractitionerInformationTask Form (ValidateOnChange / OnFieldChanged / EditContext). Quote the pattern.
-- Apply the same to NppTaskForm Add New fields and VA/PA if they have the same leftover.
-- Selecting a dropdown or picking a date must clear that field’s required error without a second Save.
-- Past Effective Date must still show: Date must be greater than or equal to today.
+Treat as fact:
+- PafFile.razor already accepts .pdf .doc .docx .jpg .jpeg .tif .tiff (132530).
+- Combined inspect: PractitionerActionFormAttachmentType has no License/Sanctions/NPI names. Do not invent enum values. Reuse how OffCyclePsv or other PAF tasks store PafFile attachments on the task model.
+- Do not open RecruitmentPsvTask as this form.
+
+VISIBILITY:
+- VA = Yes AND PA = Yes: hide State License (already). Show Sanctions PSV + NPI PSV. Both required. No License PSV (132365).
+- VA = No, or VA = Yes AND PA = No: show License PSV + Sanctions PSV + NPI PSV. All three required (132366 / 132367). Recalled license still requires these PSVs.
+- Unsupported file: existing PafFile error. Do not invent a new message.
+
+LAYOUT:
+- Same two-column / FormItem pattern as the rest of NppTaskForm. FormItems inside Form.
+- Labels: Upload License PSV / Upload Sanctions PSV / Upload NPI PSV (or the exact labels already used on a sibling PAF if they match).
+
+STOP AND REPORT:
+- If you must add PractitionerActionFormAttachmentType values — STOP and quote existing types; persist files on NppTask without a new enum.
+- If you must edit CactusUpdater / image ParentFile / GetCredentialingTypeRtk / SubmitPaf.
 
 DO NOT CHANGE:
-- Column pairs, ticket copy, Status/FOL values, 132374 text
-- PSV, GetCredentialingTypeRtk, submit, license SQL
+- GetPractitionerStateLicensesAsync SQL, Add New field rules, 132268, Demographic/Address/Specialties
+- CreateAddTaskStrategy(Npp), FSQ, Begin PAF
 
 COMMENTS: almost none.
 
 TESTS:
-- dotnet build Client.
+- dotnet build Client (+ Paf.Api if NppTask lives there).
 - git diff --check.
 
 RETURN:
 1. Files changed
-2. How errors clear on change — quote
-3. Confirmation: layout/submit not edited
-4. Build result
+2. How PafFile is reused — quote
+3. Show/hide + required rules — quote
+4. Confirmation: no new attachment enum / no Cactus image write / no GetCredentialingTypeRtk
+5. Build result
+6. Remaining gaps
