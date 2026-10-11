@@ -1,52 +1,29 @@
-Investigate the validation issue on the **ADD NPP to Facility** page and fix it by following the existing validation implementation used on other pages in this application.
+You are implementing a change in the HCA HCP Credentialing repository.
 
-### Current issue
-When the user clicks **Save** with required fields empty, a toast appears saying "This field is required," but the corresponding fields are not highlighted and inline validation messages are not displayed.
+ROLE:
+Senior engineer. One session. Clear NppTaskForm field errors when the user enters a value. Do not start a second chat.
 
-### Step 1: Reference existing pages
-Before making any changes:
+TASK:
+On ADD NPP Add New, This field is required. stays after State / Status / FOL / dates / License Number are filled. Match Demographic Work: validate or clear that FormItem on change. Keep two-column layout, four STATUS_RTKs, FOL list, duplicate message. Do not submit. Do not edit GetCredentialingTypeRtk.
 
-- Identify other pages in the same application that have required fields and display inline validation messages correctly.
-- Inspect their HTML/templates, component TypeScript, form validation logic, validators, error-message rendering, and Save/Submit handlers.
-- Check how those pages mark controls as touched or submitted when the user clicks Save.
-- Check how they handle dropdowns, date pickers, and text inputs.
-- Identify the common validation components, CSS classes, and shared utilities already used by the application.
+THEN IMPLEMENT:
+- Open ManagePractitionerInformationTask Form (ValidateOnChange / OnFieldChanged / EditContext). Quote the pattern.
+- Apply the same to NppTaskForm Add New fields and VA/PA if they have the same leftover.
+- Selecting a dropdown or picking a date must clear that field’s required error without a second Save.
+- Past Effective Date must still show: Date must be greater than or equal to today.
 
-**Use the existing working pages as the source of truth. Do not introduce a new validation pattern.**
+DO NOT CHANGE:
+- Column pairs, ticket copy, Status/FOL values, 132374 text
+- PSV, GetCredentialingTypeRtk, submit, license SQL
 
-### Step 2: Compare with ADD NPP to Facility
-Compare the current page with the reference pages and identify exactly why its validation errors appear only in the toast instead of beside the invalid fields.
+COMMENTS: almost none.
 
-Check whether:
-- Required validators are configured correctly.
-- The Save handler triggers validation for all required fields.
-- Invalid controls are marked as touched or the form is marked as submitted.
-- Inline error-message components are present and connected to the correct controls.
-- Custom dropdown and date-picker components expose and display their validation state correctly.
+TESTS:
+- dotnet build Client.
+- git diff --check.
 
-### Step 3: Implement the fix
-- Apply the same validation pattern used by the existing working pages.
-- Display the appropriate inline message directly below each invalid required field.
-- Apply the application's existing invalid-field styling.
-- Show validation messages immediately after Save is clicked when required fields are empty.
-- Clear each message when its field becomes valid.
-- Preserve existing business rules, API payloads, and toast behavior unless the reference implementation establishes otherwise.
-
-### Step 4: Verify
-- Test all required fields on ADD NPP to Facility.
-- Verify text inputs, dropdowns, and date pickers.
-- Test both empty submissions and corrected values.
-- Run relevant tests and report the results.
-
-### Constraints
-- Make minimal, targeted changes.
-- Do not modify unrelated pages or introduce duplicate validation logic.
-- Do not assume how validation works; cite the actual reference page and code locations you inspected.
-
-### Final report
-Summarize:
-1. Which existing pages were used as references.
-2. The root cause of the issue.
-3. The files changed.
-4. How the fix matches the existing application pattern.
-5. Tests executed and their results.
+RETURN:
+1. Files changed
+2. How errors clear on change — quote
+3. Confirmation: layout/submit not edited
+4. Build result
