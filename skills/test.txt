@@ -1,16 +1,55 @@
-1. **Files changed**
-   - `NppTask.cs`
-   - `NppTaskForm.razor`
-   - `NppTaskForm.razor.cs`
+You are implementing a change in the HCA HCP Credentialing repository.
 
-2. **Add New fields:** Shown only when the license section is visible and the selected license key is the Add New sentinel. Selecting a recalled license bypasses Add New validation.
+ROLE:
+Senior engineer. One session. Align NppTaskForm with other PAF Work pages and put Add New fields on a two-column grid. Do not start a second chat.
 
-3. **Status and FOL sources:** Status dropdown uses only the four supplied RTKs: Active `DRFB0IQ54S`, Temporary Permit `D2H11CCT3V`, Active Military `D3UK1E0UF6`, Active-Compact `M5890K2GGY`. No existing FOL lookup was found, so the dropdown uses exactly the supplied Word list and codes. Active Military has the requested tooltip.
+TASK:
+ADD NPP Work fields work, but layout does not match Demographic / Address / Specialties Work. Copy that Form, LabelCol/WrapperCol, gutter, control width, date picker, and one Cancel/Save toolbar. Put Add New fields two per row as specified below. Keep every field, hide rule, Status/FOL list, duplicate message, and exact ticket copy. Do not submit. Do not edit GetCredentialingTypeRtk.
 
-4. **Duplicate check:** Compares the entered State and License Number with recalled licenses for the practitioner. On a match, save is blocked with: “A license with this State and License Number already exists for this practitioner. Please select the existing license record displayed above.”
+COPY FROM:
+Open ManagePractitionerInformationTask.razor (and ManageSpecialtiesTask.razor if needed). Quote:
+- Form LabelCol / WrapperCol
+- Row Gutter and Col Span used for First Name + Last Name (or Degree + Category)
+- Which date input DOB uses (or ValidatedDateInput if that is what they use)
+Use those exact numbers and components. Reuse existing PAF CSS. No new design system.
 
-5. **Scope:** No PSV, `GetCredentialingTypeRtk`, submit, CVI, facility query, or license-list SQL changes.
+CHROME:
+- Same title row and spacing as Demographic Work.
+- ONE Cancel/Save toolbar in the same place as Demographic. Remove a second top/bottom pair if it is still there.
+- FormItems stay inside Form (do not re-break Specialties Work).
 
-6. **Validation:** Client Release build succeeded; `git diff --check` passed.
+COLUMN LAYOUT:
 
-7. **Remaining gap:** The new license details are validated and persisted on the PAF `NppTask`; this change does not create a `PROVIDERLICENSES` record in Cactus.
+Practitioner Type: one field; same single-dropdown width as Category/Degree — not a full-page stretch.
+
+VA Yes/No and PA (when VA=Yes): same Col Span as two Demographic fields on one row (side by side). If PA is hidden, VA stays in the left column.
+
+License radios (recalled rows + Add New): full-width one column (it is a list).
+
+When Add New is selected, two columns using the same Span as Demographic:
+
+| Left Col | Right Col |
+| State | Effective Date |
+| License Number | Status |
+| Expiration Date | Field of Licensure |
+
+Dates: same date input as Demographic DOB.
+Selects: same width as Degree/Category/State on Demographic.
+
+DO NOT CHANGE:
+- Which fields show, required rules, four STATUS_RTKs, FOL Word list, 132374 duplicate text
+- GetCredentialingTypeRtk, PSV, submit, license SQL
+- 132268 hide, Demographic/Address/Specialties logic
+
+COMMENTS: almost none.
+
+TESTS:
+- dotnet build Client.
+- git diff --check.
+
+RETURN:
+1. Files changed
+2. Quoted LabelCol / Col Span / date control from Demographic
+3. Row/Col structure you applied — quote
+4. Confirmation: validation/PSV/submit not edited
+5. Build result
