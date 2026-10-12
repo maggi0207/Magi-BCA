@@ -1,52 +1,69 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+I **did not change code in this turn**. The NPP and task-model files were already untracked in the worktree. I stopped because the NPP markup already matches the PafFile host contract, while the repository’s attachment schema exposes a likely shared API insertion blocker that NPP cannot fix without an API/schema change.
 
-ROLE:
-Senior engineer. One session. Make NPP PSV upload succeed by copying a working upload host in this app. Do not start a second chat.
+**Upload inventory**
+PafFile is used by these Razor hosts, each with a corresponding code-behind callback file:
 
-TASK:
-SaveForLaterModal on NppTaskForm is done. Leave it. Picking a PDF still shows PafFile’s existing text: "The upload of the file you selected failed. Please try again." Filename never appears. TaskId-from-PafState.NppTask did not fix live upload. Search the whole app for every file-upload host, quote a working one, and make NppTaskForm use that exact wiring.
+- `ManageCollaboratingPractitionersTask`
+- `ManageDelegateTask`
+- `LifeSupportPrivilege`
+- `Mss18PerFacilityQuestions`
+- `RequestedPrivileges`
+- `OffCyclePsvLoa`
+- `OffCycleRrfcLoa`
+- `PerfTask`
+- `RecruitmentCvFileAttachmentForm`
+- `NppTaskForm`
 
-BEFORE CODING — search the whole Client + Paf.Api, then quote:
-1. Every file that uses PafFile (razor + cs). List them all.
-2. Every other upload in the app (AntDesign Upload, InputFile, attachment client, image upload). List them. Do not create a new component.
-3. PafFile.razor.cs in full for the upload path: URL, headers, FormType, TaskId, PractitionerActionFormId, FacilityKey (or any other field), when _currentPafId is set, the exact branch that sets "The upload of the file you selected failed. Please try again."
-4. PafController.UploadPafAttachmentAsync + CreatePafAttachmentAsync — every required field (architecture already lists TaskId, PractitionerActionFormId, FacilityKey, FormType, FileName, ContentType, Uploaded). Quote which are required and what happens if FacilityKey or FormId is empty.
-5. Open at least two working hosts that already show a filename after PDF (prefer OffCyclePsvLoa AND one of AAR / MSS-18 / Dop / Recruitment PSV / any other PafFile host). Quote full PafFile markup and how they set TaskId, FormId, FacilityKey, Attachment. When is FormId already saved on that PAF?
-6. NppTaskForm current PafFile + the values at render: TaskId, FormId, FacilityKey. Quote. If FormId is empty until first Save, quote how a working host uploads on a new PAF (they may save the PAF first). Do not invent a save API.
+Direct Ant Design `Upload` hosts elsewhere in Client are `EditResourceDocument`, `PacketFile`, `PafFile`, `UploadPortalItemsModal`, and `UploadRecredentialingModal`. I found no `InputFile` or `IBrowserFile` usage. The PAF API’s file endpoint is `PafController.UploadPafAttachmentAsync`; Client also has Packet, Portal, and Recredentialing attachment helpers.
 
-LIVE FAIL (still):
-- The upload of the file you selected failed. Please try again.
-- No filename / Remove after pick.
+**PafFile path and comparison**
+`PafFile.razor` uses Ant Upload with its helper URL, bearer headers, metadata, and callbacks. Its code-behind sets:
 
-IMPLEMENT:
-- Copy the working host’s PafFile parameters 1:1 (same names, same sources). FormType stays Other. No new enum.
-- If the working host requires a saved FormId / FacilityKey before upload, do the same existing save/ensure step those pages already use. Do not generate Guids.
-- After a valid PDF: PafFile’s own filename + Remove. Persist on NppTask so reopen still shows it.
-- Do not add <input type="file">. Do not restyle FSQ chrome. Do not change SaveForLaterModal.
-- No Cactus image write. No GetCredentialingTypeRtk. No submit.
+```csharp
+_uploadHeaders["Authorization"] = _authenticationHeaderValue.ToString();
+_currentPafId = StateContainer.PafState.FormId;
+```
 
-STOP AND REPORT (do not invent UI):
-- If no host in the repo successfully uploads with PafFile — STOP and quote what you found.
-- If the API requires a field NPP cannot supply without a new contract — STOP and quote.
-- In RETURN, quote the TaskId, FormId, FacilityKey values NppTaskForm now passes.
+Before upload it validates that FormId, FormType, and TaskId are non-null, then builds:
 
-DO NOT CHANGE:
-- Facility Specific Questions, Demographic, Address, Specialties, OffCycle/AAR/MSS pages themselves
-- GetPractitionerStateLicensesAsync, Add New rules, 132268
-- CreateAddTaskStrategy(Npp), Begin PAF, submit/CVI
+```csharp
+var uploadDetail = new PafAttachmentUpload()
+{
+    FormType = FormType!.Value,
+    TaskId = TaskId!.Value,
+    PractitionerActionFormId = _currentPafId!.Value
+};
+```
 
-COMMENTS: almost none.
+It does **not** set `FacilityKey`. On a failed upload response, `PafFile.razor.cs` sets `_showFileUploadErrorMessage = true`; `PafFile.razor` renders “The upload of the file you selected failed. Please try again.” On success, the component creates an `AttachedFile`, sets its own `Attachment` to the returned ID and filename, and renders the filename link and Remove button.
 
-TESTS:
-- dotnet build Client.
-- git diff --check.
+The OffCycle host uses this markup:
 
-RETURN:
-1. Files changed
-2. Every PafFile host you found — list
-3. Working host you copied — file + quoted markup + how FormId/FacilityKey are set
-4. Why NPP still failed after the TaskId fix — quote (empty FormId / FacilityKey / API / other)
-5. NppTaskForm values now passed to PafFile — quote
-6. Confirmation: no new component / enum / Cactus / GetCredentialingTypeRtk
-7. Build result
-8. Remaining gaps
+```razor
+<InputHca @bind-Value="@context.Mss019RequestFileAttachmentUrl" Type="hidden" />
+<PafFile Attachment="@context.Mss019RequestFile"
+         FormType="PractitionerActionFormAttachmentType.Mss19LoaForm"
+         TaskId="@StateContainer.PafState.OffCyclePsvTask.TaskId"
+         OnAfterUpload="(e) => HandleAfterUpload(e, PractitionerActionFormAttachmentType.Mss19LoaForm)"
+         OnAfterRemove="(e) => HandleAfterRemove(e, PractitionerActionFormAttachmentType.Mss19LoaForm)" />
+```
+
+MSS-18 and Delegate use the same attachment, task ID, upload callback, and remove callback pattern. Those hosts also omit FormId and FacilityKey parameters because PafFile derives FormId from PafState and does not expose a FacilityKey parameter.
+
+**NPP values and likely blocker**
+NPP currently passes:
+
+```razor
+Attachment="@context.LicensePsvAttachment"
+FormType="PractitionerActionFormAttachmentType.Other"
+TaskId="@StateContainer.PafState.NppTask.TaskId"
+```
+
+The same wiring is used for Sanctions and NPI. PafFile internally gets FormId from `StateContainer.PafState.FormId`; FacilityKey is omitted and therefore null. The PAF shell saves/loads the PAF before entering its task view. Also, PafFile’s null-state guard runs before sending the upload, so the reported *server upload failure* is not caused by a null TaskId or null FormId. The attachment table allows null FormId and FacilityKey.
+
+The concerning shared API/schema mismatch is that the only attachment DDL in the repository declares `[Version] INT NOT NULL` with no default, while `PractitionerActionFormAttachment` has no `Version` property. `UploadPafAttachmentAsync` builds that entity without Version, and `CreatePafAttachmentAsync` inserts it directly via `conn.InsertAsync(pafAttachment)`. If the live table follows this DDL and has no out-of-band default, the insert fails for **every** PafFile host, not just NPP. The source has no later migration/default to resolve this. I cannot confirm the live database’s actual default constraint or see the authenticated upload response from this session, so this is a likely shared failure rather than a proven live response. Because fixing it requires an API/schema change outside NPP’s upload contract, I stopped rather than adding a client workaround.
+
+**Other requested checks**
+The configured PAF API answered HTTP 200 at its Swagger endpoint on port 5021. That does not prove an authenticated multipart upload succeeds. NPP already uses `FormType.Other`; no new enum, component, Cactus image write, or `GetCredentialingTypeRtk` change was made. The existing SaveForLaterModal was left untouched.
+
+Client Release build succeeded. `git diff --check` and a direct whitespace scan were clean. A live authenticated PDF upload remains unverified; the next diagnostic needs the actual PAF API response/log and confirmation whether the running database supplies a default for `PractitionerActionFormAttachment.Version`.
