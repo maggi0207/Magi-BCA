@@ -1,58 +1,21 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+1. **Files changed:** `NppTaskForm.razor` and `NppTaskForm.razor.cs`.
 
-ROLE:
-Senior engineer. One session. Make NPP PSV upload succeed and use the existing save-for-later toast. Do not start a second chat.
+2. **Upload diagnosis and change:** `PafFile` builds the upload metadata using:
 
-TASK:
-1. UPLOAD: NppTaskForm matches FSQ chrome. Picking a PDF still shows PafFile’s existing message: "The upload of the file you selected failed. Please try again." The file name never appears. Make upload work the same way OffCyclePsvLoa (or the first working PafFile host) already works.
-2. TOAST: When the user clicks Save with required fields missing, NppTaskForm must show the SAME existing confirm as the privileges / MSS-18 (or other PAF Work) page: "One or more required fields are missing. Would you like to save for later?" with No / Yes. Do not invent a toast, Modal, or copy.
+   ```csharp
+   FormType = FormType!.Value,
+   TaskId = TaskId!.Value,
+   PractitionerActionFormId = _currentPafId!.Value
+   ```
 
-BEFORE CODING — inspect, then quote:
-1. PafFile.razor.cs — the exact call that uploads; every parameter (TaskId, PractitionerActionFormId, FormType, Attachment). Quote the branch that sets "The upload of the file you selected failed. Please try again."
-2. OffCyclePsvLoa (and any other working PafFile host) — full PafFile markup + how TaskId / form id / Attachment / OnAfterUpload / OnAfterRemove are set. When does that task already have a TaskId?
-3. NppTaskForm + NppTask — current PafFile markup and where TaskId / form id come from when Work opens. Is NppTask a new object with empty TaskId?
-4. How NppTask is attached to PractitionerActionFormData / StateContainer (UpdateTaskNppStrategy). Does the PAF already have this task’s TaskId before PafFile posts?
-5. PafController.UploadPafAttachmentAsync — what it requires. Do not invent a new endpoint.
-6. Find the existing confirm that shows exactly: One or more required fields are missing. Would you like to save for later? Start on the privileges / Add Privilege MSS-18 Work Save. Quote the method and Yes/No handlers. Do not write new toast text.
+   The PAF ID is captured from `StateContainer.PafState.FormId`; the NPP task ID is now read from the same `PafState.NppTask` object that the parent saves. NPP registers that task in state before rendering the upload controls. The API listener is running, and `https://localhost:5021/swagger/v1/swagger.json` returned HTTP 200. The attachment table has no task-ID foreign key, and the controller inserts the supplied IDs directly.
 
-LIVE FAIL:
-- After pick: The upload of the file you selected failed. Please try again.
-- No file name / remove after pick.
-- Save with empty required: no existing save-for-later confirm (or a different message).
+   I can’t prove the historical upload failure’s exact server-side cause: the prior authenticated multipart response/body isn’t available. The former failure branch is reached when the upload response state is not Success; causes such as authorization or blob-scan failure require that live response to distinguish. The code-side task-ID inconsistency is fixed, but a signed-in PDF upload still needs runtime confirmation.
 
-IMPLEMENT:
-- Pass PafFile the same TaskId, PractitionerActionFormId (or whatever OffCycle already passes), FormType, and Attachment bind as the working host. FormType stays Other. No new enum.
-- If NppTask.TaskId is empty, use the existing ADD NPP / PAF task id already on the form — the same id OffCycle uses from its task. Do not generate a random Guid for upload.
-- OnAfterUpload / OnAfterRemove: same pattern as OffCycle — save the PafAttachment on NppTask and clear required on that field so the file name stays visible after success and after reopen.
-- If the upload API requires the Npp task to already exist on the PAF, persist that task the same way other PAF tasks exist before their PafFile works. Quote that path. Do not invent a new save API.
-- On Save, if required fields are missing, call the same existing confirm as the privileges/MSS page (same component, same exact sentence, same No/Yes).
-- Yes = existing Save for Later path (persist incomplete, return to PAF Tasks) — same as that page.
-- No = stay on NppTaskForm; required stays under the fields like FSQ.
-- Do not add a new Modal/Notification class. Do not change the privileges page.
-- Keep FSQ page chrome. Do not restyle. Do not route NPP Work to FSQ.
-- Keep VA/PA / license PSV show-hide. No Cactus image write. No GetCredentialingTypeRtk. No submit.
+3. **Upload wiring:** OffCycle uses a hidden URL binding with `Attachment`, `TaskId`, `FormType`, `OnAfterUpload`, and `OnAfterRemove`. NPP now uses the state-held task ID with `FormType.Other`; its callbacks store/clear the attachment and URL and revalidate the corresponding field. `PafFile` itself displays the filename and its existing Remove button after success, and reconstructs the display from the saved attachment when reopened.
 
-STOP AND REPORT:
-- If UploadPafAttachmentAsync cannot accept Npp TaskId / Other without a new contract — STOP and quote the API.
-- If Paf.Api is down / 5021 refused, say that; do not paper over it in the client.
-- If that exact save-for-later confirm is not in the repo — STOP and quote what Save uses instead.
+4. **Save-for-later:** NPP now reuses the existing `SaveForLaterModal` with the exact title: “One or more required fields are missing. Would you like to save for later?” Its existing buttons are No and Yes. No closes the modal and leaves field validation in place. Yes saves through the existing NPP completion/PAF update path with `TaskStatus.New`, then returns from the Work view.
 
-DO NOT CHANGE:
-- Facility Specific Questions, Demographic, Address, Specialties, privileges/MSS page
-- GetPractitionerStateLicensesAsync, Add New rules, 132268
-- CreateAddTaskStrategy(Npp), Begin PAF, submit/CVI
+5. **Scope:** No new endpoint or attachment enum; no Cactus image write, `GetCredentialingTypeRtk`, submit, or CVI change.
 
-COMMENTS: almost none.
-
-TESTS:
-- dotnet build Client (+ Paf.Api if you touch the upload API — prefer not to).
-- git diff --check.
-
-RETURN:
-1. Files changed
-2. Why upload failed — quote (empty TaskId / missing form id / API / other)
-3. Working host markup vs NppTaskForm after fix — quote
-4. Confirmation: file name shows after PDF; no new endpoint / enum / Cactus / GetCredentialingTypeRtk
-5. Which existing confirm you reused for save-for-later — file + quote
-6. Build result
-7. Remaining gaps
+6. **Verification:** Client Release build succeeded. `git diff --check`, the direct whitespace scan, and diagnostics were clean. The PAF API Swagger endpoint responded HTTP 200. A signed-in PDF upload was not exercised, so the actual upload success remains the outstanding runtime check.
