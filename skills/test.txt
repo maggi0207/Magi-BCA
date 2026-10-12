@@ -1,35 +1,29 @@
-**Files changed**
-- `NppTaskForm.razor`
-- `NppTaskForm.razor.cs`
-- `NppTask.cs`
-- `NppTaskValidationTests.cs`
+**OFFCYCLE: WORKS**
 
-**PafFile reuse**
-Each upload uses the existing `PafFile`, the NPP task’s `TaskId`, and the existing generic `Other` attachment type. For example:
+Read-only inspection only; no files were changed.
 
-```razor
-<PafFile Attachment="@context.LicensePsvAttachment"
-         FormType="PractitionerActionFormAttachmentType.Other"
-         TaskId="@context.TaskId"
-         OnAfterUpload="HandleLicensePsvUpload"
-         OnAfterRemove="HandleLicensePsvRemove" />
-```
+**PafFile hosts**
+Razor hosts and their upload callbacks:
 
-`PafFile` requires a `FormType` and accepts `.pdf`, `.doc`, `.docx`, `.jpg`, `.jpeg`, `.tif`, and `.tiff` (`PafFile.razor.cs:33`). The existing enum contains `Mss18Form`, `AAR`, `Dop`, and `Other`, but no License/Sanctions/NPI PSV types (`PractitionerActionFormAttachment.cs:30`). I used `Other`; no enum values were added. Upload/remove callbacks save or clear each `PafAttachment` on `NppTask` and update the corresponding required-validation field.
+- `ManageCollaboratingPractitionersTask.razor` and its `.razor.cs`
+- `ManageDelegateTask.razor` and its `.razor.cs`
+- `LifeSupportPrivilege.razor` and its `.razor.cs`
+- `Mss18PerFacilityQuestions.razor` and its `.razor.cs`
+- `RequestedPrivileges.razor` and its `.razor.cs`
+- `NppTaskForm.razor` and its `.razor.cs`
+- `OffCyclePsvLoa.razor` and its `.razor.cs`
+- `OffCycleRrfcLoa.razor` and its `.razor.cs`
+- `PerfTask.razor` and its `.razor.cs`
+- `RecruitmentCvFileAttachmentForm.razor` and its `.razor.cs`
 
-**Visibility and required rules**
-The existing State License condition controls License PSV visibility and requiredness:
+Other upload mechanisms found include Ant Design `Upload` in resource-document, packet-file, portal-item, and recredentialing workflows. No `InputFile` or `IBrowserFile` usage was found.
 
-```csharp
-nameof(LicensePsvAttachmentUrl) => ShouldShowStateLicenses(task),
-nameof(SanctionsPsvAttachmentUrl) or
-nameof(NpiPsvAttachmentUrl) => true,
-```
+**NPP-only differences**
+The working OffCycle upload uses `FormType.Mss19LoaForm`; NPP uses `FormType.Other`. That is the only apparent upload-metadata difference in the component markup. The controller has no FormType whitelist: it checks file extension, uploads/scans the blob, and copies the supplied FormType into the attachment record.
 
-Thus License PSV is hidden and not required for VA=Yes/PA=Yes; Sanctions and NPI PSV remain shown and required. When State Licenses are shown, all three PSV uploads are required (`NppTask.cs:52`, `NppTaskForm.razor:180`).
+OffCycle passes `StateContainer.PafState.OffCyclePsvTask.TaskId`. NPP passes `StateContainer.PafState.NppTask.TaskId`. `BasePractitionerActionFormTask.TaskId` defaults to a new GUID, and NPP assigns its task to PafState when the form initializes. That makes the task available in client state before the upload; it does not demonstrate that the NPP task has already been saved back to the PAF server.
 
-**Scope and remaining gaps**
-No new attachment enum, Cactus image write, `GetCredentialingTypeRtk`, submit path, license SQL, or unrelated PAF task was edited. Attachments use the existing PAF attachment upload/storage path and are tagged with generic `Other`; distinct attachment-type reporting or downstream PSV processing is not added here.
+PafFile itself obtains `PractitionerActionFormId` from `StateContainer.PafState.FormId` and does not pass `FacilityKey`. The upload API accepts and copies `FacilityKey`, but the other PafFile hosts also omit it. In the code inspected, FormType, TaskId, and FacilityKey are not individually rejected by a whitelist or validation branch.
 
-**Verification**
-Client Release build succeeded. The focused NPP validation tests passed: 2 passed. `git diff --check`, direct whitespace scans, and file diagnostics were clean. I did not separately build PAF API; `NppTask` is in Shared, and the existing attachment upload endpoint is reused.
+**Conclusion**
+The observed NPP-specific candidate is `FormType.Other` versus OffCycle’s task-specific value. Repository code does not show the API rejecting `Other`, so it does not establish that as the live failure cause. TaskId is present in NPP client state; whether it is already server-persisted before upload is not established by this code path. No enum, API contract, Cactus, or other change was made.
