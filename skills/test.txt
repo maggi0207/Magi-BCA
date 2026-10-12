@@ -1,46 +1,44 @@
 You are implementing a change in the HCA HCP Credentialing repository.
 
 ROLE:
-Senior engineer. One session. Make NPP PafFile use a server-persisted TaskId like OffCycle. Do not start a second chat.
+Senior engineer. One session. 132529 message + 132267 Review & Submit button gate only. Do not start a second chat.
 
-FACT:
-- OffCycle PDF upload WORKS on this same machine/DB. Shared Version insert is not the fail.
-- OffCycle: FormType.Mss19LoaForm + TaskId = PafState.OffCyclePsvTask.TaskId (that task was added to the PAF via the drawer / AddTask).
-- NPP: FormType.Other + TaskId = PafState.NppTask.TaskId. NppTask is assigned on form init. BasePractitionerActionFormTask.TaskId defaults to a new GUID. ADD NPP Save Facilities still uses AddTaskAddPractitionerToFacilityStrategy (AddPractitionerToFacilitiesTask), not NppTask. The API has no FormType whitelist.
-- Do not retag NPP files as Mss19LoaForm. Keep Other. Do not add License/Sanctions/NPI enum values. Do not add Version.
+TASK:
+1. 132529: When ADD NPP State Licenses are shown, and any selected PAF facility is in CA, LA, NV, KY, or TX, the practitioner must have a license in that facility’s state. If missing, block Complete / Show the existing-style error with this exact sentence (swap the two-letter state): A state license in the state of 'TX' is required for PAF submission.
+2. 132267: Reuse existing IsSubmittable() (or the same Review & Submit click gate other PAF types already use) so required NPP tasks incomplete → Review & Submit unavailable; all required Complete → available. Do not make submit succeed. Do not edit GetCredentialingTypeRtk.
 
 BEFORE CODING — inspect, then quote:
-1. How OffCyclePsvTask.TaskId is created and saved on the PAF before OffCycle Work / PafFile (AddTaskToPaf / UpdateTaskAndSavePaf / load). Quote the server-returned id.
-2. How NppTask is created and put on PafState. Quote whether UpdateTaskNppStrategy (or equivalent) has already run before PafFile is shown.
-3. What TaskId already exists on the PAF for this ADD NPP action (AddPractitionerToFacilitiesTask.TaskId or NppTask if already saved). Quote.
+1. Where facility/entity state already lives on the PAF (selected facilities, not a new Cactus query). Quote.
+2. How NppTask stores selected/recalled licenses (state code). Quote.
+3. IsSubmittable / PafReviewForm Review & Submit click — how required Complete is checked today. Quote. NPP is not in that model yet.
+4. ShouldShowStateLicenses — 132529 applies only when licenses are shown. VA+PA Yes hides licenses (132365). Do not invent a 132529 rule for that hide path. Leftover: quote it in RETURN.
 
 IMPLEMENT:
-- Before any PafFile on NppTaskForm can upload, NPP must pass a TaskId that is already on the saved PAF — same class of id OffCycle uses.
-- Prefer: persist NppTask with the existing UpdateTaskNppStrategy / UpdateTaskAndSavePaf path (or the same AddTask path other tasks use) and then use the TaskId that comes back. Do not generate a new Guid for upload.
-- If NppTask is only a client wrapper, PafFile TaskId must be the already-persisted ADD NPP task id on that PAF (quote which property). Keep NppTask in sync with that same id.
-- Keep FormType.Other, Attachment binds, OnAfterUpload/OnAfterRemove, SaveForLaterModal, FSQ chrome, VA/PA rules.
-- No new endpoint. No Cactus image. No GetCredentialingTypeRtk. No submit.
+- On NppTaskForm Save (or the existing complete-validation path): if licenses are shown and a selected facility state is CA/LA/NV/KY/TX with no matching license, show the exact message and do not mark the NPP task Complete. Save for later still allowed (existing SaveForLaterModal).
+- Do not add states beyond those five.
+- Add NppTask to the existing required-complete check IsSubmittable already uses for other tasks. Isolation: TaskSelected == Npp (or existing IsNppPaf). Begin PAF / other PAF types unchanged.
+- Do not navigate into Review processor. Do not call SubmitPaf. No Cactus license insert. No CVI. No GetCredentialingTypeRtk. Do not change PafFile / blob / 10003.
 
 STOP AND REPORT:
-- If no existing save path can persist NppTask without a new API contract — STOP and quote.
-- If the only way to upload is a new FormType enum — STOP. Other stays.
+- If facility state is not already on the PAF and you would need a new API — STOP and quote.
+- If Review & Submit can only be gated by adding an RTK to GetCredentialingTypeRtk — STOP. Gate-only or report.
 
 DO NOT CHANGE:
-- OffCycle / Delegate / MSS / FSQ / Demographic / Address / Specialties pages
-- Attachment DDL, Version, UploadPafAttachmentAsync contract
-- CreateAddTaskStrategy(Npp) factory target (still AddTaskAddPractitionerToFacilityStrategy) unless you must only copy TaskId from that existing task — quote if you do
-- Begin PAF, submit/CVI
+- Upload/PafFile, Azurite, Version, attachment enum
+- CreateAddTaskStrategy(Npp), FSQ, Demographic/Address/Specialties rules
+- Begin PAF, submit/CVI, 131785
 
 COMMENTS: almost none.
 
 TESTS:
-- dotnet build Client (+ Paf.Api only if you touch a save that already lives there).
+- dotnet build Client (+ Paf.Api only if IsSubmittable lives there).
 - git diff --check.
 
 RETURN:
 1. Files changed
-2. How OffCycle TaskId is server-saved — quote
-3. What TaskId NPP PafFile now sends — quote (and that it is persisted)
-4. Confirmation: FormType still Other; no Version; no new enum; no Cactus; no GetCredentialingTypeRtk
-5. Build result
-6. Remaining gaps
+2. 132529 — how facility state + license state are compared — quote
+3. 132267 — how IsSubmittable now includes Npp — quote
+4. Confirmation: GetCredentialingTypeRtk / submit / Cactus / PafFile not edited
+5. VA+PA Yes 132529 leftover — one sentence
+6. Build result
+7. Remaining gaps
