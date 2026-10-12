@@ -1,29 +1,46 @@
-**OFFCYCLE: WORKS**
+You are implementing a change in the HCA HCP Credentialing repository.
 
-Read-only inspection only; no files were changed.
+ROLE:
+Senior engineer. One session. Make NPP PafFile use a server-persisted TaskId like OffCycle. Do not start a second chat.
 
-**PafFile hosts**
-Razor hosts and their upload callbacks:
+FACT:
+- OffCycle PDF upload WORKS on this same machine/DB. Shared Version insert is not the fail.
+- OffCycle: FormType.Mss19LoaForm + TaskId = PafState.OffCyclePsvTask.TaskId (that task was added to the PAF via the drawer / AddTask).
+- NPP: FormType.Other + TaskId = PafState.NppTask.TaskId. NppTask is assigned on form init. BasePractitionerActionFormTask.TaskId defaults to a new GUID. ADD NPP Save Facilities still uses AddTaskAddPractitionerToFacilityStrategy (AddPractitionerToFacilitiesTask), not NppTask. The API has no FormType whitelist.
+- Do not retag NPP files as Mss19LoaForm. Keep Other. Do not add License/Sanctions/NPI enum values. Do not add Version.
 
-- `ManageCollaboratingPractitionersTask.razor` and its `.razor.cs`
-- `ManageDelegateTask.razor` and its `.razor.cs`
-- `LifeSupportPrivilege.razor` and its `.razor.cs`
-- `Mss18PerFacilityQuestions.razor` and its `.razor.cs`
-- `RequestedPrivileges.razor` and its `.razor.cs`
-- `NppTaskForm.razor` and its `.razor.cs`
-- `OffCyclePsvLoa.razor` and its `.razor.cs`
-- `OffCycleRrfcLoa.razor` and its `.razor.cs`
-- `PerfTask.razor` and its `.razor.cs`
-- `RecruitmentCvFileAttachmentForm.razor` and its `.razor.cs`
+BEFORE CODING — inspect, then quote:
+1. How OffCyclePsvTask.TaskId is created and saved on the PAF before OffCycle Work / PafFile (AddTaskToPaf / UpdateTaskAndSavePaf / load). Quote the server-returned id.
+2. How NppTask is created and put on PafState. Quote whether UpdateTaskNppStrategy (or equivalent) has already run before PafFile is shown.
+3. What TaskId already exists on the PAF for this ADD NPP action (AddPractitionerToFacilitiesTask.TaskId or NppTask if already saved). Quote.
 
-Other upload mechanisms found include Ant Design `Upload` in resource-document, packet-file, portal-item, and recredentialing workflows. No `InputFile` or `IBrowserFile` usage was found.
+IMPLEMENT:
+- Before any PafFile on NppTaskForm can upload, NPP must pass a TaskId that is already on the saved PAF — same class of id OffCycle uses.
+- Prefer: persist NppTask with the existing UpdateTaskNppStrategy / UpdateTaskAndSavePaf path (or the same AddTask path other tasks use) and then use the TaskId that comes back. Do not generate a new Guid for upload.
+- If NppTask is only a client wrapper, PafFile TaskId must be the already-persisted ADD NPP task id on that PAF (quote which property). Keep NppTask in sync with that same id.
+- Keep FormType.Other, Attachment binds, OnAfterUpload/OnAfterRemove, SaveForLaterModal, FSQ chrome, VA/PA rules.
+- No new endpoint. No Cactus image. No GetCredentialingTypeRtk. No submit.
 
-**NPP-only differences**
-The working OffCycle upload uses `FormType.Mss19LoaForm`; NPP uses `FormType.Other`. That is the only apparent upload-metadata difference in the component markup. The controller has no FormType whitelist: it checks file extension, uploads/scans the blob, and copies the supplied FormType into the attachment record.
+STOP AND REPORT:
+- If no existing save path can persist NppTask without a new API contract — STOP and quote.
+- If the only way to upload is a new FormType enum — STOP. Other stays.
 
-OffCycle passes `StateContainer.PafState.OffCyclePsvTask.TaskId`. NPP passes `StateContainer.PafState.NppTask.TaskId`. `BasePractitionerActionFormTask.TaskId` defaults to a new GUID, and NPP assigns its task to PafState when the form initializes. That makes the task available in client state before the upload; it does not demonstrate that the NPP task has already been saved back to the PAF server.
+DO NOT CHANGE:
+- OffCycle / Delegate / MSS / FSQ / Demographic / Address / Specialties pages
+- Attachment DDL, Version, UploadPafAttachmentAsync contract
+- CreateAddTaskStrategy(Npp) factory target (still AddTaskAddPractitionerToFacilityStrategy) unless you must only copy TaskId from that existing task — quote if you do
+- Begin PAF, submit/CVI
 
-PafFile itself obtains `PractitionerActionFormId` from `StateContainer.PafState.FormId` and does not pass `FacilityKey`. The upload API accepts and copies `FacilityKey`, but the other PafFile hosts also omit it. In the code inspected, FormType, TaskId, and FacilityKey are not individually rejected by a whitelist or validation branch.
+COMMENTS: almost none.
 
-**Conclusion**
-The observed NPP-specific candidate is `FormType.Other` versus OffCycle’s task-specific value. Repository code does not show the API rejecting `Other`, so it does not establish that as the live failure cause. TaskId is present in NPP client state; whether it is already server-persisted before upload is not established by this code path. No enum, API contract, Cactus, or other change was made.
+TESTS:
+- dotnet build Client (+ Paf.Api only if you touch a save that already lives there).
+- git diff --check.
+
+RETURN:
+1. Files changed
+2. How OffCycle TaskId is server-saved — quote
+3. What TaskId NPP PafFile now sends — quote (and that it is persisted)
+4. Confirmation: FormType still Other; no Version; no new enum; no Cactus; no GetCredentialingTypeRtk
+5. Build result
+6. Remaining gaps
