@@ -1,44 +1,19 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+1. **Files changed:** `NppTaskForm.razor.cs` and `ModelExtensions.cs`.
 
-ROLE:
-Senior engineer. One session. 132529 message + 132267 Review & Submit button gate only. Do not start a second chat.
+2. **132529:** Selected facility state is already carried as `FacilityValue.State`. For each selected facility in CA, LA, NV, KY, or TX, the NPP Complete check compares that state with the state on the practitioner’s loaded licenses, case-insensitively:
+   > `string.Equals(license.State?.Trim(), facilityState, StringComparison.OrdinalIgnoreCase)`
 
-TASK:
-1. 132529: When ADD NPP State Licenses are shown, and any selected PAF facility is in CA, LA, NV, KY, or TX, the practitioner must have a license in that facility’s state. If missing, block Complete / Show the existing-style error with this exact sentence (swap the two-letter state): A state license in the state of 'TX' is required for PAF submission.
-2. 132267: Reuse existing IsSubmittable() (or the same Review & Submit click gate other PAF types already use) so required NPP tasks incomplete → Review & Submit unavailable; all required Complete → available. Do not make submit succeed. Do not edit GetCredentialingTypeRtk.
+   A matching state on the entered new license also counts. If none matches, Complete is blocked with the requested message, for example: `A state license in the state of 'TX' is required for PAF submission.` Save for later remains available.
 
-BEFORE CODING — inspect, then quote:
-1. Where facility/entity state already lives on the PAF (selected facilities, not a new Cactus query). Quote.
-2. How NppTask stores selected/recalled licenses (state code). Quote.
-3. IsSubmittable / PafReviewForm Review & Submit click — how required Complete is checked today. Quote. NPP is not in that model yet.
-4. ShouldShowStateLicenses — 132529 applies only when licenses are shown. VA+PA Yes hides licenses (132365). Do not invent a 132529 rule for that hide path. Leftover: quote it in RETURN.
+3. **132267:** `IsSubmittable()` now checks NPP only when `TaskSelected == TaskType.Npp`:
+   > `if (pafData.TaskSelected == TaskType.Npp && (pafData.NppTask == null || IsTaskInError(pafData.NppTask))) return false;`
 
-IMPLEMENT:
-- On NppTaskForm Save (or the existing complete-validation path): if licenses are shown and a selected facility state is CA/LA/NV/KY/TX with no matching license, show the exact message and do not mark the NPP task Complete. Save for later still allowed (existing SaveForLaterModal).
-- Do not add states beyond those five.
-- Add NppTask to the existing required-complete check IsSubmittable already uses for other tasks. Isolation: TaskSelected == Npp (or existing IsNppPaf). Begin PAF / other PAF types unchanged.
-- Do not navigate into Review processor. Do not call SubmitPaf. No Cactus license insert. No CVI. No GetCredentialingTypeRtk. Do not change PafFile / blob / 10003.
+   `IsTaskInError` requires a required task to have `Status == TaskStatus.Complete`. Other PAF types are unaffected. This gates entry to Review & Submit; it does not make submission succeed.
 
-STOP AND REPORT:
-- If facility state is not already on the PAF and you would need a new API — STOP and quote.
-- If Review & Submit can only be gated by adding an RTK to GetCredentialingTypeRtk — STOP. Gate-only or report.
+4. **Unchanged:** `GetCredentialingTypeRtk`, submit flow, Cactus code, and PafFile/upload code were not edited.
 
-DO NOT CHANGE:
-- Upload/PafFile, Azurite, Version, attachment enum
-- CreateAddTaskStrategy(Npp), FSQ, Demographic/Address/Specialties rules
-- Begin PAF, submit/CVI, 131785
+5. **VA+PA Yes:** When VA/military is Yes and PA is Yes, `ShouldShowStateLicenses` hides state licenses, so the 132529 facility-state check is intentionally skipped.
 
-COMMENTS: almost none.
+6. **Build:** Client build succeeded. `git diff --check` and the separate whitespace check for the untracked NPP code-behind reported no issues.
 
-TESTS:
-- dotnet build Client (+ Paf.Api only if IsSubmittable lives there).
-- git diff --check.
-
-RETURN:
-1. Files changed
-2. 132529 — how facility state + license state are compared — quote
-3. 132267 — how IsSubmittable now includes Npp — quote
-4. Confirmation: GetCredentialingTypeRtk / submit / Cactus / PafFile not edited
-5. VA+PA Yes 132529 leftover — one sentence
-6. Build result
-7. Remaining gaps
+7. **Remaining gaps:** No automated behavior test or live UI validation was run; verification was the Client build and whitespace checks.
