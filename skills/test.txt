@@ -1,74 +1,58 @@
 You are implementing a change in the HCA HCP Credentialing repository.
 
 ROLE:
-Senior engineer. One session. Fix the entire NppTaskForm page UI and PSV upload. Do not start a second chat.
+Senior engineer. One session. Make NPP PSV upload succeed and use the existing save-for-later toast. Do not start a second chat.
 
 TASK:
-NppTaskForm layout, colors, field placement, errors, and Save do not match Facility Specific Questions. PSV upload does not behave like the app’s existing upload forms. After pick, the user cannot see the file. Copy FSQ chrome for the whole page. Copy PafFile from a working upload host. Do not open FSQ as the NPP Work target.
-
-TWO REFERENCES — do not mix them:
-1. ENTIRE PAGE (alignment, colors, everything): Facility Specific Questions Work (AddPractitionerToFacilities / FSQ form already in the repo). Match ALL of this:
-   - Page background and white card sections
-   - Title left; Status In Progress - Initial Save if that is already on the PAF shell
-   - Cancel (outline) + Save (primary blue) top-right AND bottom-right — same buttons FSQ already uses; do not invent a third pair
-   - Section card (like Additional Questions): label on the LEFT, control on the RIGHT
-   - Required asterisk on the label
-   - Yes/No = same HCA toggle FSQ uses (selected = primary blue, unselected = white)
-   - Radios, date/text, helper text under the control — same column spans and typography as FSQ
-   - Required/error text under the control, same red as FSQ FormItem
-   - Do not invent colors, fonts, button styles, or a new CSS theme
-2. UPLOAD CONTROL: copy PafFile from a form that already uploads files. Start: OffCyclePsvLoa / OffCyclePsvTask; also AAR / MSS-18 / Dop / any other PafFile host. Do NOT use Facility Specific Questions, Demographic, Addresses, or Specialties as the upload reference — those pages have no file upload.
+1. UPLOAD: NppTaskForm matches FSQ chrome. Picking a PDF still shows PafFile’s existing message: "The upload of the file you selected failed. Please try again." The file name never appears. Make upload work the same way OffCyclePsvLoa (or the first working PafFile host) already works.
+2. TOAST: When the user clicks Save with required fields missing, NppTaskForm must show the SAME existing confirm as the privileges / MSS-18 (or other PAF Work) page: "One or more required fields are missing. Would you like to save for later?" with No / Yes. Do not invent a toast, Modal, or copy.
 
 BEFORE CODING — inspect, then quote:
-PAGE
-1. Open the FSQ Work razor (Facility Specific Questions). Quote the shell: title, Cancel/Save toolbar, card, label-left/control-right Row/Col, Yes/No, FormItem error, colors/classes.
-2. Quote NppTaskForm’s current chrome vs that FSQ markup.
+1. PafFile.razor.cs — the exact call that uploads; every parameter (TaskId, PractitionerActionFormId, FormType, Attachment). Quote the branch that sets "The upload of the file you selected failed. Please try again."
+2. OffCyclePsvLoa (and any other working PafFile host) — full PafFile markup + how TaskId / form id / Attachment / OnAfterUpload / OnAfterRemove are set. When does that task already have a TaskId?
+3. NppTaskForm + NppTask — current PafFile markup and where TaskId / form id come from when Work opens. Is NppTask a new object with empty TaskId?
+4. How NppTask is attached to PractitionerActionFormData / StateContainer (UpdateTaskNppStrategy). Does the PAF already have this task’s TaskId before PafFile posts?
+5. PafController.UploadPafAttachmentAsync — what it requires. Do not invent a new endpoint.
+6. Find the existing confirm that shows exactly: One or more required fields are missing. Would you like to save for later? Start on the privileges / Add Privilege MSS-18 Work Save. Quote the method and Yes/No handlers. Do not write new toast text.
 
-UPLOAD
-3. List every Razor/cs that already uses PafFile.
-4. Open the first working host (prefer OffCyclePsvLoa if it shows a file name after upload). Quote PafFile markup: parent wrap, Attachment, TaskId, FormType, OnAfterUpload, OnAfterRemove, FormItem, file-after-success, remove, required/fail.
-5. Quote NppTaskForm’s current PSV markup. Note extra file inputs, custom dropzones, or missing binds.
-
-LIVE FAIL (fix these):
-- Whole page: fields and dropzones float; colors/alignment not FSQ; errors not under the control; Save/Cancel not FSQ placement.
-- Native browser "No file chosen" on the upload.
-- After selecting a file: "The upload of the file you selected failed. Please try again." User cannot see the file.
+LIVE FAIL:
+- After pick: The upload of the file you selected failed. Please try again.
+- No file name / remove after pick.
+- Save with empty required: no existing save-for-later confirm (or a different message).
 
 IMPLEMENT:
-PAGE
-- Rebuild NppTaskForm to reuse FSQ’s existing layout classes/components (same Form pattern, same column spans, same button components). One Form. FormItems inside Form.
-- Keep NPP content: disclaimer, Practitioner Type NPP, VA, PA, license list, Add New fields, PSV. Same show/hide and required rules. Do not drop sections. VA=No still shows licenses + License PSV. VA+PA Yes still hides licenses + License PSV.
-- Do not copy FSQ questions (Request Type, File Return, malpractice, facility Incomplete/Work). Those stay on FSQ only.
-
-UPLOAD
-- Use PafFile (or the exact component the working upload host uses) with the same parameter set that makes the file visible after a successful upload. Sit that control in the FSQ label-left / control-right row.
-- After a valid PDF, the user must see the file the same way that host shows it (name / remove). Persist on NppTask so reopen still shows it.
-- Required and fail messages: same placement and text as that host / existing PafFile. Do not invent copy.
-- No extra <input type="file">. No custom drag overlay. No new dropzone component.
-- Keep FormType Other. No new enum. No Cactus image write. No GetCredentialingTypeRtk. No submit.
+- Pass PafFile the same TaskId, PractitionerActionFormId (or whatever OffCycle already passes), FormType, and Attachment bind as the working host. FormType stays Other. No new enum.
+- If NppTask.TaskId is empty, use the existing ADD NPP / PAF task id already on the form — the same id OffCycle uses from its task. Do not generate a random Guid for upload.
+- OnAfterUpload / OnAfterRemove: same pattern as OffCycle — save the PafAttachment on NppTask and clear required on that field so the file name stays visible after success and after reopen.
+- If the upload API requires the Npp task to already exist on the PAF, persist that task the same way other PAF tasks exist before their PafFile works. Quote that path. Do not invent a new save API.
+- On Save, if required fields are missing, call the same existing confirm as the privileges/MSS page (same component, same exact sentence, same No/Yes).
+- Yes = existing Save for Later path (persist incomplete, return to PAF Tasks) — same as that page.
+- No = stay on NppTaskForm; required stays under the fields like FSQ.
+- Do not add a new Modal/Notification class. Do not change the privileges page.
+- Keep FSQ page chrome. Do not restyle. Do not route NPP Work to FSQ.
+- Keep VA/PA / license PSV show-hide. No Cactus image write. No GetCredentialingTypeRtk. No submit.
 
 STOP AND REPORT:
-- If no existing form hosts PafFile with a visible file-after-upload — STOP and quote what you found. Do not invent UI.
+- If UploadPafAttachmentAsync cannot accept Npp TaskId / Other without a new contract — STOP and quote the API.
+- If Paf.Api is down / 5021 refused, say that; do not paper over it in the client.
+- If that exact save-for-later confirm is not in the repo — STOP and quote what Save uses instead.
 
 DO NOT CHANGE:
-- Facility Specific Questions itself (layout copy only)
-- Demographic / Address / Specialties pages
-- GetPractitionerStateLicensesAsync, Add New field rules, 132268
+- Facility Specific Questions, Demographic, Address, Specialties, privileges/MSS page
+- GetPractitionerStateLicensesAsync, Add New rules, 132268
 - CreateAddTaskStrategy(Npp), Begin PAF, submit/CVI
-- Do not route ADD NPP Work to the FSQ form
 
 COMMENTS: almost none.
 
 TESTS:
-- dotnet build Client.
+- dotnet build Client (+ Paf.Api if you touch the upload API — prefer not to).
 - git diff --check.
 
 RETURN:
 1. Files changed
-2. FSQ files you copied for page chrome — quote (fields, colors, errors, Save)
-3. Which existing upload form you copied — file + quoted PafFile markup
-4. What was wrong on NppTaskForm — quote
-5. How file-after-upload and remove now work — quote
-6. Confirmation: FSQ page not edited / NPP Work is still NppTaskForm / no new enum / no Cactus / no GetCredentialingTypeRtk
-7. Build result
-8. Remaining gaps
+2. Why upload failed — quote (empty TaskId / missing form id / API / other)
+3. Working host markup vs NppTaskForm after fix — quote
+4. Confirmation: file name shows after PDF; no new endpoint / enum / Cactus / GetCredentialingTypeRtk
+5. Which existing confirm you reused for save-for-later — file + quote
+6. Build result
+7. Remaining gaps
