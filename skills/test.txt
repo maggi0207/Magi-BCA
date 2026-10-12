@@ -1,21 +1,52 @@
-1. **Files changed:** `NppTaskForm.razor` and `NppTaskForm.razor.cs`.
+You are implementing a change in the HCA HCP Credentialing repository.
 
-2. **Upload diagnosis and change:** `PafFile` builds the upload metadata using:
+ROLE:
+Senior engineer. One session. Make NPP PSV upload succeed by copying a working upload host in this app. Do not start a second chat.
 
-   ```csharp
-   FormType = FormType!.Value,
-   TaskId = TaskId!.Value,
-   PractitionerActionFormId = _currentPafId!.Value
-   ```
+TASK:
+SaveForLaterModal on NppTaskForm is done. Leave it. Picking a PDF still shows PafFile’s existing text: "The upload of the file you selected failed. Please try again." Filename never appears. TaskId-from-PafState.NppTask did not fix live upload. Search the whole app for every file-upload host, quote a working one, and make NppTaskForm use that exact wiring.
 
-   The PAF ID is captured from `StateContainer.PafState.FormId`; the NPP task ID is now read from the same `PafState.NppTask` object that the parent saves. NPP registers that task in state before rendering the upload controls. The API listener is running, and `https://localhost:5021/swagger/v1/swagger.json` returned HTTP 200. The attachment table has no task-ID foreign key, and the controller inserts the supplied IDs directly.
+BEFORE CODING — search the whole Client + Paf.Api, then quote:
+1. Every file that uses PafFile (razor + cs). List them all.
+2. Every other upload in the app (AntDesign Upload, InputFile, attachment client, image upload). List them. Do not create a new component.
+3. PafFile.razor.cs in full for the upload path: URL, headers, FormType, TaskId, PractitionerActionFormId, FacilityKey (or any other field), when _currentPafId is set, the exact branch that sets "The upload of the file you selected failed. Please try again."
+4. PafController.UploadPafAttachmentAsync + CreatePafAttachmentAsync — every required field (architecture already lists TaskId, PractitionerActionFormId, FacilityKey, FormType, FileName, ContentType, Uploaded). Quote which are required and what happens if FacilityKey or FormId is empty.
+5. Open at least two working hosts that already show a filename after PDF (prefer OffCyclePsvLoa AND one of AAR / MSS-18 / Dop / Recruitment PSV / any other PafFile host). Quote full PafFile markup and how they set TaskId, FormId, FacilityKey, Attachment. When is FormId already saved on that PAF?
+6. NppTaskForm current PafFile + the values at render: TaskId, FormId, FacilityKey. Quote. If FormId is empty until first Save, quote how a working host uploads on a new PAF (they may save the PAF first). Do not invent a save API.
 
-   I can’t prove the historical upload failure’s exact server-side cause: the prior authenticated multipart response/body isn’t available. The former failure branch is reached when the upload response state is not Success; causes such as authorization or blob-scan failure require that live response to distinguish. The code-side task-ID inconsistency is fixed, but a signed-in PDF upload still needs runtime confirmation.
+LIVE FAIL (still):
+- The upload of the file you selected failed. Please try again.
+- No filename / Remove after pick.
 
-3. **Upload wiring:** OffCycle uses a hidden URL binding with `Attachment`, `TaskId`, `FormType`, `OnAfterUpload`, and `OnAfterRemove`. NPP now uses the state-held task ID with `FormType.Other`; its callbacks store/clear the attachment and URL and revalidate the corresponding field. `PafFile` itself displays the filename and its existing Remove button after success, and reconstructs the display from the saved attachment when reopened.
+IMPLEMENT:
+- Copy the working host’s PafFile parameters 1:1 (same names, same sources). FormType stays Other. No new enum.
+- If the working host requires a saved FormId / FacilityKey before upload, do the same existing save/ensure step those pages already use. Do not generate Guids.
+- After a valid PDF: PafFile’s own filename + Remove. Persist on NppTask so reopen still shows it.
+- Do not add <input type="file">. Do not restyle FSQ chrome. Do not change SaveForLaterModal.
+- No Cactus image write. No GetCredentialingTypeRtk. No submit.
 
-4. **Save-for-later:** NPP now reuses the existing `SaveForLaterModal` with the exact title: “One or more required fields are missing. Would you like to save for later?” Its existing buttons are No and Yes. No closes the modal and leaves field validation in place. Yes saves through the existing NPP completion/PAF update path with `TaskStatus.New`, then returns from the Work view.
+STOP AND REPORT (do not invent UI):
+- If no host in the repo successfully uploads with PafFile — STOP and quote what you found.
+- If the API requires a field NPP cannot supply without a new contract — STOP and quote.
+- In RETURN, quote the TaskId, FormId, FacilityKey values NppTaskForm now passes.
 
-5. **Scope:** No new endpoint or attachment enum; no Cactus image write, `GetCredentialingTypeRtk`, submit, or CVI change.
+DO NOT CHANGE:
+- Facility Specific Questions, Demographic, Address, Specialties, OffCycle/AAR/MSS pages themselves
+- GetPractitionerStateLicensesAsync, Add New rules, 132268
+- CreateAddTaskStrategy(Npp), Begin PAF, submit/CVI
 
-6. **Verification:** Client Release build succeeded. `git diff --check`, the direct whitespace scan, and diagnostics were clean. The PAF API Swagger endpoint responded HTTP 200. A signed-in PDF upload was not exercised, so the actual upload success remains the outstanding runtime check.
+COMMENTS: almost none.
+
+TESTS:
+- dotnet build Client.
+- git diff --check.
+
+RETURN:
+1. Files changed
+2. Every PafFile host you found — list
+3. Working host you copied — file + quoted markup + how FormId/FacilityKey are set
+4. Why NPP still failed after the TaskId fix — quote (empty FormId / FacilityKey / API / other)
+5. NppTaskForm values now passed to PafFile — quote
+6. Confirmation: no new component / enum / Cactus / GetCredentialingTypeRtk
+7. Build result
+8. Remaining gaps
