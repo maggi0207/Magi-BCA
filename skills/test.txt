@@ -1,43 +1,35 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+**Files changed**
+- `NppTaskForm.razor`
+- `NppTaskForm.razor.cs`
+- `NppTask.cs`
+- `NppTaskValidationTests.cs`
 
-ROLE:
-Senior engineer. One session. Add PSV uploads on NppTaskForm only. Do not start a second chat.
+**PafFile reuse**
+Each upload uses the existing `PafFile`, the NPP task’s `TaskId`, and the existing generic `Other` attachment type. For example:
 
-TASK:
-On ADD NPP Work, add License / Sanctions / NPI PSV uploads using existing PafFile. Persist on NppTask. Do not write Cactus images. Do not edit GetCredentialingTypeRtk. Do not submit.
+```razor
+<PafFile Attachment="@context.LicensePsvAttachment"
+         FormType="PractitionerActionFormAttachmentType.Other"
+         TaskId="@context.TaskId"
+         OnAfterUpload="HandleLicensePsvUpload"
+         OnAfterRemove="HandleLicensePsvRemove" />
+```
 
-Treat as fact:
-- PafFile.razor already accepts .pdf .doc .docx .jpg .jpeg .tif .tiff (132530).
-- Combined inspect: PractitionerActionFormAttachmentType has no License/Sanctions/NPI names. Do not invent enum values. Reuse how OffCyclePsv or other PAF tasks store PafFile attachments on the task model.
-- Do not open RecruitmentPsvTask as this form.
+`PafFile` requires a `FormType` and accepts `.pdf`, `.doc`, `.docx`, `.jpg`, `.jpeg`, `.tif`, and `.tiff` (`PafFile.razor.cs:33`). The existing enum contains `Mss18Form`, `AAR`, `Dop`, and `Other`, but no License/Sanctions/NPI PSV types (`PractitionerActionFormAttachment.cs:30`). I used `Other`; no enum values were added. Upload/remove callbacks save or clear each `PafAttachment` on `NppTask` and update the corresponding required-validation field.
 
-VISIBILITY:
-- VA = Yes AND PA = Yes: hide State License (already). Show Sanctions PSV + NPI PSV. Both required. No License PSV (132365).
-- VA = No, or VA = Yes AND PA = No: show License PSV + Sanctions PSV + NPI PSV. All three required (132366 / 132367). Recalled license still requires these PSVs.
-- Unsupported file: existing PafFile error. Do not invent a new message.
+**Visibility and required rules**
+The existing State License condition controls License PSV visibility and requiredness:
 
-LAYOUT:
-- Same two-column / FormItem pattern as the rest of NppTaskForm. FormItems inside Form.
-- Labels: Upload License PSV / Upload Sanctions PSV / Upload NPI PSV (or the exact labels already used on a sibling PAF if they match).
+```csharp
+nameof(LicensePsvAttachmentUrl) => ShouldShowStateLicenses(task),
+nameof(SanctionsPsvAttachmentUrl) or
+nameof(NpiPsvAttachmentUrl) => true,
+```
 
-STOP AND REPORT:
-- If you must add PractitionerActionFormAttachmentType values — STOP and quote existing types; persist files on NppTask without a new enum.
-- If you must edit CactusUpdater / image ParentFile / GetCredentialingTypeRtk / SubmitPaf.
+Thus License PSV is hidden and not required for VA=Yes/PA=Yes; Sanctions and NPI PSV remain shown and required. When State Licenses are shown, all three PSV uploads are required (`NppTask.cs:52`, `NppTaskForm.razor:180`).
 
-DO NOT CHANGE:
-- GetPractitionerStateLicensesAsync SQL, Add New field rules, 132268, Demographic/Address/Specialties
-- CreateAddTaskStrategy(Npp), FSQ, Begin PAF
+**Scope and remaining gaps**
+No new attachment enum, Cactus image write, `GetCredentialingTypeRtk`, submit path, license SQL, or unrelated PAF task was edited. Attachments use the existing PAF attachment upload/storage path and are tagged with generic `Other`; distinct attachment-type reporting or downstream PSV processing is not added here.
 
-COMMENTS: almost none.
-
-TESTS:
-- dotnet build Client (+ Paf.Api if NppTask lives there).
-- git diff --check.
-
-RETURN:
-1. Files changed
-2. How PafFile is reused — quote
-3. Show/hide + required rules — quote
-4. Confirmation: no new attachment enum / no Cactus image write / no GetCredentialingTypeRtk
-5. Build result
-6. Remaining gaps
+**Verification**
+Client Release build succeeded. The focused NPP validation tests passed: 2 passed. `git diff --check`, direct whitespace scans, and file diagnostics were clean. I did not separately build PAF API; `NppTask` is in Shared, and the existing attachment upload endpoint is reused.
