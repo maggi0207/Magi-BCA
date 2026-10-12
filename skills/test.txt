@@ -1,35 +1,74 @@
-**Files changed**
-- `NppTaskForm.razor`
-- `NppTaskForm.razor.cs`
-- `NppTask.cs`
-- `NppTaskValidationTests.cs`
+You are implementing a change in the HCA HCP Credentialing repository.
 
-**PafFile reuse**
-Each upload uses the existing `PafFile`, the NPP task’s `TaskId`, and the existing generic `Other` attachment type. For example:
+ROLE:
+Senior engineer. One session. Fix the entire NppTaskForm page UI and PSV upload. Do not start a second chat.
 
-```razor
-<PafFile Attachment="@context.LicensePsvAttachment"
-         FormType="PractitionerActionFormAttachmentType.Other"
-         TaskId="@context.TaskId"
-         OnAfterUpload="HandleLicensePsvUpload"
-         OnAfterRemove="HandleLicensePsvRemove" />
-```
+TASK:
+NppTaskForm layout, colors, field placement, errors, and Save do not match Facility Specific Questions. PSV upload does not behave like the app’s existing upload forms. After pick, the user cannot see the file. Copy FSQ chrome for the whole page. Copy PafFile from a working upload host. Do not open FSQ as the NPP Work target.
 
-`PafFile` requires a `FormType` and accepts `.pdf`, `.doc`, `.docx`, `.jpg`, `.jpeg`, `.tif`, and `.tiff` (`PafFile.razor.cs:33`). The existing enum contains `Mss18Form`, `AAR`, `Dop`, and `Other`, but no License/Sanctions/NPI PSV types (`PractitionerActionFormAttachment.cs:30`). I used `Other`; no enum values were added. Upload/remove callbacks save or clear each `PafAttachment` on `NppTask` and update the corresponding required-validation field.
+TWO REFERENCES — do not mix them:
+1. ENTIRE PAGE (alignment, colors, everything): Facility Specific Questions Work (AddPractitionerToFacilities / FSQ form already in the repo). Match ALL of this:
+   - Page background and white card sections
+   - Title left; Status In Progress - Initial Save if that is already on the PAF shell
+   - Cancel (outline) + Save (primary blue) top-right AND bottom-right — same buttons FSQ already uses; do not invent a third pair
+   - Section card (like Additional Questions): label on the LEFT, control on the RIGHT
+   - Required asterisk on the label
+   - Yes/No = same HCA toggle FSQ uses (selected = primary blue, unselected = white)
+   - Radios, date/text, helper text under the control — same column spans and typography as FSQ
+   - Required/error text under the control, same red as FSQ FormItem
+   - Do not invent colors, fonts, button styles, or a new CSS theme
+2. UPLOAD CONTROL: copy PafFile from a form that already uploads files. Start: OffCyclePsvLoa / OffCyclePsvTask; also AAR / MSS-18 / Dop / any other PafFile host. Do NOT use Facility Specific Questions, Demographic, Addresses, or Specialties as the upload reference — those pages have no file upload.
 
-**Visibility and required rules**
-The existing State License condition controls License PSV visibility and requiredness:
+BEFORE CODING — inspect, then quote:
+PAGE
+1. Open the FSQ Work razor (Facility Specific Questions). Quote the shell: title, Cancel/Save toolbar, card, label-left/control-right Row/Col, Yes/No, FormItem error, colors/classes.
+2. Quote NppTaskForm’s current chrome vs that FSQ markup.
 
-```csharp
-nameof(LicensePsvAttachmentUrl) => ShouldShowStateLicenses(task),
-nameof(SanctionsPsvAttachmentUrl) or
-nameof(NpiPsvAttachmentUrl) => true,
-```
+UPLOAD
+3. List every Razor/cs that already uses PafFile.
+4. Open the first working host (prefer OffCyclePsvLoa if it shows a file name after upload). Quote PafFile markup: parent wrap, Attachment, TaskId, FormType, OnAfterUpload, OnAfterRemove, FormItem, file-after-success, remove, required/fail.
+5. Quote NppTaskForm’s current PSV markup. Note extra file inputs, custom dropzones, or missing binds.
 
-Thus License PSV is hidden and not required for VA=Yes/PA=Yes; Sanctions and NPI PSV remain shown and required. When State Licenses are shown, all three PSV uploads are required (`NppTask.cs:52`, `NppTaskForm.razor:180`).
+LIVE FAIL (fix these):
+- Whole page: fields and dropzones float; colors/alignment not FSQ; errors not under the control; Save/Cancel not FSQ placement.
+- Native browser "No file chosen" on the upload.
+- After selecting a file: "The upload of the file you selected failed. Please try again." User cannot see the file.
 
-**Scope and remaining gaps**
-No new attachment enum, Cactus image write, `GetCredentialingTypeRtk`, submit path, license SQL, or unrelated PAF task was edited. Attachments use the existing PAF attachment upload/storage path and are tagged with generic `Other`; distinct attachment-type reporting or downstream PSV processing is not added here.
+IMPLEMENT:
+PAGE
+- Rebuild NppTaskForm to reuse FSQ’s existing layout classes/components (same Form pattern, same column spans, same button components). One Form. FormItems inside Form.
+- Keep NPP content: disclaimer, Practitioner Type NPP, VA, PA, license list, Add New fields, PSV. Same show/hide and required rules. Do not drop sections. VA=No still shows licenses + License PSV. VA+PA Yes still hides licenses + License PSV.
+- Do not copy FSQ questions (Request Type, File Return, malpractice, facility Incomplete/Work). Those stay on FSQ only.
 
-**Verification**
-Client Release build succeeded. The focused NPP validation tests passed: 2 passed. `git diff --check`, direct whitespace scans, and file diagnostics were clean. I did not separately build PAF API; `NppTask` is in Shared, and the existing attachment upload endpoint is reused.
+UPLOAD
+- Use PafFile (or the exact component the working upload host uses) with the same parameter set that makes the file visible after a successful upload. Sit that control in the FSQ label-left / control-right row.
+- After a valid PDF, the user must see the file the same way that host shows it (name / remove). Persist on NppTask so reopen still shows it.
+- Required and fail messages: same placement and text as that host / existing PafFile. Do not invent copy.
+- No extra <input type="file">. No custom drag overlay. No new dropzone component.
+- Keep FormType Other. No new enum. No Cactus image write. No GetCredentialingTypeRtk. No submit.
+
+STOP AND REPORT:
+- If no existing form hosts PafFile with a visible file-after-upload — STOP and quote what you found. Do not invent UI.
+
+DO NOT CHANGE:
+- Facility Specific Questions itself (layout copy only)
+- Demographic / Address / Specialties pages
+- GetPractitionerStateLicensesAsync, Add New field rules, 132268
+- CreateAddTaskStrategy(Npp), Begin PAF, submit/CVI
+- Do not route ADD NPP Work to the FSQ form
+
+COMMENTS: almost none.
+
+TESTS:
+- dotnet build Client.
+- git diff --check.
+
+RETURN:
+1. Files changed
+2. FSQ files you copied for page chrome — quote (fields, colors, errors, Save)
+3. Which existing upload form you copied — file + quoted PafFile markup
+4. What was wrong on NppTaskForm — quote
+5. How file-after-upload and remove now work — quote
+6. Confirmation: FSQ page not edited / NPP Work is still NppTaskForm / no new enum / no Cactus / no GetCredentialingTypeRtk
+7. Build result
+8. Remaining gaps
