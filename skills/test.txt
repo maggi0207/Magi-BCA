@@ -1,24 +1,35 @@
-You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
+**Files changed**
+- `NppTaskForm.razor`
+- `NppTaskForm.razor.cs`
+- `NppTask.cs`
+- `NppTaskValidationTests.cs`
 
-ROLE:
-Senior engineer. READ ONLY. Do not edit files. Do not add Version. Do not start implementation.
+**PafFile reuse**
+Each upload uses the existing `PafFile`, the NPP task’s `TaskId`, and the existing generic `Other` attachment type. For example:
 
-OFFCYCLE: WORKS
-(or OFFCYCLE: FAILS)
+```razor
+<PafFile Attachment="@context.LicensePsvAttachment"
+         FormType="PractitionerActionFormAttachmentType.Other"
+         TaskId="@context.TaskId"
+         OnAfterUpload="HandleLicensePsvUpload"
+         OnAfterRemove="HandleLicensePsvRemove" />
+```
 
-TASK:
-NPP PafFile markup already matches OffCycle/Delegate/MSS-18. Live NPP PDF still fails. Use the OFFCYCLE line above.
+`PafFile` requires a `FormType` and accepts `.pdf`, `.doc`, `.docx`, `.jpg`, `.jpeg`, `.tif`, and `.tiff` (`PafFile.razor.cs:33`). The existing enum contains `Mss18Form`, `AAR`, `Dop`, and `Other`, but no License/Sanctions/NPI PSV types (`PractitionerActionFormAttachment.cs:30`). I used `Other`; no enum values were added. Upload/remove callbacks save or clear each `PafAttachment` on `NppTask` and update the corresponding required-validation field.
 
-IF OFFCYCLE WORKS:
-Quote anything NPP-only that the API could reject: FormType.Other vs Mss19LoaForm / Mss18 / AAR; whether NppTask.TaskId is persisted before upload; malware/size; any FormType whitelist. Then STOP. Do not invent an enum or Version.
+**Visibility and required rules**
+The existing State License condition controls License PSV visibility and requiredness:
 
-IF OFFCYCLE FAILS:
-Quote PractitionerActionFormAttachment DDL Version, the C# entity, InsertAsync, and any existing Version default / migration / other table that already inserts Version. Quote only what exists. Then STOP. Do not add a property or SQL default.
+```csharp
+nameof(LicensePsvAttachmentUrl) => ShouldShowStateLicenses(task),
+nameof(SanctionsPsvAttachmentUrl) or
+nameof(NpiPsvAttachmentUrl) => true,
+```
 
-Do not change GetCredentialingTypeRtk, Cactus, submit.
+Thus License PSV is hidden and not required for VA=Yes/PA=Yes; Sanctions and NPI PSV remain shown and required. When State Licenses are shown, all three PSV uploads are required (`NppTask.cs:52`, `NppTaskForm.razor:180`).
 
-RETURN:
-1. Which branch (OffCycle works vs fails)
-2. Quotes
-3. What NPP can reuse without a new contract
-4. What requires API/schema (if anything) — list only, do not implement
+**Scope and remaining gaps**
+No new attachment enum, Cactus image write, `GetCredentialingTypeRtk`, submit path, license SQL, or unrelated PAF task was edited. Attachments use the existing PAF attachment upload/storage path and are tagged with generic `Other`; distinct attachment-type reporting or downstream PSV processing is not added here.
+
+**Verification**
+Client Release build succeeded. The focused NPP validation tests passed: 2 passed. `git diff --check`, direct whitespace scans, and file diagnostics were clean. I did not separately build PAF API; `NppTask` is in Shared, and the existing attachment upload endpoint is reused.
