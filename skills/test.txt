@@ -1,50 +1,43 @@
 You are implementing a change in the HCA HCP Credentialing repository.
 
 ROLE:
-Senior engineer. One session. Wire NPP RTK + MSP submit + CVI create status. Do not start a second chat.
+Senior engineer. One session. VA+PA Yes NPP auto-accept only. Do not start a second chat.
 
 FACT:
-- Prior STOP: no reusable non-SSP auto-accept. Do NOT implement VA+PA Yes auto-accept in this shot. Leave that for a later 1B.
-- For this shot every NPP submit (including VA+PA Yes) uses ProcessSubmitForMspAsync (CPC review path) — same as other MSP. Laura auto-accept is deferred.
-- GetCredentialingTypeRtk has no Npp; default throws.
-- Same type RTK fills GroupTypeRtk and CredentialingTypeRtk — use HCA0095563 for both.
-- CreateStandardCviRecordsAsync does not pass status override today. Initial processing-change sets CredentialingStatusRtk = DataEnteredCviStatusRtk. NPP create must pass UDP0000001 the same way.
-- HCA0095563 / UDP0000001 / UDP0000002 NOT IN CommonCactusRtks — add them.
-- CreateAddTaskStrategy(Npp) stays AddTaskAddPractitionerToFacilityStrategy.
-- Do not call ProcessSubmitForSSPBrief for NPP.
+- 1A done: Npp → ProcessSubmitForMspAsync; GetCredentialingTypeRtk Npp = HCA0095563; CVI create UDP0000001.
+- Laura: VA=Yes AND PA=Yes → auto-accept the PAF AND create a CVI.
+- ProcessSubmitForSSPBrief cannot be called for NPP (SSP demographics / revalidation).
+- SSP Brief success path already does: SubmittedByMsp, queue processing, SetAcceptedByCpcUserInfo. Reuse those existing calls for NPP VA+PA Yes — do not invent a new accept engine.
+- Other NPP (not VA+PA Yes) stay on ProcessSubmitForMspAsync from 1A.
 
-PRODUCT VALUES:
-- HCA0095563 (type both columns)
-- UDP0000001 (create status)
-- UDP0000002 (add constant only; do not invent close-on-submit)
+BEFORE CODING — quote:
+1. ProcessSubmitForSSPBrief success lines: SubmittedByMsp, queue, SetAcceptedByCpcUserInfo (exact methods).
+2. Where 1A dispatches TaskType.Npp → ProcessSubmitForMspAsync.
+3. How NppTask exposes VA / PA answers on the submit model.
 
 IMPLEMENT:
-1. Add the three constants in CommonCactusRtks next to existing CVI/type constants.
-2. GetCredentialingTypeRtk: TaskType.Npp => HCA0095563.
-3. When NPP submit creates the CVI (same path ProcessSubmitForMspAsync / CactusUpdater already uses for MSP), pass CredentialingStatusRtk = UDP0000001. Extend CreateStandardCviRecordsAsync (or the NPP call site) so status override is set — mirror the processing-change override pattern.
-4. SubmitPafStrategy: when TaskSelected == Npp, call ProcessSubmitForMspAsync (not SSP Brief).
-5. Do not invent auto-accept. Do not edit PafFile, blob, Demographic/Address/Specialties, Begin PAF.
+1. When TaskSelected == Npp AND VA=Yes AND PA=Yes: do not call ProcessSubmitForMspAsync. Call a thin NPP path that reuses the same accept steps quoted from SSP Brief (SubmittedByMsp / queue / SetAcceptedByCpcUserInfo) and still creates CVI via the existing 1A path (HCA0095563 + UDP0000001). Prefer extracting a private shared helper used by SSP Brief and NPP only if that is the cleanest existing-style change — do not change SSP Brief behavior.
+2. All other NPP: keep ProcessSubmitForMspAsync.
+3. Do not edit CommonCactusRtks values. Do not edit PafFile / blob. Do not edit CreateAddTaskStrategy(Npp).
 
 STOP AND REPORT:
-- If ProcessSubmitForMspAsync never creates a CVI for AddPractitioner-style tasks and you would need a new Cactus write — STOP and quote.
+- If SubmittedByMsp / SetAcceptedByCpcUserInfo cannot run without SSP Brief-only state — STOP and quote.
 
 DO NOT CHANGE:
-- ProcessSubmitForSSPBrief body
-- CreateAddTaskStrategy(Npp) target
-- Upload / Azurite / Version
+- ProcessSubmitForSSPBrief demographics / revalidation list
+- Begin PAF, 131785, upload
 
 COMMENTS: almost none.
 
 TESTS:
-- dotnet build projects that own CommonCactusRtks, PafExtensions, SubmitPafStrategy, CactusUpdater.
+- Build SubmitPafStrategy / processor projects.
 - git diff --check.
 
 RETURN:
 1. Files changed
-2. Constants — quote
-3. GetCredentialingTypeRtk Npp — quote
-4. How UDP0000001 is passed — quote
-5. NPP submit dispatch — quote (must be ProcessSubmitForMspAsync)
-6. Confirmation: no auto-accept; SSP Brief not used for NPP; CreateAddTaskStrategy(Npp) unchanged
-7. Build result
-8. Remaining gaps (note 1B: VA+PA auto-accept)
+2. How VA+PA Yes is detected — quote
+3. Accept steps reused — quote (must match SSP Brief success, not call ProcessSubmitForSSPBrief)
+4. Other NPP still ProcessSubmitForMspAsync — quote
+5. Confirmation: CVI still HCA0095563 + UDP0000001; CreateAddTaskStrategy(Npp) unchanged
+6. Build result
+7. Remaining gaps
