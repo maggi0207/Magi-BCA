@@ -1,42 +1,11 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
 
-ROLE:
-Senior engineer. One session. NPP VA+PA Yes auto-accept. Do not start a second chat.
+ROLE: READ ONLY. Do not edit files.
 
-FACT (1B STOP):
-- SetAcceptedByCpcUserInfo / ModelExtensions only sets HCP system acceptance for MSP when TaskSelected == SSPBriefEnrollment && HasDemographicsChangedSSPBrief. Other MSP returns without setting fields.
-- SSP Brief success: SubmittedByMsp, _shouldQueuePafForProcessing = true, SetAcceptedByCpcUserInfo.
-- NppTask: IsActiveDutyMilitaryOrPracticingAtVa + IsPhysicianAssistant; Laura wants both true → auto-accept + CVI.
-- 1A: other NPP → ProcessSubmitForMspAsync; CVI HCA0095563 + UDP0000001.
-- Do not call ProcessSubmitForSSPBrief for NPP.
-
-BEFORE CODING — quote the exact ModelExtensions guard and what it sets when true.
-
-IMPLEMENT:
-1. Extend that guard so acceptance fields are also set when TaskSelected == TaskType.Npp AND both VA and PA are true (same null-safe == true as the form). SSP Brief branch must keep identical behavior (same SSP condition still works).
-2. SubmitPafStrategy: when Npp AND VA+PA Yes — do not call ProcessSubmitForMspAsync. Mirror SSP Brief success steps: SubmittedByMsp, queue processing flag, SetAcceptedByCpcUserInfo (now works for NPP). CVI still via existing 1A CreateStandardCviRecordsAsync path (UDP0000001).
-3. All other NPP: keep ProcessSubmitForMspAsync.
-4. Do not invent a second accept user source — reuse whatever SetAcceptedByCpcUserInfo already writes for SSP Brief MSP.
-5. Do not edit CommonCactusRtks values, PafFile, CreateAddTaskStrategy(Npp).
-
-STOP AND REPORT:
-- If extending the guard would change non-NPP MSP accept behavior beyond the new Npp OR — STOP and quote.
-
-DO NOT CHANGE:
-- SSP Brief demographics / HasDemographicsChangedSSPBrief meaning
-- Begin PAF, upload, 131785
-
-COMMENTS: almost none.
-
-TESTS:
-- Build Shared + processor / SubmitPafStrategy projects.
-- git diff --check.
+TASK:
+UploadPafAttachment fails with Azure.RequestFailedException connection refused 127.0.0.1:10003. Quote appsettings / launchSettings / docker-compose / README that points Blob or UploadAndScan at 10003. Quote the exact local command or compose service already documented to start that listener. Then STOP.
 
 RETURN:
-1. Files changed
-2. ModelExtensions guard before/after — quote
-3. NPP VA+PA Yes submit path — quote
-4. Other NPP still ProcessSubmitForMspAsync — quote
-5. Confirmation: SSP Brief path unchanged for SSP; CVI still HCA0095563 + UDP0000001
-6. Build result
-7. Remaining gaps
+1. Setting that uses 10003 — quote
+2. How to start it — quote existing docs only
+3. Confirmation: no code changed
