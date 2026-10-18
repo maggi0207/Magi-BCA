@@ -1,43 +1,42 @@
 You are implementing a change in the HCA HCP Credentialing repository.
 
 ROLE:
-Senior engineer. One session. VA+PA Yes NPP auto-accept only. Do not start a second chat.
+Senior engineer. One session. NPP VA+PA Yes auto-accept. Do not start a second chat.
 
-FACT:
-- 1A done: Npp → ProcessSubmitForMspAsync; GetCredentialingTypeRtk Npp = HCA0095563; CVI create UDP0000001.
-- Laura: VA=Yes AND PA=Yes → auto-accept the PAF AND create a CVI.
-- ProcessSubmitForSSPBrief cannot be called for NPP (SSP demographics / revalidation).
-- SSP Brief success path already does: SubmittedByMsp, queue processing, SetAcceptedByCpcUserInfo. Reuse those existing calls for NPP VA+PA Yes — do not invent a new accept engine.
-- Other NPP (not VA+PA Yes) stay on ProcessSubmitForMspAsync from 1A.
+FACT (1B STOP):
+- SetAcceptedByCpcUserInfo / ModelExtensions only sets HCP system acceptance for MSP when TaskSelected == SSPBriefEnrollment && HasDemographicsChangedSSPBrief. Other MSP returns without setting fields.
+- SSP Brief success: SubmittedByMsp, _shouldQueuePafForProcessing = true, SetAcceptedByCpcUserInfo.
+- NppTask: IsActiveDutyMilitaryOrPracticingAtVa + IsPhysicianAssistant; Laura wants both true → auto-accept + CVI.
+- 1A: other NPP → ProcessSubmitForMspAsync; CVI HCA0095563 + UDP0000001.
+- Do not call ProcessSubmitForSSPBrief for NPP.
 
-BEFORE CODING — quote:
-1. ProcessSubmitForSSPBrief success lines: SubmittedByMsp, queue, SetAcceptedByCpcUserInfo (exact methods).
-2. Where 1A dispatches TaskType.Npp → ProcessSubmitForMspAsync.
-3. How NppTask exposes VA / PA answers on the submit model.
+BEFORE CODING — quote the exact ModelExtensions guard and what it sets when true.
 
 IMPLEMENT:
-1. When TaskSelected == Npp AND VA=Yes AND PA=Yes: do not call ProcessSubmitForMspAsync. Call a thin NPP path that reuses the same accept steps quoted from SSP Brief (SubmittedByMsp / queue / SetAcceptedByCpcUserInfo) and still creates CVI via the existing 1A path (HCA0095563 + UDP0000001). Prefer extracting a private shared helper used by SSP Brief and NPP only if that is the cleanest existing-style change — do not change SSP Brief behavior.
-2. All other NPP: keep ProcessSubmitForMspAsync.
-3. Do not edit CommonCactusRtks values. Do not edit PafFile / blob. Do not edit CreateAddTaskStrategy(Npp).
+1. Extend that guard so acceptance fields are also set when TaskSelected == TaskType.Npp AND both VA and PA are true (same null-safe == true as the form). SSP Brief branch must keep identical behavior (same SSP condition still works).
+2. SubmitPafStrategy: when Npp AND VA+PA Yes — do not call ProcessSubmitForMspAsync. Mirror SSP Brief success steps: SubmittedByMsp, queue processing flag, SetAcceptedByCpcUserInfo (now works for NPP). CVI still via existing 1A CreateStandardCviRecordsAsync path (UDP0000001).
+3. All other NPP: keep ProcessSubmitForMspAsync.
+4. Do not invent a second accept user source — reuse whatever SetAcceptedByCpcUserInfo already writes for SSP Brief MSP.
+5. Do not edit CommonCactusRtks values, PafFile, CreateAddTaskStrategy(Npp).
 
 STOP AND REPORT:
-- If SubmittedByMsp / SetAcceptedByCpcUserInfo cannot run without SSP Brief-only state — STOP and quote.
+- If extending the guard would change non-NPP MSP accept behavior beyond the new Npp OR — STOP and quote.
 
 DO NOT CHANGE:
-- ProcessSubmitForSSPBrief demographics / revalidation list
-- Begin PAF, 131785, upload
+- SSP Brief demographics / HasDemographicsChangedSSPBrief meaning
+- Begin PAF, upload, 131785
 
 COMMENTS: almost none.
 
 TESTS:
-- Build SubmitPafStrategy / processor projects.
+- Build Shared + processor / SubmitPafStrategy projects.
 - git diff --check.
 
 RETURN:
 1. Files changed
-2. How VA+PA Yes is detected — quote
-3. Accept steps reused — quote (must match SSP Brief success, not call ProcessSubmitForSSPBrief)
+2. ModelExtensions guard before/after — quote
+3. NPP VA+PA Yes submit path — quote
 4. Other NPP still ProcessSubmitForMspAsync — quote
-5. Confirmation: CVI still HCA0095563 + UDP0000001; CreateAddTaskStrategy(Npp) unchanged
+5. Confirmation: SSP Brief path unchanged for SSP; CVI still HCA0095563 + UDP0000001
 6. Build result
 7. Remaining gaps
