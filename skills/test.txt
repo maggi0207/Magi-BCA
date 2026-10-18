@@ -1,19 +1,59 @@
-1. **Files changed:** `NppTaskForm.razor.cs` and `ModelExtensions.cs`.
+You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
 
-2. **132529:** Selected facility state is already carried as `FacilityValue.State`. For each selected facility in CA, LA, NV, KY, or TX, the NPP Complete check compares that state with the state on the practitioner’s loaded licenses, case-insensitively:
-   > `string.Equals(license.State?.Trim(), facilityState, StringComparison.OrdinalIgnoreCase)`
+ROLE:
+Senior engineer. READ ONLY. Do not edit files, create files, or run formatters. Do not start implementation. Do not add RTK constants.
 
-   A matching state on the entered new license also counts. If none matches, Complete is blocked with the requested message, for example: `A state license in the state of 'TX' is required for PAF submission.` Save for later remains available.
+TASK:
+Map the existing PAF submit → CVI write path that ADD NPP (TaskType.Npp) must reuse. Answer A–L with file/class/method quotes. Then STOP.
 
-3. **132267:** `IsSubmittable()` now checks NPP only when `TaskSelected == TaskType.Npp`:
-   > `if (pafData.TaskSelected == TaskType.Npp && (pafData.NppTask == null || IsTaskInError(pafData.NppTask))) return false;`
+PRODUCT (already decided — do not invent):
+- CVI type display: Facility Undefined Practitioner
+- HCA0095563 is valid for BOTH CREDENTIALINGGROUP.TYPE_RTK and CREDENTIALING.TYPE_RTK (Laura)
+- Create status UDP0000001 = UDP Facility Request
+- Close status UDP0000002 = UDP Facility Request Complete
+- VA=Yes AND PA=Yes → auto-accept the PAF AND create a CVI (Laura). Do not treat 132365 CPC as that path’s submit outcome.
+- 132531 Word table (CPC / Standard / Validation Required) still exists for other license routes — quote how submit routing works today; do not invent a second router.
 
-   `IsTaskInError` requires a required task to have `Status == TaskStatus.Complete`. Other PAF types are unaffected. This gates entry to Review & Submit; it does not make submission succeed.
+KNOWN STARTING POINTS (confirm or correct):
+- PafExtensions.GetCredentialingTypeRtk() — no TaskType.Npp; default throws ArgumentOutOfRangeException
+- CactusUpdater.CreateStandardCviRecordsAsync — uses GetCredentialingTypeRtk() for CVI columns
+- ResolveCviStatusRtkAsync (or current name) — status on create
+- SubmitPafStrategy.ProcessSubmitForSSPBrief() — only existing auto-accept
+- SubmitPafAsync / PafProcessingStrategyContext submit switch — no Npp
+- CommonCactusRtks (PAF Processor, Packet Processor, Client) — HCA0095563 / UDP0000001 / UDP0000002 were NOT IN CODE on 2026-10-08
 
-4. **Unchanged:** `GetCredentialingTypeRtk`, submit flow, Cactus code, and PafFile/upload code were not edited.
+A. Quote GetCredentialingTypeRtk entire switch + default. List every TaskType case and the RTK string.
 
-5. **VA+PA Yes:** When VA/military is Yes and PA is Yes, `ShouldShowStateLicenses` hides state licenses, so the 132529 facility-state check is intentionally skipped.
+B. Quote CreateStandardCviRecordsAsync (or the current CVI insert). Which properties get GetCredentialingTypeRtk()? TYPE vs GROUP vs both? File + line quotes.
 
-6. **Build:** Client build succeeded. `git diff --check` and the separate whitespace check for the untracked NPP code-behind reported no issues.
+C. Quote ResolveCviStatusRtkAsync (or equivalent). What status RTK is written on CREATE for existing PAF types? Can a caller pass UDP0000001, or is it always derived inside the method? Quote.
 
-7. **Remaining gaps:** No automated behavior test or live UI validation was run; verification was the Client build and whitespace checks.
+D. Would adding TaskType.Npp => HCA0095563 to GetCredentialingTypeRtk, without changing ResolveCviStatusRtkAsync, write the wrong create status? Yes/no + quote.
+
+E. Quote SubmitPafStrategy (or current submit) for how Review & Submit becomes Cactus CVI. Is Npp in the switch? Default?
+
+F. Quote ProcessSubmitForSSPBrief: what it requires (unchanged demographics, etc.). Can NPP call it as-is? If not, what sibling submit method exists for a type that auto-accepts and still writes CVI?
+
+G. 132531: quote any existing CPC vs standard vs validation routing on submit (license status, PA, net-new). File/method. Do not invent.
+
+H. CommonCactusRtks: search HCA0095563, UDP0000001, UDP0000002, Facility Undefined Practitioner. IN CODE or NOT. Quote if found.
+
+I. GetCredentialingTypeRtk callers besides CVI create — list. Would an Npp arm affect AddTask / Work / 132267 gate?
+
+J. Isolation: CreateAddTaskStrategy(Npp) must stay AddTaskAddPractitionerToFacilityStrategy. Confirm still true.
+
+K. What must exist before a later implement shot can wire Npp without inventing: constants location, GetCredentialingTypeRtk arm, status-on-create, auto-accept method, 132531 route. Bullet list from quotes only.
+
+L. STOP conditions for a later implement: if ResolveCviStatusRtkAsync cannot use UDP0000001 without a new status mapper; if TYPE vs GROUP are different columns and GetCredentialingTypeRtk only fills one.
+
+DO NOT:
+- Add Npp to GetCredentialingTypeRtk
+- Add CommonCactusRtks values
+- Edit SubmitPaf, CactusUpdater, PafFile, NppTaskForm
+- Click or describe a live Review & Submit happy path as implemented
+
+RETURN:
+1. A–L quotes
+2. One paragraph: implement-ready vs STOP (status-on-create / TYPE vs GROUP)
+3. Files that a later ONE-SHOT would touch (names only)
+4. Confirmation: no files were changed
