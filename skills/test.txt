@@ -1,57 +1,50 @@
 You are implementing a change in the HCA HCP Credentialing repository.
 
 ROLE:
-Senior engineer. One session. Wire NPP submit + CVI create. Do not start a second chat.
+Senior engineer. One session. Wire NPP RTK + MSP submit + CVI create status. Do not start a second chat.
 
-FACT (inspect — treat as true):
-- GetCredentialingTypeRtk has no TaskType.Npp; default throws ArgumentOutOfRangeException.
-- CreateStandardCviRecordsAsync uses the same credentialingTypeRtk for GroupTypeRtk and CredentialingTypeRtk — Laura HCA0095563 is valid for both.
-- CVI create can pass CredentialingStatusRtk override (like DataEnteredCviStatusRtk). Insert uses CredentialingStatusRtk ?? ResolveCviStatusRtkAsync(). Pass UDP0000001 for NPP create. Do not invent a new ResolveCviStatusRtkAsync mapper for UDP0000001.
-- ProcessSubmitForSSPBrief is SSP Brief only — do NOT call it for NPP. No existing NPP auto-accept sibling. Ordinary MSP sibling: ProcessSubmitForMspAsync (CPC review).
-- CreateAddTaskStrategy(Npp) must stay AddTaskAddPractitionerToFacilityStrategy.
-- HCA0095563 / UDP0000001 / UDP0000002 are NOT IN CommonCactusRtks — add them next to existing constants, same style.
-- Laura: VA=Yes AND PA=Yes → auto-accept the PAF AND create a CVI. Other NPP paths: reuse ProcessSubmitForMspAsync (or the same existing MSP submit that creates CVI for CPC) — do not invent a second processor.
+FACT:
+- Prior STOP: no reusable non-SSP auto-accept. Do NOT implement VA+PA Yes auto-accept in this shot. Leave that for a later 1B.
+- For this shot every NPP submit (including VA+PA Yes) uses ProcessSubmitForMspAsync (CPC review path) — same as other MSP. Laura auto-accept is deferred.
+- GetCredentialingTypeRtk has no Npp; default throws.
+- Same type RTK fills GroupTypeRtk and CredentialingTypeRtk — use HCA0095563 for both.
+- CreateStandardCviRecordsAsync does not pass status override today. Initial processing-change sets CredentialingStatusRtk = DataEnteredCviStatusRtk. NPP create must pass UDP0000001 the same way.
+- HCA0095563 / UDP0000001 / UDP0000002 NOT IN CommonCactusRtks — add them.
+- CreateAddTaskStrategy(Npp) stays AddTaskAddPractitionerToFacilityStrategy.
+- Do not call ProcessSubmitForSSPBrief for NPP.
 
-PRODUCT VALUES (do not invent others):
-- Type both columns: HCA0095563
-- Create status: UDP0000001
-- Close status constant UDP0000002 may be added for later close; do not invent close-on-submit unless an existing PAF type already closes CVI on the same submit call.
-
-BEFORE CODING — quote then implement:
-1. Where CommonCactusRtks constants are declared (which project file(s)).
-2. SubmitPafStrategy switch that picks ProcessSubmitForSSPBrief vs ProcessSubmitForMspAsync — where TaskType is read.
-3. CreateStandardCviRecordsAsync / processing-change path that sets CredentialingStatusRtk override.
+PRODUCT VALUES:
+- HCA0095563 (type both columns)
+- UDP0000001 (create status)
+- UDP0000002 (add constant only; do not invent close-on-submit)
 
 IMPLEMENT:
-1. Add constants for HCA0095563, UDP0000001, UDP0000002 in CommonCactusRtks (same naming style as neighbors). Do not invent display strings beyond what Laura gave.
-2. GetCredentialingTypeRtk: TaskType.Npp => HCA0095563 constant.
-3. NPP CVI create: same helper as other types, with CredentialingStatusRtk = UDP0000001. Do not rely on ResolveCviStatusRtkAsync alone for NPP create.
-4. Submit path for TaskType.Npp:
-   - If NppTask VA=Yes AND PA=Yes: auto-accept + create CVI (Laura). Reuse existing auto-accept mechanics from the codebase if any exist outside SSP Brief; if none, STOP and quote — do not invent a half accept.
-   - Else: ProcessSubmitForMspAsync (or exact existing MSP submit) so CVI still uses HCA0095563 + UDP0000001.
-5. Keep CreateAddTaskStrategy(Npp) unchanged. Keep IsSubmittable Npp gate. Do not edit PafFile / blob / 10003. Do not edit Demographic/Address/Specialties. Do not invent attachment enums.
+1. Add the three constants in CommonCactusRtks next to existing CVI/type constants.
+2. GetCredentialingTypeRtk: TaskType.Npp => HCA0095563.
+3. When NPP submit creates the CVI (same path ProcessSubmitForMspAsync / CactusUpdater already uses for MSP), pass CredentialingStatusRtk = UDP0000001. Extend CreateStandardCviRecordsAsync (or the NPP call site) so status override is set — mirror the processing-change override pattern.
+4. SubmitPafStrategy: when TaskSelected == Npp, call ProcessSubmitForMspAsync (not SSP Brief).
+5. Do not invent auto-accept. Do not edit PafFile, blob, Demographic/Address/Specialties, Begin PAF.
 
 STOP AND REPORT:
-- If auto-accept for non-SSP types has no existing pattern to reuse — STOP and quote. Do not invent auto-accept.
-- If ProcessSubmitForMspAsync cannot create CVI without GetCredentialingTypeRtk (after you add Npp) — quote and fix only the Npp arm.
+- If ProcessSubmitForMspAsync never creates a CVI for AddPractitioner-style tasks and you would need a new Cactus write — STOP and quote.
 
 DO NOT CHANGE:
-- Begin PAF, 131785, OffCycle, FSQ hide rules, CreateAddTaskStrategy(Npp) target
-- Azurite / UploadPafAttachment / Version column
-- Live Review & Submit UAT is user-side; you build only
+- ProcessSubmitForSSPBrief body
+- CreateAddTaskStrategy(Npp) target
+- Upload / Azurite / Version
 
 COMMENTS: almost none.
 
 TESTS:
-- dotnet build Paf.Processor (or project that owns SubmitPafStrategy / CactusUpdater) + Shared if constants live there.
+- dotnet build projects that own CommonCactusRtks, PafExtensions, SubmitPafStrategy, CactusUpdater.
 - git diff --check.
 
 RETURN:
 1. Files changed
-2. Constants added — quote names/values
-3. GetCredentialingTypeRtk Npp arm — quote
-4. How UDP0000001 is passed on create — quote
-5. How VA+PA Yes submit is wired (or STOP quote if no auto-accept pattern)
-6. Confirmation: CreateAddTaskStrategy(Npp) unchanged; SSP Brief not used for NPP
+2. Constants — quote
+3. GetCredentialingTypeRtk Npp — quote
+4. How UDP0000001 is passed — quote
+5. NPP submit dispatch — quote (must be ProcessSubmitForMspAsync)
+6. Confirmation: no auto-accept; SSP Brief not used for NPP; CreateAddTaskStrategy(Npp) unchanged
 7. Build result
-8. Remaining gaps
+8. Remaining gaps (note 1B: VA+PA auto-accept)
