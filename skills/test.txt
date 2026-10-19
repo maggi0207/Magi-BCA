@@ -1,41 +1,48 @@
-**1. Inventory**
+You are implementing a change in the HCA HCP Credentialing repository.
 
-**INCLUDE — NPP feature code and tests**
+ROLE:
+Senior engineer. One session. Fix pre-commit Blocker: Submit never calls UpdateTaskAsync for NppTask so UpdateTaskNppStrategy revalidation never runs. Do not start a second chat. Do not commit.
 
-- PAF API: `CactusReloadHelper.cs`, `ModelExtensions.cs`, `PafProcessingStrategyContext.cs`, `SubmitPafStrategy.cs`, `UpdateTaskNppStrategy.cs`.
-- PAF Processor: `CactusUpdater.cs`, `CommonCactusRtks.cs`, `PafExtensions.cs`, `NppTaskValidationTests.cs`.
-- PAF client: `PafFormComponent.razor`, `PafFormComponent.razor.cs`, `PafTaskDisplay.razor.cs`, `PafReviewForm.razor`, `NppTaskForm.razor`, `NppTaskForm.razor.cs`, `NppTaskForm.razor.css`.
-- NPP-specific shared state/models: `ModelExtensions.cs`, `StateContainer.cs`, `NppTask.cs`, `PractitionerActionFormData.cs`, `SpecialtyTask.cs`.
-- NPP task behavior added to existing Demographic, Address, and Specialties pages: `ManagePractitionerInformationTask.razor.cs`, `ManageAddresses.razor`, `ManageAddresses.razor.cs`, `ManageAddressesTask.razor`, `ManageAddressesTask.razor.cs`, `PracticeAddressModal.razor.cs`, `ManageSpecialtiesTask.razor`, `ManageSpecialtiesTask.razor.cs`.
-- NPP support endpoints/data: `FacilityController.cs`, `PractitionerLicenseController.cs`, `FacilityRepository.cs`, `PractitionerLicenseRepository.cs`, `FacilityClient.cs`, `PractitionerLicenseClient.cs`.
+FACT (review):
+- ProcessSubmitForMspAsync / ProcessSubmitForNppAutoAcceptAsync skip UpdateTaskAsync(FormData.NppTask, TaskType.Npp, ...).
+- UpdateTaskNppStrategy exists but is unused on submit.
+- Path A has no server revalidation of NPP answers; Path B auto-accept trusts client VA/PA.
+- Still skip UpdateTaskAsync for ManageDelegate / AddPractitionerToFacilities / MSS-18 when TaskSelected == Npp (1-SUBMIT-FIX). Do not reintroduce FSQ failures.
 
-**EXCLUDE from this feature commit**
+BEFORE CODING — quote:
+1. How other task types call UpdateTaskAsync inside ProcessSubmitForMspAsync (one example).
+2. UpdateTaskNppStrategy.InternalExecuteAsync (or equivalent) — what it validates; does it set Complete / fail PafProcessingResult.
+3. Where CreateUpdateTaskStrategy maps TaskType.Npp.
+4. Current NPP branches in ProcessSubmitForMspAsync and ProcessSubmitForNppAutoAcceptAsync (order of reload vs task updates).
 
-- Local tooling: `settings.json`, `tasks.json`, `launchSettings.json`, `start-all.ps1`.
-- Dependency/solution churn: `Hca.Credentialing.Api.Shared.csproj`, `Hca.Credentialing.Background.Tests.csproj`, `Hca.Credentialing.Background.csproj`, `Hca.Credentialing.Cactus.Api.Tests.csproj`, `Hca.Credentialing.Packet.Api.Tests.csproj`, `Hca.Credentialing.Packet.Api.csproj`, `Hca.Credentialing.Packet.Processor.Tests.csproj`, `Hca.Credentialing.Packet.Processor.csproj`, `Hca.Credentialing.Paf.Api.csproj`, `Hca.Credentialing.Paf.Processor.Tests.csproj`, `Hca.Credentialing.Paf.Processor.csproj`, `Hca.Credentialing.Portal.Api.csproj`, `Hca.Credentialing.Server.csproj`, and `Hca.Credentialing.sln`. These are package-version/format changes, not NPP behavior; notably ImageSharp moves from 3.x to 4.x in Background.
-- The untracked `.github/skills/hca-hcp-add-npp/**` requirements, ticket, screenshot, and analysis corpus is NPP-related documentation, but should be a separate documentation/skills commit rather than bundled with the application feature.
-- `ConfirmationWizardModal.razor.cs` and `VerifyExistingPractitionerForm.razor.cs` are **UNKNOWN** for this feature commit. Their diffs are generic existing-practitioner wizard exception/validation changes and do not contain an NPP guard; confirm their owner/intent before bundling.
+IMPLEMENT:
+1. When FormData.TaskSelected == Npp and FormData.NppTask != null, call UpdateTaskAsync(FormData.NppTask, TaskType.Npp, pafProcessingResult) on BOTH:
+   - ProcessSubmitForMspAsync (Path A / VA No and other non-auto-accept NPP)
+   - ProcessSubmitForNppAutoAcceptAsync (Path B) — ONLY proceed to accept/queue if Npp update validation succeeds (same failure pattern as other UpdateTaskAsync calls).
+2. Place the Npp UpdateTaskAsync after CactusReloadHelper / facility checks succeed (or match the same relative order used for other required tasks — quote and mirror).
+3. Keep skipping Delegate / AddPractitioner / MSS-18 UpdateTaskAsync for Npp.
+4. Do not call ProcessSubmitForSSPBrief. Do not change CreateAddTaskStrategy(Npp). Do not invent RTKs.
+5. Do not implement Review NPP component or Address validation in this shot (Majors = next).
 
-**2. Findings**
+STOP AND REPORT:
+- If UpdateTaskNppStrategy cannot run on submit (wrong shape / missing factory case) — quote and STOP; do not invent a parallel validator.
+- If NppTask is null on submit for valid NPP PAFs — quote why and STOP.
 
-| Severity | File / method | Issue and why it matters | Suggested fix |
-|---|---|---|---|
-| **Blocker** | `SubmitPafStrategy.ProcessSubmitForMspAsync` and `ProcessSubmitForNppAutoAcceptAsync`; `UpdateTaskNppStrategy` | Submit never calls `UpdateTaskAsync(FormData.NppTask, TaskType.Npp, ...)`. The registered strategy’s revalidation branch is therefore unused. Path A does not server-revalidate NPP answers, and Path B directly marks success/queues acceptance based on request payload VA/PA values without that revalidation. This makes client-side validation the effective authority for required NPP fields and auto-accept eligibility. | `SubmitPafStrategy`; `UpdateTaskNppStrategy` |
-| **Major** | `PafReviewForm.razor` / `.razor.cs` | Review hides Delegate/Add-Practitioner/MSS-18 for NPP, but there is no NPP task reference or NPP review component. A Path A CPC reviewer gets no NPP answers or PSV attachment summary in the Review form. | `PafReviewForm`; NPP review component |
-| **Major** | `ManageAddressesTask.ValidateAndSaveAddresses` | NPP hides Home, Credentialing, and Alternate address sections, but save still requires confirmed Home, Primary, and Credentialing addresses and no unreviewed Alternate addresses. A net-new NPP with no hidden-category addresses cannot complete this optional task after editing only the visible Primary section. | `ManageAddressesTask.ValidateAndSaveAddresses` |
-| **Minor** | `SubmitPafStrategy.ProcessSubmitForMspAsync` | For non-NPP PAFs, Delegate revalidation moved ahead of Add Privileges and Collaborating Practitioners; the same calls remain, but their order changed. Preserve the old order to make “non-NPP unchanged” exact. | `SubmitPafStrategy.ProcessSubmitForMspAsync` |
-| **Minor** | NPP tests | The new test covers model annotation validation only; there are no tests for submit task-list `UserId`, NPP server revalidation, auto-accept, or CVI type/status creation. Path B UAT and live CVI verification are still open as noted. | PAF API/Processor tests |
+DO NOT CHANGE:
+- CactusReloadHelper UserId/IsMspUserMode (already fixed)
+- Package/csproj churn, tooling, Begin PAF wizard UNKNOWN files
 
-The core checklist otherwise looks sound: NPP submit gets authenticated `_user` values for `IsMspUserMode` and `UserId`; NPP VA-No dispatches to `ProcessSubmitForMspAsync`; VA+PA Yes does not call SSP Brief; `CreateAddTaskStrategy(Npp)` remains `AddTaskAddPractitionerToFacilityStrategy`; Review hides the three specified legacy cards; the new PafFile controls use `FormType.Other` and the existing callbacks. `HCA0095563` and `UDP0000001/2` match the supplied product values. Facility category IDs in the new query already occur in existing repository queries, and `NPDBSTATEx` is already used in the codebase. I found no apparent credentials added in changed tracked lines.
+COMMENTS: almost none.
 
-**3. Verdict: FIX FIRST**
+TESTS:
+- Build Paf.Api (+ Processor/Shared if touched).
+- Prefer add/adjust one test that submit path invokes Npp update validation if an existing submit-strategy test pattern exists; otherwise note gap.
+- git diff --check on touched files.
 
-Do not commit the full worktree as one feature commit. At minimum, address server-side NPP task revalidation before allowing the VA+PA auto-accept branch. Add the missing NPP review representation and resolve the hidden-address save validation before treating the NPP workflow as complete. Stage only the INCLUDE paths; keep tooling, dependency updates, Begin PAF wizard changes, and the NPP reference corpus separate.
-
-**4. Suggested commit message**
-
-`Add NPP PAF task and CVI routing`
-
-`Wires NPP task entry, PSV uploads, eligibility, MSP submission, and the NPP CVI type/status into the existing PAF workflow.`
-
-**5. Confirmation:** No files were changed.
+RETURN:
+1. Files changed
+2. UpdateTaskAsync(Npp) call sites — quote both paths
+3. Failure behavior when Npp validation fails — quote
+4. Confirmation: FSQ/Delegate still skipped for Npp; CreateAddTaskStrategy(Npp) unchanged; SSP Brief unused
+5. Build result
+6. Remaining: Review Major, Address Major, Minor order, commit
