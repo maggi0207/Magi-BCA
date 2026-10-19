@@ -1,35 +1,69 @@
-You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
+**A. Exact strings**
 
-ROLE:
-Senior engineer. READ ONLY. Do not edit files. Do not invent RTKs.
+Both originate in `CactusReloadHelper.cs`:
 
-TASK:
-Live NPP Path A submit (VA No, Passmore, Alpine Surgery Center) reached Review, then failed with:
-- Status: Rejected - Task no longer available
-- Modal: PAF Submission Failed. Task no longer available. PAF will be deleted.
+> `_formData.SetStatus(PafStatus.RejectedToMsp, "Task no longer available.");`
 
-Quote A–H then STOP.
+> `pafProcessingResult.StatusDetail.Add("Task no longer available. PAF will be deleted.");`
 
-A. Exact string search: "Task no longer available" and "PAF will be deleted". File/method for each.
+The client displays the returned detail under “PAF Submission Failed” in `PafFormComponent.razor.cs`.
 
-B. Call chain from Review Submit click → ProcessSubmitForMspAsync (or NPP dispatch). Quote.
+**B. Review submit call chain**
 
-C. Inside that path: what "task" is looked up (CPC queue type, facility task, assignment)? Quote the condition that throws/returns this message.
+The Review form’s Validate & Submit button calls `OnValidateAndSubmit`; when validation succeeds it invokes `OnRequestSubmit`. `PafReviewForm.razor.cs`:
 
-D. Does TaskType.Npp appear in that lookup? Yes/no + quote. Would AddPractitionerToFacility succeed where Npp fails?
+> `await OnRequestSubmit.InvokeAsync(eventArgs);`
 
-E. CreateAddTaskStrategy(Npp) still AddTaskAddPractitionerToFacilityStrategy — confirm. Does submit assume AddPractitionerToFacilitiesTask Complete / FSQ answers?
+The parent handler calls `PafClient.SubmitPafAsync(PafData)`, which reaches `PafController.SubmitPafAsync` and creates `SubmitPafStrategy`. For NPP with VA No, the current NPP dispatch calls `ProcessSubmitForMspAsync(pafProcessingResult)` in `SubmitPafStrategy.cs`.
 
-F. Review UI still shows Delegate + Alpine FSQ for this NPP PAF — quote why Review renders those (PafReviewForm / task list). Separate from fail if unrelated.
+**C. What is looked up**
 
-G. Processor vs API: which side emits the message? Quote.
+It looks up **available PAF task types**, not a CPC queue, facility assignment, or FSQ answer:
 
-H. Minimal fix options from code only (list, do not implement): e.g. map Npp to same CPC task type as AddPractitionerToFacility; complete/skip FSQ on submit; other existing pattern.
+> `var tasks = await _taskDeterminationService.GetAvailableTaskListAsync(new TaskListParameters() { ... });`
 
-DO NOT implement. DO NOT add GetCredentialingTypeRtk changes in this turn.
+> `if (tasks.Any(t => t.Type == _formData.TaskSelected))`
 
-RETURN:
-1. A–H quotes
-2. One sentence root cause
-3. Recommended next implement shot (names only)
-4. Confirmation: no files changed
+If no matching task type is found, the helper sets `RejectedToMsp` and adds “Task no longer available. PAF will be deleted.” Only after a match does it proceed to `VerifyFacilities`.
+
+**D. Is NPP in that lookup?**
+
+NPP is conditionally added by `TaskDeterminationService.cs`:
+
+> `if (listParameters.IsMspUserMode) { ... Type = TaskType.Npp }`
+
+But `CactusReloadHelper` does not set `IsMspUserMode`; the property defaults to `false`. The public `TaskController` sets it from the authenticated user, but this submit path calls the service directly. Therefore NPP is absent from this lookup for this path. **AddPractitionerToFacility would pass this specific membership check** because the New Practitioner list adds it unconditionally; that does not guarantee later validation will pass.
+
+**E. Add-task strategy and FSQ revalidation**
+
+The factory still maps NPP to the Add-Practitioner strategy:
+
+> `TaskType.Npp => new AddTaskAddPractitionerToFacilityStrategy(this),`
+
+That strategy creates `AddPractitionerToFacilitiesTask` as required and creates per-facility question entries with `Complete = false`. On ordinary MSP submit, `ProcessSubmitForMspAsync` calls `UpdateTaskAsync(FormData.AddPractitionerToFacilitiesTask, TaskType.AddPractitionerToFacility, ...)`. The update strategy sets its status to Complete, then validates corporate and facility-question values; invalid data can still fail this later submit step. It does not simply trust a previously Complete status.
+
+**F. Why Delegate and Alpine facility questions show in Review**
+
+The task-list cards hide Delegate and Add-Practitioner for NPP with `TaskSelected != TaskType.Npp` conditions in `PafFormComponent.razor`. The Review form is different: `PafReviewForm.razor` renders each when its task reference is non-null:
+
+> `@if (_manageDelegateTask != null)`  
+> `@if (_addPractitionerToFacilitiesTask != null)`
+
+`LoadData()` assigns both from PAF state, and the Add-Practitioner review component labels its content “Facility Specific Questions.” Thus these models remain visible in Review despite being hidden from the task list.
+
+**G. Which side emits it**
+
+The **PAF API** emits the failure: `CactusReloadHelper` sets `PafProcessingResult.Status` to Failure and adds the detail before processor queuing. The Client only displays it. `CactusReloadHelper` is in the API project, not the PAF processor.
+
+**H. Minimal code-based fix options**
+
+- In `CactusReloadHelper.ReloadTaskAndFacilitiesAsync`, populate the server-derived `IsMspUserMode` for the direct task-list lookup; the existing `TaskController` demonstrates authenticated-role derivation.
+- Keep `TaskSelected` as NPP; `TaskDeterminationService.GetAvailableFacilityListAsync` already handles `TaskType.Npp` alongside Add-Practitioner for facilities.
+- Separately address `SubmitPafStrategy.ProcessSubmitForMspAsync` revalidating hidden Add-Practitioner/Delegate task objects for NPP; Add-Practitioner revalidation can reject missing/invalid FSQ data even after the task-type lookup is fixed.
+- If Review should not display the hidden tasks, add NPP-aware render conditions in `PafReviewForm`; that is separate from this submit failure.
+
+**Root cause:** The submit API’s New Practitioner task lookup omits the server-computed MSP flag, so its NPP-only task entry is excluded and the `TaskType.Npp` membership check rejects the PAF.
+
+**Recommended next implement shot (names only):** `CactusReloadHelper.ReloadTaskAndFacilitiesAsync`; `SubmitPafStrategy.ProcessSubmitForMspAsync`; `PafReviewForm.LoadData`; `PafReviewForm.razor`.
+
+**No files changed.**
