@@ -1,24 +1,60 @@
-You are reviewing the HCA HCP Credentialing repository. READ-ONLY. Do not edit files. Do not commit. Do not push.
+**INCLUDE**
 
-ROLE:
-Senior engineer. One session. Re-review NPP/PAF feature diffs after Blocker + Majors fixes. Verdict READY TO COMMIT or FIX FIRST. Do not start a second chat.
+- `FacilityController.cs`
+- `PractitionerLicenseController.cs`
+- `FacilityRepository.cs`
+- `PractitionerLicenseRepository.cs`
+- `CactusReloadHelper.cs`
+- `ModelExtensions.cs`
+- `PafProcessingStrategyContext.cs`
+- `SubmitPafStrategy.cs`
+- `UpdateTaskManageAddressesStrategy.cs`
+- `UpdateTaskNppStrategy.cs`
+- `CactusUpdater.cs`
+- `CommonCactusRtks.cs`
+- `PafExtensions.cs`
+- `NppTaskValidationTests.cs`
+- `PafFormComponent.razor`
+- `PafFormComponent.razor.cs`
+- `PafTaskDisplay.razor.cs`
+- `PafReviewForm.razor`
+- `PafReviewForm.razor.cs`
+- `ReviewNppTask.razor`
+- `ReviewNppTask.razor.cs`
+- `ManageAddresses.razor`
+- `ManageAddresses.razor.cs`
+- `ManageAddressesTask.razor`
+- `ManageAddressesTask.razor.cs`
+- `PracticeAddressModal.razor.cs`
+- `ManagePractitionerInformationTask.razor.cs`
+- `ManageSpecialtiesTask.razor`
+- `ManageSpecialtiesTask.razor.cs`
+- `NppTaskForm.razor`
+- `NppTaskForm.razor.cs`
+- `NppTaskForm.razor.css`
+- `ModelExtensions.cs`
+- `StateContainer.cs`
+- `FacilityClient.cs`
+- `PractitionerLicenseClient.cs`
+- `PractitionerActionFormData.cs`
+- `SpecialtyTask.cs`
+- `NppTask.cs`
 
-PRIOR FIXES (must verify in diff):
-1. SubmitPafStrategy — UpdateTaskAsync(FormData.NppTask, TaskType.Npp) on ProcessSubmitForMspAsync AND ProcessSubmitForNppAutoAcceptAsync; Failure blocks accept/queue on Path B; Delegate/AddPractitioner/MSS-18 still skipped for Npp.
-2. ReviewNppTask (+ PafReviewForm LoadData) — VA/PA, licenses, PSV names; FSQ/Delegate/MSS-18 still hidden for Npp.
-3. ManageAddressesTask + UpdateTaskManageAddressesStrategy — NPP Primary-only; Home/Credentialing/Alternate not required for Npp; non-NPP unchanged.
+**EXCLUDE / UNKNOWN**
 
-CHECKLIST (quote pass/fail):
-A. Auth IsMspUserMode + UserId still server-derived in CactusReloadHelper
-B. No ProcessSubmitForSSPBrief for Npp; CreateAddTaskStrategy(Npp) unchanged
-C. No invented RTKs beyond HCA0095563 / UDP0000001/2 already in product
-D. Non-NPP Address + Review + MSP submit order not regressed (Minor order OK as note)
-E. No secrets; INCLUDE vs EXCLUDE same as prior review (tooling, csproj, skills corpus, UNKNOWN wizard files out)
+Do not stage `settings.json`, `tasks.json`, `start-all.ps1`, `Hca.Credentialing.sln`, any changed `.csproj` files, or `Hca.Credentialing/Client/Properties/launchSettings.json`. Exclude `.github/skills/**` and both ConfirmationWizard changes (`ConfirmationWizardModal.razor.cs`, `VerifyExistingPractitionerForm.razor.cs`) as out of scope/unknown.
 
-RETURN:
-1. INCLUDE file list for the feature commit (paths only)
-2. EXCLUDE / UNKNOWN (do not stage)
-3. Findings table (Blocker/Major/Minor/Nit) — empty OK if clean
-4. Verdict: READY TO COMMIT / FIX FIRST
-5. Suggested commit message (why-focused, 1–2 sentences)
-6. Confirmation: no files changed
+**Findings**
+
+| Severity | Finding |
+|---|---|
+| Minor | MSP task refresh moves `ManageDelegate` after `CollaboratingPractitioners`; other non-NPP updates retain their existing behavior. No concrete failure found, but the ordering changed. |
+| Minor | Path B auto-accept and live CVI verification remain open from the prior review; the diff review does not establish runtime/UAT behavior. |
+
+Checklist: **A PASS** — Cactus reload still supplies `_user.IsMspUser()` and `_user.GetUserId()`. **B PASS** — NPP dispatches through its own submit paths, does not call `ProcessSubmitForSSPBrief`, and `CreateAddTaskStrategy(Npp)` still maps to `AddTaskAddPractitionerToFacilityStrategy`. **C PASS** — the NPP additions are `HCA0095563`, `UDP0000001`, and `UDP0000002`. **D PASS, with Minor noted above** — NPP-only address rules are gated; non-NPP validation is retained; existing review components remain unchanged for non-NPP. **E PASS** — no credential-shaped values found in added tracked lines or the new NPP source checked; keep tooling, project-file churn, skills, and wizard changes excluded.
+
+**Verdict: READY TO COMMIT.** This is a source-diff review; Path B UAT and live CVI verification remain open. No tests were run during this read-only pass.
+
+Suggested commit message: `Add NPP review and primary-only address validation`. It captures the user-visible NPP review summary and aligns completion/revalidation with the address categories shown for NPP.
+
+**Confirmation:** No files were changed, staged, committed, or pushed during this review.
