@@ -1,1 +1,43 @@
-2b249b27aae418ad8bed41dca7789ec70ecaa919
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
+
+ROLE:
+Senior engineer. One session. Map CPC Dashboard Completed Queue PAF Type filter for 131783/131784. Do not start a second chat. Do not implement.
+
+PRODUCT (ADO):
+- Surface: CPC Dashboard → Completed Queue → existing Type dropdown only. No second NPP-only filter.
+- New value to appear: "Add NPP to Facility" (ticket string). 132255 radio is "ADD NPP to Facility" — quote if code has either; do not invent a third label.
+- AC: list value; filter matching completed NPP only; empty when none; clear restores unfiltered; other types unchanged; DEV/QA/PROD later.
+- Out of scope: creating NPP PAFs, Begin NPP, search, CVI, CACTUS, MSP action radio.
+
+QUOTE:
+1. CPC Dashboard Completed Queue page/component (file paths).
+2. Type / PAF Type dropdown — where options are bound (razor + code-behind / VM).
+3. Source of Type values today (enum, lookup API, static list, DB/reference table). Quote the list builder and every current option name/id you can see.
+4. Is "Add NPP to Facility" or "ADD NPP to Facility" or TaskType.Npp already in that source? Yes/No + quote.
+5. How selected Type is passed into the completed-queue query/API (parameter name + filter predicate).
+6. What identifies a "completed" PAF in that query (status enum/field).
+7. How submitted NPP PAFs are stored today regarding type: TaskSelected == Npp vs PafType / FormType / display string — quote PractitionerActionFormData or equivalent. Can Completed Queue filter on that field as-is?
+8. Existing tests for Type filter / Completed Queue (names only).
+9. Files that would change for 131784 (list only). Files that must not change.
+
+STOP AND REPORT:
+- If Type values come from reference data not in this repo — quote the client/API call and say config/data change may be required; do not invent seed SQL or RTKs.
+- If NPP completed PAFs have no distinct type field the queue can filter on — quote the gap; do not invent PafType.
+
+DO NOT:
+- Edit code
+- Invent PafType enum / RTK / new API
+- Touch In Progress or other queues unless the same control is shared (then quote share point only)
+- Bundle 132275 smoke/CVI into this inspect
+
+RETURN (A–J):
+A. Completed Queue host — files
+B. Type dropdown bind + option source — quote
+C. Current Type options (names/ids) — list
+D. NPP label already present? Yes/No
+E. Query filter parameter + predicate — quote
+F. Completed status definition — quote
+G. How NPP PAF type is persisted today — quote; filterable as-is? Yes/No/Gap
+H. Tests (names)
+I. Proposed smallest change (names only) — or STOP with data/config gap
+J. Confirmation: no files changed
