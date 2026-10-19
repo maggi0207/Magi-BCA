@@ -1,38 +1,35 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
 
 ROLE:
-Senior engineer. One session. Fix IsSubmittable for NPP so hidden FSQ/Delegate do not block Review. Do not start a second chat.
+Senior engineer. READ ONLY. Do not edit files. Do not invent RTKs.
 
-FACT:
-- 132268 hides ManageDelegateTask, AddPractitionerToFacilitiesTask, Mss18FacilitySpecificQuestionsTask when TaskSelected == Npp. Task objects stay; CreateAddTaskStrategy(Npp) still creates AddPractitionerToFacilitiesTask with IsRequired = true.
-- Live UAT: ADD NPP card Complete; Demographic/Address/Specialties Optional; Review & Submit shows "PAF Incomplete. Please complete all required tasks before attempting to submit the PAF."
-- Shot B already adds NppTask to IsSubmittable. It did not skip the hidden required FSQ.
+TASK:
+Live NPP Path A submit (VA No, Passmore, Alpine Surgery Center) reached Review, then failed with:
+- Status: Rejected - Task no longer available
+- Modal: PAF Submission Failed. Task no longer available. PAF will be deleted.
 
-BEFORE CODING — quote IsSubmittable / IsTaskInError fully. List every required task it checks.
+Quote A–H then STOP.
 
-IMPLEMENT:
-1. When TaskSelected == TaskType.Npp, IsSubmittable must NOT fail because of ManageDelegateTask, AddPractitionerToFacilitiesTask, or Mss18FacilitySpecificQuestionsTask (same three 132268 hides).
-2. Still require NppTask present and Complete (existing Shot B check).
-3. Prefer skip-in-IsSubmittable. Do not change CreateAddTaskStrategy(Npp) unless you must — quote why if you do.
-4. Non-NPP PAF types: IsSubmittable unchanged (FSQ/Delegate still required when those cards show).
-5. Do not edit PafFile, CVI RTKs, auto-accept, Begin PAF.
+A. Exact string search: "Task no longer available" and "PAF will be deleted". File/method for each.
 
-STOP AND REPORT:
-- If IsSubmittable lives in more than one place and you cannot find the toast source — quote both.
+B. Call chain from Review Submit click → ProcessSubmitForMspAsync (or NPP dispatch). Quote.
 
-DO NOT CHANGE:
-- 132268 hide CSS (keep it)
-- CreateAddTaskStrategy(Npp) target unless STOP path requires it
+C. Inside that path: what "task" is looked up (CPC queue type, facility task, assignment)? Quote the condition that throws/returns this message.
 
-COMMENTS: almost none.
+D. Does TaskType.Npp appear in that lookup? Yes/no + quote. Would AddPractitionerToFacility succeed where Npp fails?
 
-TESTS:
-- dotnet build Shared + Client.
-- git diff --check.
+E. CreateAddTaskStrategy(Npp) still AddTaskAddPractitionerToFacilityStrategy — confirm. Does submit assume AddPractitionerToFacilitiesTask Complete / FSQ answers?
+
+F. Review UI still shows Delegate + Alpine FSQ for this NPP PAF — quote why Review renders those (PafReviewForm / task list). Separate from fail if unrelated.
+
+G. Processor vs API: which side emits the message? Quote.
+
+H. Minimal fix options from code only (list, do not implement): e.g. map Npp to same CPC task type as AddPractitionerToFacility; complete/skip FSQ on submit; other existing pattern.
+
+DO NOT implement. DO NOT add GetCredentialingTypeRtk changes in this turn.
 
 RETURN:
-1. Files changed
-2. IsSubmittable before/after — quote
-3. Confirmation: non-NPP still requires FSQ when present; Npp still requires NppTask Complete
-4. Build result
-5. Remaining gaps
+1. A–H quotes
+2. One sentence root cause
+3. Recommended next implement shot (names only)
+4. Confirmation: no files changed
