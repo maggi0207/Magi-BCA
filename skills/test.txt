@@ -1,43 +1,37 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
 
 ROLE:
-Senior engineer. One session. Fix NPP submit "Task no longer available". Do not start a second chat.
+Senior engineer. One session. Find why NPP Validate & Submit returns HTTP 500 from Paf.Api SubmitPaf. Do not start a second chat. Do not implement.
 
-FACT (inspect):
-- CactusReloadHelper.ReloadTaskAndFacilitiesAsync calls GetAvailableTaskListAsync without IsMspUserMode (false). NPP is only added when IsMspUserMode is true. Membership check fails → RejectedToMsp + "Task no longer available. PAF will be deleted."
-- TaskController already sets IsMspUserMode from authenticated MSP role — reuse that pattern in the helper (server-derived, not client-trusted).
-- After lookup passes, ProcessSubmitForMspAsync still UpdateTaskAsync(AddPractitionerToFacilitiesTask) and can fail FSQ validation for NPP (FSQ hidden / incomplete). Skip that revalidation for TaskType.Npp the same way IsSubmittable skips those tasks.
-- Optional same shot: PafReviewForm hide Delegate / AddPractitioner / MSS-18 when TaskSelected == Npp (match 132268). Do not invent new Review chrome.
+UAT FACT:
+- After 1-SUBMIT-FIX (IsMspUserMode + skip FSQ UpdateTaskAsync for Npp + Review hide), Path A submit hits ErrorPage.
+- Client Network: :5021/api/Paf/SubmitPaf → 500 Internal Server Error.
+- Client stack: HttpRequestException → EnsureSuccessStatusCode → HttpResponseExtensions.GetFromJsonAsync<PafProcessingResult>.
+- This is NOT the prior RejectedToMsp “Task no longer available” path (that returned a processing result the UI could show).
 
-BEFORE CODING — quote:
-1. CactusReloadHelper task-list call + membership check.
-2. TaskController IsMspUserMode assignment.
-3. ProcessSubmitForMspAsync UpdateTaskAsync on AddPractitionerToFacilitiesTask / Delegate.
+DO THIS:
+1. Reproduce or use the latest Paf.Api console/log for this SubmitPaf call. Quote: exception type, message, and top stack frames (file + method + line if present).
+2. Trace SubmitPafController → CreateSubmitPafStrategy → InternalExecuteAsync / ProcessSubmitForMspAsync (NPP VA No path from 1A). Quote the first method that can throw uncaught for TaskType.Npp after the IsMspUserMode fix.
+3. Check CactusReloadHelper after task-list membership passes: VerifyFacilities, facility list for TaskType.Npp, null refs on AddPractitionerToFacilitiesTask / Delegate when skipped.
+4. Check OnAfterExecuteAsync / QueuePafForProcessing — can those 500 the HTTP response?
+5. Confirm whether SubmitPaf catches and maps failures to PafProcessingResult vs letting exceptions bubble to 500 middleware.
+6. List null/empty fields typical for NPP that non-NPP Add-Practitioner submit always has (FSQ answers, facility question Complete flags, etc.) if the throw site touches them.
 
-IMPLEMENT:
-1. In ReloadTaskAndFacilitiesAsync (or the exact method that builds TaskListParameters), set IsMspUserMode from the same server auth/role source TaskController uses. Keep TaskSelected as Npp.
-2. When TaskSelected == Npp, ProcessSubmitForMspAsync must not revalidate/fail on ManageDelegateTask, AddPractitionerToFacilitiesTask, or Mss18FacilitySpecificQuestionsTask. Still run facility VerifyFacilities / CVI path from 1A.
-3. Prefer: PafReviewForm do not render those three when TaskSelected == Npp.
-4. Do not call ProcessSubmitForSSPBrief. Do not change CreateAddTaskStrategy(Npp). Do not invent CPC RTKs. VA+PA auto-accept path unchanged.
+STOP AND REPORT if Paf.Api log is unavailable — say exactly where to look (console window / Serilog / appsettings sink) and what filter string to use. Do not invent the exception.
 
-STOP AND REPORT:
-- If helper has no access to HttpContext/user for MSP role — STOP and quote how TaskController gets it; do not invent a client flag.
+DO NOT:
+- Edit code
+- Invent CPC RTKs
+- Change CreateAddTaskStrategy(Npp)
+- Blame the client ErrorPage — it only surfaces the 500
 
-DO NOT CHANGE:
-- TaskDeterminationService NPP eligibility rules (only pass IsMspUserMode correctly)
-- Begin PAF, PafFile, Azurite
+RETURN (A–G):
+A. Exact exception type + message (quote from Paf.Api log)
+B. Top stack (3–8 frames) with file/method
+C. Call chain from SubmitPaf endpoint to throw site
+D. Whether this is after task-list membership (past “Task no longer available”)
+E. Null/missing NPP-specific data at throw site (quote)
+F. Does SubmitPaf normally catch and return PafProcessingResult Failure, or only 500 on unhandled?
+G. Recommended next implement shot (names only) — or STOP if log missing
 
-COMMENTS: almost none.
-
-TESTS:
-- Build Paf.Api + Shared (+ Client if Review razor changes).
-- git diff --check.
-
-RETURN:
-1. Files changed
-2. IsMspUserMode wiring — quote
-3. NPP skip of FSQ/Delegate revalidation — quote
-4. Review hide (if done) — quote
-5. Confirmation: CreateAddTaskStrategy(Npp) unchanged; non-NPP lookup/submit unchanged
-6. Build result
-7. Remaining gaps
+Confirmation: no files changed.
