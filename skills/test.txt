@@ -1,37 +1,15 @@
-You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
+**STOP: the PAF API exception log is unavailable to this session.** The API process is running, but I can’t access its Windows Terminal console output or a persisted log file. I won’t invent an exception or throw site.
 
-ROLE:
-Senior engineer. One session. Find why NPP Validate & Submit returns HTTP 500 from Paf.Api SubmitPaf. Do not start a second chat. Do not implement.
+**A. Exact exception:** Unavailable. No exception type or message can be quoted without the PAF API log.
 
-UAT FACT:
-- After 1-SUBMIT-FIX (IsMspUserMode + skip FSQ UpdateTaskAsync for Npp + Review hide), Path A submit hits ErrorPage.
-- Client Network: :5021/api/Paf/SubmitPaf → 500 Internal Server Error.
-- Client stack: HttpRequestException → EnsureSuccessStatusCode → HttpResponseExtensions.GetFromJsonAsync<PafProcessingResult>.
-- This is NOT the prior RejectedToMsp “Task no longer available” path (that returned a processing result the UI could show).
+**B. Stack:** Unavailable for the same reason.
 
-DO THIS:
-1. Reproduce or use the latest Paf.Api console/log for this SubmitPaf call. Quote: exception type, message, and top stack frames (file + method + line if present).
-2. Trace SubmitPafController → CreateSubmitPafStrategy → InternalExecuteAsync / ProcessSubmitForMspAsync (NPP VA No path from 1A). Quote the first method that can throw uncaught for TaskType.Npp after the IsMspUserMode fix.
-3. Check CactusReloadHelper after task-list membership passes: VerifyFacilities, facility list for TaskType.Npp, null refs on AddPractitionerToFacilitiesTask / Delegate when skipped.
-4. Check OnAfterExecuteAsync / QueuePafForProcessing — can those 500 the HTTP response?
-5. Confirm whether SubmitPaf catches and maps failures to PafProcessingResult vs letting exceptions bubble to 500 middleware.
-6. List null/empty fields typical for NPP that non-NPP Add-Practitioner submit always has (FSQ answers, facility question Complete flags, etc.) if the throw site touches them.
+**C. Known call chain:** `PafController.SubmitPafAsync` → `CreateSubmitPafStrategy()` → `SubmitPafStrategy.InternalExecuteAsync` → NPP VA-No branch → `ProcessSubmitForMspAsync` → `CactusReloadHelper.ReloadPractitionerAsync` → `ReloadTaskAndFacilitiesAsync` → task-list lookup and, if the task matches, `VerifyFacilities`. The first method that actually throws cannot be determined from source alone.
 
-STOP AND REPORT if Paf.Api log is unavailable — say exactly where to look (console window / Serilog / appsettings sink) and what filter string to use. Do not invent the exception.
+**D. Membership:** The old `"Task no longer available"` branch sets a failure `PafProcessingResult` and returns it; it does not throw there. A 500 is consistent with an unhandled exception, but without the log I cannot confirm that execution passed the membership check.
 
-DO NOT:
-- Edit code
-- Invent CPC RTKs
-- Change CreateAddTaskStrategy(Npp)
-- Blame the client ErrorPage — it only surfaces the 500
+**E. NPP-specific data:** The current NPP path skips Add-Practitioner and Delegate `UpdateTaskAsync` revalidation. `VerifyFacilities` still uses `TaskSelected == Npp`. Without the exception site, I cannot identify which NPP field was null or missing at the failure point.
 
-RETURN (A–G):
-A. Exact exception type + message (quote from Paf.Api log)
-B. Top stack (3–8 frames) with file/method
-C. Call chain from SubmitPaf endpoint to throw site
-D. Whether this is after task-list membership (past “Task no longer available”)
-E. Null/missing NPP-specific data at throw site (quote)
-F. Does SubmitPaf normally catch and return PafProcessingResult Failure, or only 500 on unhandled?
-G. Recommended next implement shot (names only) — or STOP if log missing
+**F. Exception mapping:** `SubmitPafAsync` has no catch around strategy execution. `BasePafProcessingStrategy.ExecuteAsync` rethrows exceptions from `InternalExecuteAsync`; `SaveUpdatedPafAsync` catches exceptions from `OnAfterExecuteAsync` and logs a warning, but that does not map them to a failure result. Unhandled exceptions can therefore become HTTP 500.
 
-Confirmation: no files changed.
+**G. Next step:** Check the PAF API console window running the `Hca.Credentialing.Paf.Api` launch profile. `Program.cs` uses `Host.CreateDefaultBuilder`, and the API development settings set default logging to Debug; the inspected settings show no file sink. Capture the exception and stack frames around the request, filtering for `SubmitPaf`, `Exception`, `CactusReloadHelper`, and `ProcessSubmitForMspAsync`. **No files changed.**
