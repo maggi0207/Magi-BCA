@@ -1,47 +1,39 @@
-The source points to a specific submit-only omission: the existing-practitioner NPP eligibility query passes `TaskListParameters.UserId` to `FacilityClient`, but `CactusReloadHelper` never sets it; the UI TaskController does. That makes the interpolated route’s `{userId}` segment empty. The Cactus action itself has no “practitioner not found” 404 branch, though I don’t have the runtime Cactus log to confirm the exact requested URL.
+You are implementing a change in the HCA HCP Credentialing repository.
 
-**A. FacilityClient URL**
+ROLE:
+Senior engineer. One session. Fix SubmitPaf 500 caused by null TaskListParameters.UserId in CactusReloadHelper. Do not start a second chat.
 
-`FacilityClient.cs`:
+FACT (inspect):
+- After IsMspUserMode fix, ExistingPractitioner + MSP NPP eligibility calls GetUserFacilitiesNotAddedToOrInactiveAtAsync(listParameters.UserId, practitioner.Key).
+- FacilityClient URL: api/Facility/{userId}/PractitionerNotAddedToOrInactiveAt/{practitionerKey}. Null UserId → empty route segment → 404 → BaseApiClient rethrows → SubmitPaf 500.
+- TaskController sets listParameters.UserId = currentUser.GetUserId(). CactusReloadHelper sets IsMspUserMode and PractitionerId but omits UserId.
+- Cactus FacilityController returns Ok(repo); no practitioner-not-found 404. Do not invent 404→empty in BaseApiClient.
 
-> `$"{ApiBasePath}/{userId}/PractitionerNotAddedToOrInactiveAt/{HttpUtility.UrlEncode(practitionerKey.Trim())}"`
+BEFORE CODING — quote:
+1. CactusReloadHelper TaskListParameters construction (IsMspUserMode / PractitionerId / missing UserId).
+2. TaskController UserId assignment (GetUserId).
+3. Confirm _user (or equivalent) already used for IsMspUserMode has GetUserId().
 
-`ApiBasePath` is `"api/Facility"`. Arguments are `userId` and `practitionerKey`.
+IMPLEMENT:
+1. In ReloadTaskAndFacilitiesAsync (same TaskListParameters object), set UserId from authenticated principal the same way TaskController does (_user.GetUserId() or equivalent already in scope).
+2. Do not change FacilityClient, FacilityController, TaskDeterminationService eligibility rules, or BaseApiClient 404 behavior.
+3. Do not change CreateAddTaskStrategy(Npp). Do not invent CPC RTKs.
 
-**B. Matching Cactus action**
+STOP AND REPORT:
+- If _user has no GetUserId() — quote how TaskController obtains userId and wire the same source; do not hardcode or take UserId from the client form.
 
-`FacilityController.cs`:
+DO NOT CHANGE:
+- Begin PAF UI, PafFile, Azurite, Review hide, FSQ skip from 1-SUBMIT-FIX
 
-> `[HttpGet("{userId}/PractitionerNotAddedToOrInactiveAt/{practitionerKey}")]`
+COMMENTS: almost none.
 
-The action logs “Getting facilities from Cactus for userId … where practitioner … is not added or is inactive at” and returns `Ok(await _facilityRepository.GetFacilitiesPractitionerNotAddedToOrInactiveAtAsync(userId, practitionerKey))`. There is no practitioner-not-found 404 branch; the repository method runs a query and returns its results. I do not have the Cactus runtime log to confirm the actual URL received.
+TESTS:
+- Build Paf.Api (+ Shared if needed).
+- git diff --check.
 
-**C. When the service calls this method**
-
-`TaskDeterminationService.cs`: in **ExistingPractitioner** mode, when `IsMspUserMode` is true, NPP eligibility calls:
-
-> `GetUserFacilitiesNotAddedToOrInactiveAtAsync(listParameters.UserId, practitioner.Key)`
-
-The NewPractitioner branch adds NPP directly for MSP and does not make this facility query. So the reported stack indicates the submit reload entered ExistingPractitioner mode.
-
-**D. Submit-time arguments**
-
-`CactusReloadHelper.cs` sets `PractitionerId = _formData.Practitioner.Id` and `IsMspUserMode = _user.IsMspUser()`, but does **not** set `UserId`. The service fetches that practitioner and passes `practitioner.Key` as the practitioner key. `UserId` therefore remains its default `null`.
-
-By contrast, `TaskController.cs` sets `listParameters.UserId = currentUser.GetUserId()` from the authenticated `HttpContext.User`.
-
-**E. Why task selection can work while submit fails**
-
-The UI’s task-selection request goes through `TaskController`, which populates both MSP mode and user ID before calling the same task-determination service. Submit calls that service directly through `CactusReloadHelper`; it populates MSP mode but omits user ID. With a null user ID, the FacilityClient interpolation produces an empty `{userId}` route segment, likely resulting in route mismatch/404. The supplied stack does not include the actual request URL, so that final routing detail is inferred from the code.
-
-**F. Existing 404 handling**
-
-No 404-to-empty-list or skip pattern was found for this call. The Cactus action returns `Ok(repositoryResult)` and the repository query can return an empty collection; it does not return 404 when a practitioner has no matching facilities. `BaseApiClient.TryApiCall` explicitly rethrows `HttpRequestException` for `NotFound`.
-
-**G. Recommended next implement shot**
-
-`CactusReloadHelper.ReloadTaskAndFacilitiesAsync`: populate `TaskListParameters.UserId` from `_user.GetUserId()`, following `TaskController`’s authenticated-user pattern.
-
-**H. Confirmation**
-
-No files were changed.
+RETURN:
+1. Files changed
+2. UserId wiring — quote
+3. Confirmation: FacilityClient/BaseApiClient/TaskDeterminationService unchanged; CreateAddTaskStrategy(Npp) unchanged
+4. Build result
+5. Remaining gaps (live UAT)
