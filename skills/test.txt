@@ -1,35 +1,24 @@
-**Files Changed**
+You are reviewing the HCA HCP Credentialing repository. READ-ONLY. Do not edit files. Do not commit. Do not push.
 
-- `PafReviewForm.razor`
-- `PafReviewForm.razor.cs`
-- `ReviewNppTask.razor` (new)
-- `ReviewNppTask.razor.cs` (new)
-- `ManageAddressesTask.razor.cs`
-- `UpdateTaskManageAddressesStrategy.cs`
+ROLE:
+Senior engineer. One session. Re-review NPP/PAF feature diffs after Blocker + Majors fixes. Verdict READY TO COMMIT or FIX FIRST. Do not start a second chat.
 
-**Review NPP**
+PRIOR FIXES (must verify in diff):
+1. SubmitPafStrategy — UpdateTaskAsync(FormData.NppTask, TaskType.Npp) on ProcessSubmitForMspAsync AND ProcessSubmitForNppAutoAcceptAsync; Failure blocks accept/queue on Path B; Delegate/AddPractitioner/MSS-18 still skipped for Npp.
+2. ReviewNppTask (+ PafReviewForm LoadData) — VA/PA, licenses, PSV names; FSQ/Delegate/MSS-18 still hidden for Npp.
+3. ManageAddressesTask + UpdateTaskManageAddressesStrategy — NPP Primary-only; Home/Credentialing/Alternate not required for Npp; non-NPP unchanged.
 
-The review renders the NPP section only when the selected task is NPP and its task data exists:
+CHECKLIST (quote pass/fail):
+A. Auth IsMspUserMode + UserId still server-derived in CactusReloadHelper
+B. No ProcessSubmitForSSPBrief for Npp; CreateAddTaskStrategy(Npp) unchanged
+C. No invented RTKs beyond HCA0095563 / UDP0000001/2 already in product
+D. Non-NPP Address + Review + MSP submit order not regressed (Minor order OK as note)
+E. No secrets; INCLUDE vs EXCLUDE same as prior review (tooling, csproj, skills corpus, UNKNOWN wizard files out)
 
-```razor
-<ReviewNppTask Task="@_nppTask" PractitionerKey="@_practitionerAtLastLoad?.Key"
-               OnRequestEdit="() => OnRequestEdit.InvokeAsync(TaskType.Npp)">
-```
-
-`LoadData()` supplies it with `_nppTask = state.NppTask;`. The read-only summary shows VA and applicable PA answers, the selected license or new-license details, and License/Sanctions/NPI PSV categories with uploaded file names. Existing-license details are looked up by the saved key. Delegate, Add-Practitioner, MSS-18, and MSS-18 FSQ remain hidden for NPP.
-
-**Address Validation**
-
-For NPP, completion now requires only a confirmed Primary; missing Primary opens the existing Save for Later flow. Hidden Home, Credentialing, and Alternate collections are not read or checked in that NPP branch. Non-NPP client validation remains on its original path.
-
-The processor basis is that `CactusUpdater` processes each address collection only when it is non-null and non-empty; it does not require Home or Credentialing. I also aligned submit-time API revalidation: NPP still revalidates Primary, but skips the hidden Home, Credentialing, and Alternate checks that otherwise would reject the Primary-only task.
-
-**Validation**
-
-Client and Shared build succeeded. PAF API build succeeded to a temporary output directory. Tracked-file `git diff --check` and whitespace checks on the new files were clean. The combined site build reached successful Client/Shared builds but failed when copying Client output into the running Server’s locked directory; the direct Client build passed.
-
-No tests were run. No commit was made.
-
-**Remaining**
-
-Minor order is optional; re-review, then commit only the intended feature files. Exclude the docs/skills corpus and unrelated Begin PAF or tooling changes.
+RETURN:
+1. INCLUDE file list for the feature commit (paths only)
+2. EXCLUDE / UNKNOWN (do not stage)
+3. Findings table (Blocker/Major/Minor/Nit) — empty OK if clean
+4. Verdict: READY TO COMMIT / FIX FIRST
+5. Suggested commit message (why-focused, 1–2 sentences)
+6. Confirmation: no files changed
