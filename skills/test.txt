@@ -1,44 +1,35 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+**1. Files Changed**
 
-ROLE:
-Senior engineer. One session. 131784: add "Add NPP to Facility" to CPC Completed Queue Type filter. Do not start a second chat.
+- `PafQueueSearchCriteria.razor.cs`
+- `PafQueueSearch.razor.cs`
 
-FACT (inspect):
-- Options are the static _taskTypeFilterOptions list in PafQueueSearchCriteria.razor.cs (not reference data).
-- Filter already uses IndexedTaskSelected = selected TaskType. TaskType.Npp exists (14). Query need not change.
-- NPP label is not in the list today. Enum description is "NPP PAF" — dropdown label must be ticket string "Add NPP to Facility".
-- Component is shared (CPC/MSP/admin, Open/Completed). Add the option ONLY when the surface is CPC + Completed queue mode so it does not leak to MSP/Open. Quote how the criteria component knows dashboard role and Open vs Completed (QueueMode / Mode / parent params) before coding.
+Other dirty files shown by `git status` predate this change and were not edited for 131784.
 
-BEFORE CODING — quote:
-1. _taskTypeFilterOptions construction (one existing FieldOption line as pattern).
-2. How PafQueueSearchCriteria knows CPC vs MSP and Open vs Completed.
-3. TaskType.Npp enum member + any Description attribute.
+**2. Option and Gate**
 
-IMPLEMENT:
-1. Add FieldOption (or same pattern as siblings) Text = "Add NPP to Facility", Value = TaskType.Npp, included only for CPC Completed mode.
-2. Prefer building the list so non-CPC / Open modes never see the option (conditional add or filtered copy — match existing style in this file).
-3. Do not change PafSearchQueryBuilder, PafType enum, APIs, or create reference-data seeds.
-4. Do not change 132255 radio string. Do not invent RTKs.
-5. Non-NPP options and Unknown / CalculatedUnlocked behavior unchanged.
+The criteria builds the NPP option only under this condition:
 
-STOP AND REPORT:
-- If there is no reliable CPC+Completed signal in this component — quote parent props and STOP; do not show NPP Type on all queues.
+```csharp
+if (IsCpcUser && _mode == QueueMode.Completed)
+{
+    options.Add(new()
+    {
+        Text = "Add NPP to Facility",
+        Value = TaskType.Npp
+    });
+}
+```
 
-DO NOT CHANGE:
-- CpcDashboardPage layout, SharedPafQueue structure (unless a tiny prop is required to pass mode — prefer existing props)
-- 132275 submit/CVI paths
-- Package/csproj churn
+When the mode changes and the selected option is no longer available, the selection resets to `TaskType.Unknown`; the parent syncs that selection before reloading the queue. This keeps NPP out of CPC Open and MSP/admin queues.
 
-COMMENTS: almost none.
+**3. Existing Filter Unchanged**
 
-TESTS:
-- Build Client (+ Shared if touched).
-- If a trivial criteria unit test host exists, add one assertion that CPC Completed includes Npp and MSP/Open does not; else note gap.
-- git diff --check.
+The existing `TaskType` query parameter and `IndexedTaskSelected` predicate are unchanged. `PafType` and `TaskType.Npp`’s enum value are unchanged. All existing Type options, including `Unknown` and `CalculatedUnlocked`, remain as before.
 
-RETURN:
-1. Files changed
-2. Option + gate — quote
-3. Confirmation: query/PafType/TaskType.Npp enum value unchanged; other Type options unchanged
-4. Build result
-5. Remaining: UAT needs completed NPP PAF; smoke Path A still PENDING
+**4. Validation**
+
+Client and Shared build succeeded. `git diff --check` passed. No trivial criteria unit-test host was found, so no test was added.
+
+**5. Remaining**
+
+UAT still needs a completed NPP PAF. Smoke Path A remains **PENDING**.
