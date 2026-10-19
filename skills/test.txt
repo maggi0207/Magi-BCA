@@ -1,35 +1,29 @@
-**1. Files Changed**
+You are committing in the HCA HCP Credentialing repository.
 
-- `PafQueueSearchCriteria.razor.cs`
-- `PafQueueSearch.razor.cs`
+ROLE:
+Senior engineer. One session. Commit ONLY the 131784 CPC Completed Type filter change. Do not push. Do not start a second chat. Do not edit product code.
 
-Other dirty files shown by `git status` predate this change and were not edited for 131784.
+INCLUDE (stage only these if dirty):
+- PafQueueSearchCriteria.razor.cs
+- PafQueueSearch.razor.cs
 
-**2. Option and Gate**
+EXCLUDE:
+- Everything else (tooling, csproj, skills, 132275 leftovers, wizard files, unrelated dirty files).
 
-The criteria builds the NPP option only under this condition:
+STEPS:
+1. git status — confirm only INCLUDE are intended for this commit; list anything else left unstaged.
+2. git add the two INCLUDE paths (full paths from status).
+3. git commit with message:
 
-```csharp
-if (IsCpcUser && _mode == QueueMode.Completed)
-{
-    options.Add(new()
-    {
-        Text = "Add NPP to Facility",
-        Value = TaskType.Npp
-    });
-}
-```
+Add Add NPP to Facility to CPC Completed Type filter
 
-When the mode changes and the selected option is no longer available, the selection resets to `TaskType.Unknown`; the parent syncs that selection before reloading the queue. This keeps NPP out of CPC Open and MSP/admin queues.
+Expose TaskType.Npp as "Add NPP to Facility" only for CPC Completed queue so CPC can filter completed NPP PAFs without leaking the option to Open or MSP.
 
-**3. Existing Filter Unchanged**
+4. Do NOT --no-verify, --amend (unless hook auto-fix and amend rules fully met — prefer new commit if unsure), force push, or git config.
+5. git status after commit.
 
-The existing `TaskType` query parameter and `IndexedTaskSelected` predicate are unchanged. `PafType` and `TaskType.Npp`’s enum value are unchanged. All existing Type options, including `Unknown` and `CalculatedUnlocked`, remain as before.
-
-**4. Validation**
-
-Client and Shared build succeeded. `git diff --check` passed. No trivial criteria unit-test host was found, so no test was added.
-
-**5. Remaining**
-
-UAT still needs a completed NPP PAF. Smoke Path A remains **PENDING**.
+RETURN:
+1. Paths committed
+2. Dirty files left unstaged
+3. Commit hash + full message
+4. Confirmation: no push
