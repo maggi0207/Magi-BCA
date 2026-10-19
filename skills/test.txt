@@ -1,24 +1,50 @@
-**Implemented**
+You are implementing a change in the HCA HCP Credentialing repository.
 
-Changed only `SubmitPafStrategy.cs`.
+ROLE:
+Senior engineer. One session. Fix two pre-commit Majors: (1) NPP Review representation (2) ManageAddresses NPP save validation vs Primary-only UI. Do not start a second chat. Do not commit.
 
-Both submit paths now call NPP validation after Cactus reload and facility checks:
+FACT (review + prior 132283):
+- Review hides Delegate/Add-Practitioner/MSS-18 for Npp but has no NppTask review block — CPC Path A sees no NPP answers/PSV summary.
+- NPP UI hides Home/Credentialing/Alternate; ValidateAndSaveAddresses still requires confirmed Home + Primary + Credentialing (+ no unreviewed Alternate). Net-new / Primary-only NPP cannot Complete.
+- Prior 132283 left that save gap intentional until processor address rules were quoted — quote processor / save contract NOW before changing validation.
 
-- MSP / Path A: `await UpdateTaskAsync(FormData.NppTask, TaskType.Npp, pafProcessingResult);` ([line 134](Hca.Credentialing/Hca.Credentialing.Paf.Api/Domain/Strategy/SubmitPafStrategy.cs#L134))
-- Auto-accept / Path B: `await UpdateTaskAsync(FormData.NppTask, TaskType.Npp, pafProcessingResult);` ([line 339](Hca.Credentialing/Hca.Credentialing.Paf.Api/Domain/Strategy/SubmitPafStrategy.cs#L339))
+BEFORE CODING — quote:
+1. How another task review section is rendered in PafReviewForm (e.g. Demographic or Specialties) — razor + LoadData assignment.
+2. NppTask fields needed on Review (VA, PA, licenses, PSV file names/types) — from NppTask / NppTaskForm.
+3. ValidateAndSaveAddresses complete vs save-for-later rules (Home/Primary/Credentialing/Alternate).
+4. Any PAF Processor / Cactus address update path that requires Home or Credentialing for TaskType.Npp or ManageAddresses on NPP PAFs. If none specific to NPP, quote the shared ManageAddresses processor expectations.
 
-If validation fails, `UpdateTaskAsync` propagates `Failure`. Path A returns the PAF to MSP with “One or more tasks were invalid”; Path B does the same and does not call the acceptance/queue method.
+IMPLEMENT:
 
-**Confirmations**
+A) Review
+1. When TaskSelected == Npp and NppTask != null, render an NPP review section (reuse existing Review chrome / FormItem patterns — prefer sibling of other task review components; do not invent a new design system).
+2. Show at least: VA, PA, license list (if shown), PSV attachments present (License/Sanctions/NPI as applicable). Read-only.
+3. Keep Delegate/Add-Practitioner/MSS-18 hidden for Npp.
 
-For NPP, Add-Practitioner, Delegate, and MSS-18 updates remain skipped ([lines 136–144](Hca.Credentialing/Hca.Credentialing.Paf.Api/Domain/Strategy/SubmitPafStrategy.cs#L136)). The non-NPP task-update order is preserved. `CreateAddTaskStrategy(Npp)` remains unchanged, and NPP does not call `ProcessSubmitForSSPBrief`.
+B) Address
+1. When IsNppPaf (same flag as hide), Complete/save validation must match visible rules: require confirmed Primary; do NOT require Home/Credentialing/Alternate that are hidden for NPP — IF processor quotes allow Primary-only for NPP (or shared path does not require those categories for NPP).
+2. If processor REQUIRES Home or Credentialing for NPP — STOP and quote; do not weaken validation.
+3. Non-NPP ValidateAndSaveAddresses unchanged.
+4. Unreviewed Address errors must not fire for categories hidden on NPP.
 
-A valid client NPP submission has a non-null task: the NPP form initializes it from the persisted Add-Practitioner task, and `IsSubmittable()` rejects a null or errored NPP task. No existing submit-strategy test pattern was found, so no test was added.
+DO NOT:
+- Touch SubmitPafStrategy Npp UpdateTaskAsync (blocker already done)
+- Call ProcessSubmitForSSPBrief / change CreateAddTaskStrategy(Npp)
+- Invent RTKs, csproj churn, tooling, Begin PAF UNKNOWN files
+- Bundle docs/skills commit
 
-**Validation**
+STOP AND REPORT if Review has no reusable pattern for a new task section — quote closest pattern and STOP rather than inventing a one-off layout.
 
-The PAF API build succeeded when directed to a temporary output directory. The normal build could not overwrite the running API’s locked output files (PID 50536). `git diff --check` passed for the changed file.
+COMMENTS: almost none.
 
-**Remaining**
+TESTS:
+- Build Client + Shared (+ Paf.Api if touched).
+- git diff --check on touched files.
 
-Review Major, Address Major, Minor order, then commit. No commit was made. Path B UAT and live CVI verification remain open.
+RETURN:
+1. Files changed
+2. Review NPP section — quote render + LoadData
+3. Address validation change — quote; processor basis one sentence
+4. Confirmation: non-NPP Review/Address unchanged; FSQ still hidden for Npp
+5. Build result
+6. Remaining: Minor order (optional), re-review, commit INCLUDE only
