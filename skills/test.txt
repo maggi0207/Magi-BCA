@@ -1,11 +1,38 @@
-You are inspecting (NOT implementing) the HCA HCP Credentialing repository.
+You are implementing a change in the HCA HCP Credentialing repository.
 
-ROLE: READ ONLY. Do not edit files.
+ROLE:
+Senior engineer. One session. Fix IsSubmittable for NPP so hidden FSQ/Delegate do not block Review. Do not start a second chat.
 
-TASK:
-UploadPafAttachment fails with Azure.RequestFailedException connection refused 127.0.0.1:10003. Quote appsettings / launchSettings / docker-compose / README that points Blob or UploadAndScan at 10003. Quote the exact local command or compose service already documented to start that listener. Then STOP.
+FACT:
+- 132268 hides ManageDelegateTask, AddPractitionerToFacilitiesTask, Mss18FacilitySpecificQuestionsTask when TaskSelected == Npp. Task objects stay; CreateAddTaskStrategy(Npp) still creates AddPractitionerToFacilitiesTask with IsRequired = true.
+- Live UAT: ADD NPP card Complete; Demographic/Address/Specialties Optional; Review & Submit shows "PAF Incomplete. Please complete all required tasks before attempting to submit the PAF."
+- Shot B already adds NppTask to IsSubmittable. It did not skip the hidden required FSQ.
+
+BEFORE CODING — quote IsSubmittable / IsTaskInError fully. List every required task it checks.
+
+IMPLEMENT:
+1. When TaskSelected == TaskType.Npp, IsSubmittable must NOT fail because of ManageDelegateTask, AddPractitionerToFacilitiesTask, or Mss18FacilitySpecificQuestionsTask (same three 132268 hides).
+2. Still require NppTask present and Complete (existing Shot B check).
+3. Prefer skip-in-IsSubmittable. Do not change CreateAddTaskStrategy(Npp) unless you must — quote why if you do.
+4. Non-NPP PAF types: IsSubmittable unchanged (FSQ/Delegate still required when those cards show).
+5. Do not edit PafFile, CVI RTKs, auto-accept, Begin PAF.
+
+STOP AND REPORT:
+- If IsSubmittable lives in more than one place and you cannot find the toast source — quote both.
+
+DO NOT CHANGE:
+- 132268 hide CSS (keep it)
+- CreateAddTaskStrategy(Npp) target unless STOP path requires it
+
+COMMENTS: almost none.
+
+TESTS:
+- dotnet build Shared + Client.
+- git diff --check.
 
 RETURN:
-1. Setting that uses 10003 — quote
-2. How to start it — quote existing docs only
-3. Confirmation: no code changed
+1. Files changed
+2. IsSubmittable before/after — quote
+3. Confirmation: non-NPP still requires FSQ when present; Npp still requires NppTask Complete
+4. Build result
+5. Remaining gaps
