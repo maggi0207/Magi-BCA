@@ -1,14 +1,42 @@
-1. **File changed:** `CactusReloadHelper.cs`.
+You are working in the HCA HCP Credentialing repository on the office laptop.
 
-2. **UserId wiring:** Submit-time task lookup now sets:
-   ```csharp
-   IsMspUserMode = _user.IsMspUser(),
-   UserId = _user.GetUserId()
-   ```
-   This uses the same authenticated principal already used for the MSP flag and matches the identity source used by `TaskController`.
+ROLE:
+Senior engineer. One session. Stage and commit ONLY the ADD NPP / PAF Tasks related source changes from this workstream. Do not start a second chat. Do not push unless I explicitly say push.
 
-3. **Unchanged:** I did not modify `FacilityClient`, `BaseApiClient`, `TaskDeterminationService`, or `CreateAddTaskStrategy(Npp)`. Some of those files already show unrelated worktree modifications; this change touched only `CactusReloadHelper.cs`.
+SCOPE (include if modified for NPP/PAF Tasks):
+- CactusReloadHelper.cs (IsMspUserMode + UserId)
+- SubmitPafStrategy.cs (NPP MSP submit, skip FSQ/Delegate UpdateTaskAsync for Npp, VA+PA auto-accept path if present)
+- PafReviewForm.razor (+ .cs if changed) — hide Delegate/FSQ/MSS-18 for Npp
+- NPP Work / NppTask / PafFile / IsSubmittable / ModelExtensions accept guard
+- GetCredentialingTypeRtk / CommonCactusRtks / CactusUpdater CVI pieces for Npp (HCA0095563, UDP0000001) if in this worktree
+- Related Shared/Client/Paf.Api/Processor files that are clearly part of this NPP PAF Tasks work
 
-4. **Build:** PAF API, Shared, and API.Shared builds succeeded using a temporary output directory to avoid the running API’s locked output. The touched-file whitespace check passed. Repository-wide `git diff --check` still reports trailing whitespace in the unrelated Background project file.
+EXCLUDE:
+- Unrelated worktree edits (Background trailing whitespace, random other features)
+- Secrets, appsettings with credentials, local-only machine paths
+- Bin/obj, user-specific IDE files
+- Do not invent new code in this session — commit existing changes only
 
-5. **Remaining gaps:** Live NPP submit UAT was not run.
+BEFORE COMMIT:
+1. git status + git diff — list candidate files; mark INCLUDE vs EXCLUDE with one-line reason.
+2. STOP if a file’s purpose is unclear — quote path and ask; do not guess.
+3. Run build on touched projects if practical (Paf.Api / Shared / Client / Processor as touched). Note result.
+4. git diff --check on staged files.
+
+COMMIT:
+- Stage only INCLUDE files.
+- One commit (or two if form vs submit/CVI are cleanly separable — prefer one coherent commit).
+- Message style match recent git log. Focus on why, e.g.:
+  "Enable NPP PAF submit: MSP task-list UserId/IsMspUserMode, skip hidden FSQ revalidation, Review hide, CVI/auto-accept wiring."
+- Do NOT use --no-verify / --amend / force push.
+- Do NOT git config.
+
+RETURN:
+1. Files staged (paths)
+2. Files excluded (paths + reason)
+3. Commit hash + full message
+4. git status after commit
+5. Build result (if run)
+6. Confirmation: no push
+
+If nothing NPP/PAF-related is dirty: say so and do not create an empty commit.
