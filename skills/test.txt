@@ -1,48 +1,24 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+**Implemented**
 
-ROLE:
-Senior engineer. One session. Fix pre-commit Blocker: Submit never calls UpdateTaskAsync for NppTask so UpdateTaskNppStrategy revalidation never runs. Do not start a second chat. Do not commit.
+Changed only `SubmitPafStrategy.cs`.
 
-FACT (review):
-- ProcessSubmitForMspAsync / ProcessSubmitForNppAutoAcceptAsync skip UpdateTaskAsync(FormData.NppTask, TaskType.Npp, ...).
-- UpdateTaskNppStrategy exists but is unused on submit.
-- Path A has no server revalidation of NPP answers; Path B auto-accept trusts client VA/PA.
-- Still skip UpdateTaskAsync for ManageDelegate / AddPractitionerToFacilities / MSS-18 when TaskSelected == Npp (1-SUBMIT-FIX). Do not reintroduce FSQ failures.
+Both submit paths now call NPP validation after Cactus reload and facility checks:
 
-BEFORE CODING — quote:
-1. How other task types call UpdateTaskAsync inside ProcessSubmitForMspAsync (one example).
-2. UpdateTaskNppStrategy.InternalExecuteAsync (or equivalent) — what it validates; does it set Complete / fail PafProcessingResult.
-3. Where CreateUpdateTaskStrategy maps TaskType.Npp.
-4. Current NPP branches in ProcessSubmitForMspAsync and ProcessSubmitForNppAutoAcceptAsync (order of reload vs task updates).
+- MSP / Path A: `await UpdateTaskAsync(FormData.NppTask, TaskType.Npp, pafProcessingResult);` ([line 134](Hca.Credentialing/Hca.Credentialing.Paf.Api/Domain/Strategy/SubmitPafStrategy.cs#L134))
+- Auto-accept / Path B: `await UpdateTaskAsync(FormData.NppTask, TaskType.Npp, pafProcessingResult);` ([line 339](Hca.Credentialing/Hca.Credentialing.Paf.Api/Domain/Strategy/SubmitPafStrategy.cs#L339))
 
-IMPLEMENT:
-1. When FormData.TaskSelected == Npp and FormData.NppTask != null, call UpdateTaskAsync(FormData.NppTask, TaskType.Npp, pafProcessingResult) on BOTH:
-   - ProcessSubmitForMspAsync (Path A / VA No and other non-auto-accept NPP)
-   - ProcessSubmitForNppAutoAcceptAsync (Path B) — ONLY proceed to accept/queue if Npp update validation succeeds (same failure pattern as other UpdateTaskAsync calls).
-2. Place the Npp UpdateTaskAsync after CactusReloadHelper / facility checks succeed (or match the same relative order used for other required tasks — quote and mirror).
-3. Keep skipping Delegate / AddPractitioner / MSS-18 UpdateTaskAsync for Npp.
-4. Do not call ProcessSubmitForSSPBrief. Do not change CreateAddTaskStrategy(Npp). Do not invent RTKs.
-5. Do not implement Review NPP component or Address validation in this shot (Majors = next).
+If validation fails, `UpdateTaskAsync` propagates `Failure`. Path A returns the PAF to MSP with “One or more tasks were invalid”; Path B does the same and does not call the acceptance/queue method.
 
-STOP AND REPORT:
-- If UpdateTaskNppStrategy cannot run on submit (wrong shape / missing factory case) — quote and STOP; do not invent a parallel validator.
-- If NppTask is null on submit for valid NPP PAFs — quote why and STOP.
+**Confirmations**
 
-DO NOT CHANGE:
-- CactusReloadHelper UserId/IsMspUserMode (already fixed)
-- Package/csproj churn, tooling, Begin PAF wizard UNKNOWN files
+For NPP, Add-Practitioner, Delegate, and MSS-18 updates remain skipped ([lines 136–144](Hca.Credentialing/Hca.Credentialing.Paf.Api/Domain/Strategy/SubmitPafStrategy.cs#L136)). The non-NPP task-update order is preserved. `CreateAddTaskStrategy(Npp)` remains unchanged, and NPP does not call `ProcessSubmitForSSPBrief`.
 
-COMMENTS: almost none.
+A valid client NPP submission has a non-null task: the NPP form initializes it from the persisted Add-Practitioner task, and `IsSubmittable()` rejects a null or errored NPP task. No existing submit-strategy test pattern was found, so no test was added.
 
-TESTS:
-- Build Paf.Api (+ Processor/Shared if touched).
-- Prefer add/adjust one test that submit path invokes Npp update validation if an existing submit-strategy test pattern exists; otherwise note gap.
-- git diff --check on touched files.
+**Validation**
 
-RETURN:
-1. Files changed
-2. UpdateTaskAsync(Npp) call sites — quote both paths
-3. Failure behavior when Npp validation fails — quote
-4. Confirmation: FSQ/Delegate still skipped for Npp; CreateAddTaskStrategy(Npp) unchanged; SSP Brief unused
-5. Build result
-6. Remaining: Review Major, Address Major, Minor order, commit
+The PAF API build succeeded when directed to a temporary output directory. The normal build could not overwrite the running API’s locked output files (PID 50536). `git diff --check` passed for the changed file.
+
+**Remaining**
+
+Review Major, Address Major, Minor order, then commit. No commit was made. Path B UAT and live CVI verification remain open.
