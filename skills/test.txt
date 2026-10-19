@@ -1,43 +1,85 @@
-You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
+**A. Completed Queue Host**
 
-ROLE:
-Senior engineer. One session. Map CPC Dashboard Completed Queue PAF Type filter for 131783/131784. Do not start a second chat. Do not implement.
+There is no separate CPC-only Completed Queue component. The CPC dashboard hosts the shared PAF queue, whose criteria component switches between Open and Completed:
 
-PRODUCT (ADO):
-- Surface: CPC Dashboard → Completed Queue → existing Type dropdown only. No second NPP-only filter.
-- New value to appear: "Add NPP to Facility" (ticket string). 132255 radio is "ADD NPP to Facility" — quote if code has either; do not invent a third label.
-- AC: list value; filter matching completed NPP only; empty when none; clear restores unfiltered; other types unchanged; DEV/QA/PROD later.
-- Out of scope: creating NPP PAFs, Begin NPP, search, CVI, CACTUS, MSP action radio.
+- `CpcDashboardPage.razor` and `CpcDashboardPage.razor.cs`
+- `SharedPafQueue.razor` and `SharedPafQueue.razor.cs`
+- `PafQueueSearch.razor` and `PafQueueSearch.razor.cs`
+- `PafQueueSearchCriteria.razor` and `PafQueueSearchCriteria.razor.cs`
 
-QUOTE:
-1. CPC Dashboard Completed Queue page/component (file paths).
-2. Type / PAF Type dropdown — where options are bound (razor + code-behind / VM).
-3. Source of Type values today (enum, lookup API, static list, DB/reference table). Quote the list builder and every current option name/id you can see.
-4. Is "Add NPP to Facility" or "ADD NPP to Facility" or TaskType.Npp already in that source? Yes/No + quote.
-5. How selected Type is passed into the completed-queue query/API (parameter name + filter predicate).
-6. What identifies a "completed" PAF in that query (status enum/field).
-7. How submitted NPP PAFs are stored today regarding type: TaskSelected == Npp vs PafType / FormType / display string — quote PractitionerActionFormData or equivalent. Can Completed Queue filter on that field as-is?
-8. Existing tests for Type filter / Completed Queue (names only).
-9. Files that would change for 131784 (list only). Files that must not change.
+**B. Type Dropdown and Source**
 
-STOP AND REPORT:
-- If Type values come from reference data not in this repo — quote the client/API call and say config/data change may be required; do not invent seed SQL or RTKs.
-- If NPP completed PAFs have no distinct type field the queue can filter on — quote the gap; do not invent PafType.
+The existing dropdown is in `PafQueueSearchCriteria.razor`:
 
-DO NOT:
-- Edit code
-- Invent PafType enum / RTK / new API
-- Touch In Progress or other queues unless the same control is shared (then quote share point only)
-- Bundle 132275 smoke/CVI into this inspect
+> `DataSource="@_taskTypeFilterOptions"`  
+> `@bind-Value="_selectedTaskTypeValue"`  
+> `ValueName="@nameof(FieldOption<PafType?>.Value)"`  
+> `LabelName="@nameof(FieldOption<PafType?>.Text)"`
 
-RETURN (A–J):
-A. Completed Queue host — files
-B. Type dropdown bind + option source — quote
-C. Current Type options (names/ids) — list
-D. NPP label already present? Yes/No
-E. Query filter parameter + predicate — quote
-F. Completed status definition — quote
-G. How NPP PAF type is persisted today — quote; filterable as-is? Yes/No/Gap
-H. Tests (names)
-I. Proposed smallest change (names only) — or STOP with data/config gap
-J. Confirmation: no files changed
+Its options are built by the static `_taskTypeFilterOptions` list in `PafQueueSearchCriteria.razor.cs`. This is a **static in-repo list**, not reference data from an API or database. The selected value is stored in the existing criteria model.
+
+**C. Current Type Options**
+
+The list’s values are `TaskType` enum values; the numeric IDs below follow the enum’s implicit numbering in `TaskType.cs`:
+
+- All PAF Types — `Unknown` (`-1`)
+- Add Practitioner to Facility — `AddPractitionerToFacility` (`1`)
+- Add Privilege MSS-18 — `AddPrivilegesMss18` (`6`)
+- Delegate — `ManageDelegate` (`8`)
+- Manage Addresses — `ManageAddresses` (`7`)
+- Manage / Add Coll.Prac. — `ManageCollaboratingPractitioners` (`3`)
+- Off-Cycle PSV — `OffCyclePsv` (`4`)
+- Off-Cycle RRFC — `OffCycleRrfc` (`5`)
+- PERF — `Perf` (`10`)
+- Practitioner Personal Info — `ManagePersonalInfo` (`0`)
+- Recruitment — `Recruitment` (`13`)
+- Request Processing Change — `RequestProcessingChange` (`2`)
+- Specialties — `ManageSpecialities` (`9`)
+- SSP Brief Enrollment — `SSPBriefEnrollment` (`12`)
+- Unlocked PAF — `CalculatedUnlocked` (`11`)
+
+**D. NPP Label Present?**
+
+**No.** Neither “Add NPP to Facility” nor “ADD NPP to Facility” is in the current dropdown options. `TaskType.Npp` already exists, but its enum description is “NPP PAF”; the list has no `Npp` option.
+
+**E. Query Filter**
+
+The selected dropdown value is passed as `PafSearchParameters.TaskType` in `PafQueueSearch.razor.cs`:
+
+> `TaskType = _searchCriteriaModel.TaskTypeFilter.Value.GetValueOrDefault(TaskType.Unknown)`
+
+The request also passes `QueueMode = Mode.GetDescription()` and the selected `Status` values. In `PafSearchQueryBuilder.cs`, the type predicate is:
+
+> `where.Part += "paf.IndexedTaskSelected = @TaskType AND ";`
+
+`TaskType.Unknown` leaves that predicate off; the special `CalculatedUnlocked` option filters by `IndexedLockedBy IS NULL`. Completed membership is based on the selected status values, with `QueueMode` also used by special calculated-failure status handling.
+
+**F. Completed Status**
+
+ PafStatus.cs defines `AcceptedByCpc` with description “Completed” and comment `// aka Completed Queue`. CPC Completed status options also include `ProcessedManually`, `RejectedToMsp`, `Deleted`, `CalculatedMyFailedPafs`, `SubmittedByRecruiter`, and `RecruitmentR0999`. The repository filters ordinary statuses through `paf.IndexedPafStatus = @PafStatusN`; calculated statuses use their corresponding predicates in `PafStatusFilter.cs`.
+
+**G. NPP Type Persistence**
+
+`PractitionerActionFormData.cs` has both:
+
+> `public PafType Type { get; set; }`  
+> `public TaskType TaskSelected { get; set; } = TaskType.Unknown;`
+
+`PafType` distinguishes only `ManageNewPractitioner` and `ManageExistingPractitioner` in `PafType.cs`; it does not identify NPP. NPP is `TaskType.Npp` (`14`). `PractitionerActionForm.cs` indexes it with:
+
+> `IndexedPafType = _formData.Type;`  
+> `IndexedTaskSelected = _formData.TaskSelected;`
+
+**Filterable as-is: Yes**, through `TaskSelected` / `IndexedTaskSelected`. No new PAF type field or API is indicated by the existing data path.
+
+**H. Tests**
+
+None found for PAF Type filtering or the Completed Queue Type filter.
+
+**I. Smallest Proposed Change**
+
+- `PafQueueSearchCriteria.razor.cs`
+
+Add the exact dropdown label **“Add NPP to Facility”** mapped to `TaskType.Npp`, gated to CPC Completed mode. The component is shared across CPC, MSP, and admin PAF queues, and the Type control is currently shown for non-recruitment users in Open and Completed modes; an unconditional option would leak into those other surfaces. The existing filter query can remain unchanged.
+
+No reference-data/config gap was found, and no code was changed. The dashboard/queue hosts, PAF query/API, status model, `TaskType`, and `PafType` do not need changes for this mapping. 
