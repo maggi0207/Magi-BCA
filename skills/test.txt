@@ -1,39 +1,14 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+1. **File changed:** `CactusReloadHelper.cs`.
 
-ROLE:
-Senior engineer. One session. Fix SubmitPaf 500 caused by null TaskListParameters.UserId in CactusReloadHelper. Do not start a second chat.
+2. **UserId wiring:** Submit-time task lookup now sets:
+   ```csharp
+   IsMspUserMode = _user.IsMspUser(),
+   UserId = _user.GetUserId()
+   ```
+   This uses the same authenticated principal already used for the MSP flag and matches the identity source used by `TaskController`.
 
-FACT (inspect):
-- After IsMspUserMode fix, ExistingPractitioner + MSP NPP eligibility calls GetUserFacilitiesNotAddedToOrInactiveAtAsync(listParameters.UserId, practitioner.Key).
-- FacilityClient URL: api/Facility/{userId}/PractitionerNotAddedToOrInactiveAt/{practitionerKey}. Null UserId → empty route segment → 404 → BaseApiClient rethrows → SubmitPaf 500.
-- TaskController sets listParameters.UserId = currentUser.GetUserId(). CactusReloadHelper sets IsMspUserMode and PractitionerId but omits UserId.
-- Cactus FacilityController returns Ok(repo); no practitioner-not-found 404. Do not invent 404→empty in BaseApiClient.
+3. **Unchanged:** I did not modify `FacilityClient`, `BaseApiClient`, `TaskDeterminationService`, or `CreateAddTaskStrategy(Npp)`. Some of those files already show unrelated worktree modifications; this change touched only `CactusReloadHelper.cs`.
 
-BEFORE CODING — quote:
-1. CactusReloadHelper TaskListParameters construction (IsMspUserMode / PractitionerId / missing UserId).
-2. TaskController UserId assignment (GetUserId).
-3. Confirm _user (or equivalent) already used for IsMspUserMode has GetUserId().
+4. **Build:** PAF API, Shared, and API.Shared builds succeeded using a temporary output directory to avoid the running API’s locked output. The touched-file whitespace check passed. Repository-wide `git diff --check` still reports trailing whitespace in the unrelated Background project file.
 
-IMPLEMENT:
-1. In ReloadTaskAndFacilitiesAsync (same TaskListParameters object), set UserId from authenticated principal the same way TaskController does (_user.GetUserId() or equivalent already in scope).
-2. Do not change FacilityClient, FacilityController, TaskDeterminationService eligibility rules, or BaseApiClient 404 behavior.
-3. Do not change CreateAddTaskStrategy(Npp). Do not invent CPC RTKs.
-
-STOP AND REPORT:
-- If _user has no GetUserId() — quote how TaskController obtains userId and wire the same source; do not hardcode or take UserId from the client form.
-
-DO NOT CHANGE:
-- Begin PAF UI, PafFile, Azurite, Review hide, FSQ skip from 1-SUBMIT-FIX
-
-COMMENTS: almost none.
-
-TESTS:
-- Build Paf.Api (+ Shared if needed).
-- git diff --check.
-
-RETURN:
-1. Files changed
-2. UserId wiring — quote
-3. Confirmation: FacilityClient/BaseApiClient/TaskDeterminationService unchanged; CreateAddTaskStrategy(Npp) unchanged
-4. Build result
-5. Remaining gaps (live UAT)
+5. **Remaining gaps:** Live NPP submit UAT was not run.
