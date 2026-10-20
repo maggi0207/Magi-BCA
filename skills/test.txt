@@ -1,57 +1,32 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+**1. Files Changed**
 
-ROLE:
-Senior engineer. One session. NPP State License: duplicate check, create when absent, preserve active, inactive≈net-new, attach License PSV image. Do not start a second chat.
+- `CrudPractitionerLicensesOperation.cs`
+- `CactusOperationIntegrationTests.cs`
 
-PRODUCT / AC (132642–132646):
-- Duplicate = License Type + Number + State → do not create.
-- Create when no duplicate. Defaults (apply what InsertLicenseAsync / helpers already support; do not invent columns):
-  - Type_RTK / state license type literal: NPDBSTATEx (confirmed in CrudPractitionerLicensesOperation Recruitment path + 132530)
-  - PersistentVerification = T (existing helper sets true)
-  - NPDBPrimaryLicense: set true if helper/API allows; else Remaining gap if helper hardcodes false
-  - License number, award/effective, expiration, licensure field from NppTask NewLicense* / SelectedStateLicenseKey as already modeled
-  - LICMONENROLLMENTSTATUS_RTK “Requesting – Ready to enroll in LEMM”: only if RTK already exists in repo — else Remaining gap, do not invent
-- 132644: active practitioner + license exists → no updates
-- 132645: if Practitioner.IsNew OR inactive classification already used elsewhere for NPP — follow net-new create rules; if inactive cannot be detected, document Remaining gap and implement for IsNew + missing-duplicate create for existing NPP when license fields present
-- 132646 image: Description {LastName13}_{FirstName3}_{State}_Lic_MMDDYY; Type D2B50K69Z8 (ADO); Notes Uploaded via auto PAF for ADD NPP to Facility
-- Source: NppTask license fields + LicensePsvAttachment (reuse Sanction image/queue pattern)
+**2. NPP Gates**
 
-OFFICE EVIDENCE:
-- NPP currently only CreateOrAttachNppSanctionCheckAsync — no state-license branch.
-- Recruitment duplicate: LICENSE_RTK + STATE + LICENSENUMBER.
-- Keep Sanction path intact and call order safe.
+For a completed NPP task, the existing sanction operation still runs first, followed by the new state-license operation. The state-license logic uses `NPDBSTATEx` and checks duplicates by provider, license type, state, and number. Active practitioners with a matching license are not updated; the license can still receive the submitted PSV attachment. Missing licenses are inserted, then their PSV is attached using `D2B50K69Z8` and queued for conversion.
 
-EXISTING PATTERN:
-Quote NPP license arm, Recruitment state-license create, Sanction image attach, NppTask NewLicense* / LicensePsvAttachment.
+The shared key-returning insert helper now accepts optional NPP status, award/expiration dates, licensure field, and primary-license values. Defaults for existing callers remain unchanged.
 
-SCOPE (may change):
-- CrudPractitionerLicensesOperation.cs
-- CactusUpdater.cs only if needed
-- Constants only if grouping image RTK D2B50K69Z8 next to S3PK02WN8H
-- Focused tests
+**3. AC Status**
 
-DO NOT CHANGE:
-- Sanction NPP behavior
-- Non-Npp Recruitment/AddPractitioner license defaults beyond reuse
-- NPI / PPI / Entity
-- Invent enrollment RTK
+- **132642, duplicate check:** Yes. Matching type/state/number prevents another insert.
+- **132643, create and supported defaults:** Yes for effective date, expiration date, license status, licensure field, persistent verification, and primary-license flag.
+- **132644, active practitioner preserve:** Yes. A matching license is not updated for an active practitioner.
+- **132645, net-new/inactive:** Partial. `Practitioner.IsNew` and inactive (`Active == false`) use the update path when a matching license exists; otherwise missing licenses are created. The create path is implemented, but database verification was blocked by SQL permissions.
+- **132646, PSV image:** Implemented with the requested description pattern, image type, notes, and attachment queueing; integration verification was permission-limited.
 
-IMPLEMENTATION:
-1. BEFORE coding: quote gates + NppTask fields + InsertLicenseAsync limitations.
-2. For completed NppTask: process state license from selected/new fields with duplicate Type+State+Number; create if absent; if duplicate and practitioner not inactive-net-new path → no update (132644).
-3. Attach LicensePsvAttachment via CrudImagesOperation like sanctions (type D2B50K69Z8); missing → warn.
-4. Smallest diff; do not break S3PK02GTA1 sanction flow.
+**4. Tests and Validation**
 
-TESTS:
-- Duplicate → no second insert (as harness allows).
-- Create when absent (may skip on GenB36Key — note).
-- Image metadata type D2B50K69Z8 when possible.
-- Build + git diff --check.
+The PAF Processor and test project compiled successfully. The duplicate-license test passed. The create-and-image test was skipped as inconclusive because the Cactus test login lacks `EXECUTE` permission on `dbo.GenB36Key`. The existing sanction regression was included in a focused run; the two-test run reported 1 passed, 0 failed, 1 skipped. No editor diagnostics were reported.
 
-RETURN:
-1. Files changed
-2. Gate quotes
-3. AC 132642–646 Yes/Partial/No each
-4. Tests + results
-5. Remaining gaps (enrollment, NPDBPrimary, inactive, GenB36Key)
-6. Confirmation: Sanction path untouched in behavior
+Scoped `git diff --check` passed for the two changed files.
+
+**5. Remaining Gaps**
+
+`LICMONENROLLMENTSTATUS_RTK` and the “Requesting – Ready to enroll in LEMM” value are not present in the repository, so they were not added. The actual license insert and PSV image assertions need rerunning with a Cactus account authorized to execute `dbo.GenB36Key`.
+
+**6. Sanction Behavior**
+
+The existing sanction path and its image/queue behavior were not changed; state-license processing follows it. Temporary validation task entries were removed.
