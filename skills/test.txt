@@ -1,55 +1,29 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+Implemented existing-provider preservation for NPP.
 
-ROLE:
-Senior engineer. One session. Preserve existing PROVIDERS demographics for NPP PAFs. Do not start a second chat.
+1. **Files changed**
+   - `CrudPractitionerOperation.cs`
+   - `CactusOperationIntegrationTests.cs`
 
-PRODUCT / AC (132604):
-Given a matching Provider exists in Cactus, When the PAF is accepted, Then no Provider demographic fields are updated.
+2. **Method and gate**
+   
+   `UpdatePractitionerAsync` now returns the existing practitioner key before fetching or persisting the provider row when:
+   ```csharp
+   if (paf.TaskSelected == Shared.Data.Model.Paf.TaskType.Npp)
+       return practitionerKey;
+   ```
+   The caller still dispatches by `Practitioner.IsNew`; the NPP check is only in the existing-practitioner method.
 
-OFFICE EVIDENCE (TASK 0):
-- Create path (IsNew) already INSERT via CrudPractitionerOperation — leave create behavior alone (132602).
-- Existing path UpdatePractitionerAsync: First/Last/Suffix/Degrees/NPI already commented out, BUT still assigns SSN, DOB, sex, category, contact email, cell from PractitionerDemographicTask before UpdateAsync.
-- Dispatch is Practitioner.IsNew, not TaskType — shared with other PAF types.
-- Dev IsDevMode queue skip is OUT OF SCOPE (do not add sync API).
+3. **AC 132604**
+   
+   **Yes for NPP existing practitioners:** the provider row is not fetched, audited, or updated, preserving all PROVIDERS fields. Non-NPP existing-provider updates continue through the prior update logic.
 
-EXISTING PATTERN:
-Reuse TaskType / FormData.TaskSelected (or same pattern other Crud* Npp branches use). Quote the gate you use before coding.
+4. **Validation**
+   - Focused test `ExistingNppPractitionerDoesNotAccessProvidersRow`: **passed** (1 passed, 0 failed).
+   - The test run built `Hca.Credentialing.Paf.Processor` and its test project successfully.
+   - `git diff --check` passed for both changed files.
+   - No explicit non-NPP existing-provider preservation test was found; the NPP test specifically verifies no provider DB command is issued.
 
-SCOPE (may change):
-- CrudPractitionerOperation.cs (preferred: skip demographic apply + skip UpdateAsync persistence of provider demographics when Npp + existing)
-- CactusUpdater.cs only if needed to pass task type into the operation / skip calling update for Npp existing provider
-- Tests: CactusUpdaterIntegrationTests / CactusOperationIntegrationTests — add or uncomment existing-provider preserve coverage for Npp
-
-DO NOT CHANGE:
-- Create/INSERT path for IsNew
-- AddPractitionerToFacility (or non-Npp) existing-provider update field list
-- PractitionerValidations uniqueness rules (unless required to compile)
-- Queue / IsDevMode / Service Bus
-- Other 132600 children (License, Specialty, Address, Entity, images)
-- Invent RTKs or PROVIDERS columns
-
-IMPLEMENTATION:
-1. BEFORE coding: quote UpdatePractitionerAsync lines that assign SSN/DOB/sex/category/email/cell; quote how TaskType.Npp is detected on this call path.
-2. For Npp + existing provider: do not update PROVIDERS demographic fields (at minimum the fields still assigned today; prefer full no-op on provider row update if that matches “no Provider demographic fields are updated”).
-3. Non-Npp: keep current behavior.
-4. Prefer smallest diff. Do not refactor whole CrudPractitionerOperation.
-
-OUT OF SCOPE THIS TASK:
-- 132604 exception “match failure → continue downstream” — if still throw-and-stop, list as Remaining gap; do not invent continue-on-error flow.
-
-TESTS:
-- Existing Npp (or existing practitioner) path: assert PROVIDERS demographics unchanged after updater (or unit-level that update assignments are skipped).
-- Regression: IsNew create still inserts; non-Npp existing update still applies prior fields if tests already cover that.
-
-VALIDATION:
-- build
-- relevant tests
-- git diff — only intended files
-
-RETURN:
-1. Files changed
-2. Methods changed (quote gate)
-3. AC coverage — 132604 preserve Yes/No
-4. Tests run + result
-5. Remaining gaps (match-failure continue; Dev queue)
-6. Confirmation: create path untouched; non-Npp update untouched
+5. **Remaining gaps**
+   - New-practitioner matching failures still throw and stop downstream processing; 132604’s “match failure → continue” behavior remains unimplemented as requested.
+   - Development-mode queue skipping remains out of scope; this change does not enable or bypass the queue.
+   - Existing unrelated dirty files remain in the worktree; nothing was staged or committed.
