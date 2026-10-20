@@ -1,33 +1,57 @@
-**1. Files Changed**
+You are implementing a change in the HCA HCP Credentialing repository.
 
-- `CactusUpdater.cs`
-- `CrudPractitionerSpecialtiesOperation.cs`
-- `CactusOperationIntegrationTests.cs`
+ROLE:
+Senior engineer. One session. NPP State License: duplicate check, create when absent, preserve active, inactive≈net-new, attach License PSV image. Do not start a second chat.
 
-**2. Gate**
+PRODUCT / AC (132642–132646):
+- Duplicate = License Type + Number + State → do not create.
+- Create when no duplicate. Defaults (apply what InsertLicenseAsync / helpers already support; do not invent columns):
+  - Type_RTK / state license type literal: NPDBSTATEx (confirmed in CrudPractitionerLicensesOperation Recruitment path + 132530)
+  - PersistentVerification = T (existing helper sets true)
+  - NPDBPrimaryLicense: set true if helper/API allows; else Remaining gap if helper hardcodes false
+  - License number, award/effective, expiration, licensure field from NppTask NewLicense* / SelectedStateLicenseKey as already modeled
+  - LICMONENROLLMENTSTATUS_RTK “Requesting – Ready to enroll in LEMM”: only if RTK already exists in repo — else Remaining gap, do not invent
+- 132644: active practitioner + license exists → no updates
+- 132645: if Practitioner.IsNew OR inactive classification already used elsewhere for NPP — follow net-new create rules; if inactive cannot be detected, document Remaining gap and implement for IsNew + missing-duplicate create for existing NPP when license fields present
+- 132646 image: Description {LastName13}_{FirstName3}_{State}_Lic_MMDDYY; Type D2B50K69Z8 (ADO); Notes Uploaded via auto PAF for ADD NPP to Facility
+- Source: NppTask license fields + LicensePsvAttachment (reuse Sanction image/queue pattern)
 
-The existing NPP updater branch runs license processing and CVI creation; it now invokes specialty handling only for an existing active practitioner when the Specialty task is complete and `SpecialtyTask.Primary.Key` is populated.
+OFFICE EVIDENCE:
+- NPP currently only CreateOrAttachNppSanctionCheckAsync — no state-license branch.
+- Recruitment duplicate: LICENSE_RTK + STATE + LICENSENUMBER.
+- Keep Sanction path intact and call order safe.
 
-The operation routes existing NPP practitioners to a dedicated create-if-missing path. Its existence check looks for the provider’s `PRSPTYPRIM` specialty type. If one exists, it returns without mutation; otherwise it inserts `SpecialtyTask.Primary.Key` using the existing save helper, which sets `ACTIVE = true`. It does not run full specialty reconciliation.
+EXISTING PATTERN:
+Quote NPP license arm, Recruitment state-license create, Sanction image attach, NppTask NewLicense* / LicensePsvAttachment.
 
-**3. Acceptance Criteria**
+SCOPE (may change):
+- CrudPractitionerLicensesOperation.cs
+- CactusUpdater.cs only if needed
+- Constants only if grouping image RTK D2B50K69Z8 next to S3PK02WN8H
+- Focused tests
 
-- **132634: Yes in implementation.** Existing active NPP practitioners get a Primary specialty only when the Primary type is absent. Runtime insert verification is blocked by the test database permission noted below.
-- **132632: Confirmed.** Net-new practitioners still take the existing `SavePractitionerSpecialtiesAsync` path; it was not changed.
-- **132635:** Remains out of scope.
+DO NOT CHANGE:
+- Sanction NPP behavior
+- Non-Npp Recruitment/AddPractitioner license defaults beyond reuse
+- NPI / PPI / Entity
+- Invent enrollment RTK
 
-**4. Tests + Results**
+IMPLEMENTATION:
+1. BEFORE coding: quote gates + NppTask fields + InsertLicenseAsync limitations.
+2. For completed NppTask: process state license from selected/new fields with duplicate Type+State+Number; create if absent; if duplicate and practitioner not inactive-net-new path → no update (132644).
+3. Attach LicensePsvAttachment via CrudImagesOperation like sanctions (type D2B50K69Z8); missing → warn.
+4. Smallest diff; do not break S3PK02GTA1 sanction flow.
 
-- PAF Processor standalone build: **passed**.
-- `ExistingNppPrimarySpecialtyIsNotChanged`: **passed**.
-- `ExistingNppWithoutPrimarySpecialtyCreatesPrimary`: **skipped/inconclusive** because the Cactus test account lacks `EXECUTE` permission on `dbo.GenB36Key`.
-- Combined focused pair: **2 total, 1 passed, 0 failed, 1 skipped**. The test project compiled successfully.
-- Scoped `git diff --check`: **passed**. No editor diagnostics found in the changed files.
+TESTS:
+- Duplicate → no second insert (as harness allows).
+- Create when absent (may skip on GenB36Key — note).
+- Image metadata type D2B50K69Z8 when possible.
+- Build + git diff --check.
 
-**5. Remaining Gaps**
-
-The database-backed creation assertion needs rerunning with a Cactus account authorized to execute `dbo.GenB36Key`. The Primary existence query considers any row of type `PRSPTYPRIM`, including inactive specialty rows, to avoid creating a duplicate Primary row.
-
-**6. Non-NPP Confirmation**
-
-The existing non-NPP reconciliation and its inactivation behavior remain unchanged. Sanction, Address, Provider-preservation, and PPI code were not modified. Temporary validation task entries were removed.
+RETURN:
+1. Files changed
+2. Gate quotes
+3. AC 132642–646 Yes/Partial/No each
+4. Tests + results
+5. Remaining gaps (enrollment, NPDBPrimary, inactive, GenB36Key)
+6. Confirmation: Sanction path untouched in behavior
