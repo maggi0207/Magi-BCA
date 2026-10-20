@@ -1,39 +1,27 @@
-**1. Files Changed**
+You are validating the HCA HCP Credentialing repository. Do not change product code unless a compile error in the Address NPP guard requires a one-line fix.
 
-This implementation touched:
-- `CactusUpdater.cs`
-- `CrudPractitionerAddressOperation.cs`
-- `CactusOperationIntegrationTests.cs`
+ROLE:
+Senior engineer. One session. Unlock/stop locking processes if needed, then build PAF Processor + run focused Address/NPP tests. Do not start a second chat. Do not implement Entity/License/NPI.
 
-**2. Gate / Existence Rule**
+CONTEXT:
+- Recent uncommitted NPP address guard in CactusUpdater / CrudPractitionerAddressOperation.
+- Tests: NppExistingPrimaryAddressIsPreserved; NppMissingPrimaryAddressDoesNotSkipCreation.
+- Prior session: API/Server locked DLLs; test discovery failed.
 
-Added a check before `CrudAddressOperation` in both updater address loops. It applies only when `TaskSelected == TaskType.Npp` and the address type is `CommonCactusRtks.PrimaryAddressTypeRtk`. The query checks for any active, non-ended Primary association for that provider:
+DO:
+1. Stop processes locking Hca.Credentialing.Paf.* output DLLs if safe (or tell user which PIDs).
+2. Build PAF Processor + its test project.
+3. Run the two Address NPP tests (and NppSanction / ExistingNppPractitionerDoesNotAccessProvidersRow if quick).
+4. git diff --check on changed files (list paths).
 
-> `PROVIDER_K = @ProviderK`  
-> `AND ADDRESSTYPE_RTK = @AddressTypeRtk`  
-> `AND ACTIVE = 1`  
-> `AND TODATE IS NULL`
+DO NOT:
+- Commit
+- Implement Entity/License/Specialty/NPI
+- Broad refactor
 
-A match causes the updater to `continue`, skipping both address creation and provider-address update. With no match, the existing creation flow proceeds.
-
-**3. AC 132638 / 132629**
-
-**Yes in the code path:** existing NPP Primary associations are preserved; if none exists, the existing create flow runs. Non-NPP processing bypasses the guard.
-
-**4. Tests + Results**
-
-Added `NppExistingPrimaryAddressIsPreserved` and `NppMissingPrimaryAddressDoesNotSkipCreation`. They cover the guard’s existing/missing decisions; they do not execute the full updater address flow.
-
-Validation is incomplete:
-- `get_errors` reported no editor errors in the three changed files.
-- The test tool reported no tests found for the integration file.
-- The registered PAF API build failed because running Server/API processes locked output DLLs. The dedicated PAF Processor task could not find a terminal.
-- I could not obtain a focused build/test result or a `git diff` check in this environment.
-
-**5. Remaining Gaps**
-
-The focused tests and build still need to run after the locked processes are stopped. The missing-Primary test confirms the guard returns false, but does not itself verify the database create path.
-
-**6. Confirmation**
-
-Non-NPP behavior is unchanged by the guard condition. Sanction and provider-preservation code were not changed. The patch operation touched only the three files listed above; a separate `git diff` verification could not be completed.
+RETURN:
+A. Build result
+B. Tests run + pass/fail
+C. git diff --check
+D. Any one-line fixes made (or none)
+E. Remaining gaps
