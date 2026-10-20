@@ -1,60 +1,40 @@
-**A. Call Chain**
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
 
-- For a net-new practitioner, `CactusUpdater.UpdateFromNewAsync` processes address lists through a shared helper that calls `CrudAddressOperation`, then `CrudPractitionerAddressOperation`. It passes `CommonCactusRtks.PrimaryAddressTypeRtk` for `PractitionerAddressesTask.PrimaryAddresses`. The path excludes Recruitment, but has no NPP exclusion.
-- For an existing practitioner, `UpdateFromExistingAsync` runs the address block when `PractitionerAddressesTask.Status == Complete`, using the same two operations. This generic block can run for an existing NPP PAF.
-- `CrudPractitionerAddressOperation` branches on `Practitioner.IsNew`: new practitioners save the provider-address row; existing practitioners check for a matching provider-address link and update it or insert a link.
+ROLE:
+Senior engineer. One session. Map Entity Assignment create/status/security/preserve for NPP. Do not implement. Do not start a second chat.
 
-Evidence: `CactusUpdater.cs`, `CrudAddressOperation.cs`, `CrudPractitionerAddressOperation.cs`
+PRODUCT (132608–132626):
+- Create EA for facility selected on PAF (net-new).
+- Security Internal Use Only: ENTITYASSIGNMENTS_WEBPUBLISHSTATUS_RTK = RECFLT_INT
+- Status default NPP – Active when empty; update only if current is None, N/A, NPP–Inactive, NPP–Suspend, Inactive.
+- Do not modify inactive EA with start and end dates (historical privileges).
+- Facility not found → log + stop assignment; duplicate → update per existing logic.
 
-**B. Existence Check**
+QUOTE:
+1. CactusUpdater / CrudEntityAssignmentOperation (or real) — new vs existing; any TaskType.Npp.
+2. Facility selection source on PAF — quote.
+3. RECFLT_INT / Internal Use Only — quote constant or absence.
+4. NPP – Active status RTK (known candidates M67G0Q3AIP etc. from Portal — quote Processor constants only; do not invent).
+5. Status update whitelist behavior today — quote.
+6. Historical inactive with start/end — quote preserve or gap.
+7. Gap vs tickets for Npp — Yes/No/Partial.
+8. Tests (names only). Files for implement / must-not.
 
-For an existing practitioner, the provider-address lookup requires the same address type, provider, and address key, and an active row with no end date:
+STOP AND REPORT:
+- If NPP–Active RTK missing in Processor — STOP list Ashley confirm; do not invent from Portal comments alone.
+- If NPP already creates EA via shared AddPractitioner path — quote gates.
 
-> `pa.ADDRESSTYPE_RTK = @AddressTypRtk`  
-> `AND pa.PROVIDER_K = @ProviderK`  
-> `AND pa.ADDRESS_K = @AddressK`  
-> `AND ACTIVE = 1`  
-> `AND TODATE IS NULL`
+DO NOT:
+- Edit code
+- Invent status RTKs
+- Implement Address yet (next after this RETURN)
 
-This is an exact-link check, not a check that the provider has any Primary address. If no such link matches, the operation inserts a provider-address row.
-
-At the address-record level, `CrudAddressOperation` checks whether the PAF supplies an address key. Without a key it inserts an address; with a key it returns that key. Its comment says:
-
-> `// can not actually update existing addresses only create.`
-
-It does not search address fields for a duplicate.
-
-**C. Mapping**
-
-The named Primary address constant is `PrimaryAddressTypeRtk = "NPDBPRIMAR"` in `CommonCactusRtks.cs`.
-
-The input mapping is split across two rows:
-
-- `ADDRESSES`: Line1, Line2, City, State, Zip, Country, Phone, Extension, Fax, FaxExtension, and Email are mapped from `AddressValue.Address`. Zip and phone/fax values are normalized with `NumbersOnly()`; Country defaults to `"United States"` when missing.
-- `PROVIDERADDRESSES`: stores the address key/type and provider-specific phone, extension, fax, and fax extension. `EMAILADDRESS` uses `ResolveEmailAddress()`, which returns an email only in PERF mode and otherwise returns an empty string.
-
-**D. Preserve**
-
-- **Address content:** Yes, for both NPP and Add-Practitioner when the PAF has an existing address key; `CrudAddressOperation` returns the key without updating the `ADDRESSES` row.
-- **Provider-address association:** No, not strictly. When an exact active link is found, `CrudPractitionerAddressOperation` still issues `UpdateAsync` for its `Active` and `ToDate` fields. With a current, nonduplicate link those values may remain the same, but an update is still issued. This behavior is shared by NPP and Add-Practitioner.
-- If a different address key is supplied, the exact-link query will not match it; the operation can insert another Primary association rather than checking whether some other Primary association already exists.
-
-**E. NPP Gap: Partial**
-
-Net-new NPP can already create a Primary address from `PractitionerAddressesTask.PrimaryAddresses` through the shared new-practitioner path. Existing NPP can also enter the generic address block when `PractitionerAddressesTask` is complete; it is **not** net-new-only. However, the existing logic does not implement the requested rule “create when no Primary address exists, otherwise do not update”: the check is for an exact provider/type/address-key link, not for any existing Primary address, and a matched link is updated.
-
-The address source is `PractitionerAddressesTask.PrimaryAddresses` (`AddressTask`), not an NPP-specific address field.
-
-**F. Tests**
-
-No address-specific test was found in the PAF Processor tests. Related updater integration test names: `TestCactusUpdater_NewNew`; `TestCactusUpdater_NewExisting`.
-
-**G. Smallest Implement Shot or STOP**
-
-The Primary RTK is confirmed; no new RTK is needed. The smallest follow-up would be an NPP-specific existence/preserve decision around the existing address flow, scoped to Primary addresses, while retaining the existing create/mapping operations. Avoid treating the exact-link query as an “any Primary exists” check. Add focused coverage for net-new creation, existing Primary preservation, and the missing-Primary case.
-
-Likely implementation files: `CactusUpdater.cs`, `CrudPractitionerAddressOperation.cs`, and the PAF Processor test project. Do not regress the NPP sanction path in `CrudPractitionerLicensesOperation.cs` or provider preservation in `CrudPractitionerOperation.cs`, covered by `ExistingNppPractitionerDoesNotAccessProvidersRow`.
-
-**H. Confirmation**
-
-No files were changed.
+RETURN (A–H):
+A. Call chain EA
+B. Create + facility — quote
+C. Security RECFLT_INT — quote
+D. Status default / whitelist — quote
+E. Historical preserve — quote
+F. Npp gap Yes/No/Partial
+G. Smallest implement shot or STOP
+H. Confirmation: no files changed
