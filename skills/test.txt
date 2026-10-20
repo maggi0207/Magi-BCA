@@ -1,37 +1,194 @@
-**A. Skip Condition**
+132678 NPP: Sanction Check
 
-`PafProcessingService.QueuePafForProcessingAsync` skips publishing when:
+Feature 7: Create Sanction Check Records and Attachments
+Description
 
-```csharp
-if (_settings.IsDevMode)
-{
-    ...
-    _logger.LogWarning("... in dev mode skipping processing queue");
-    return;
-}
-```
+Create Sanction Check records and attach sanctions documentation when records do not already exist.
 
-`Paf.Api/Startup.cs` sets that value with `settings.IsDevMode = Environment.IsDevelopment();`. The PAF API launch profile sets `ASPNETCORE_ENVIRONMENT` to `Development`, so the skip is expected. There is no `IsDevMode` appsettings switch.
+Included Functionality
+Sanction record lookup.
+Record creation.
+Image attachment.
+Business Rules
+Check for existing Sanction Check record:
+LICENSE_RTK.PROVIDERLICENSES = S3PK02GTA1
+Create record if none exists.
+Attach sanctions image from PAF.
+Image Standards
+Name IMAGES_DESCRIPTION
 
-**B. Configuration Keys**
+ 
+{LastName13}_{FirstName3}_Sanctions_MMDDYY 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Type  IMAGES _TYPE_RTK S3PK02WN8H
 
-The PAF API gets its Service Bus sender connection from `HcoServiceBus`. Its Development appsettings contains that key, but it cannot override the Development-mode skip.
+ 
+Sanction Checks 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Notes IMAGES_NOTES
 
-The PAF Processor function trigger is configured as `[ServiceBusTrigger("paf-processing", Connection = "HcoServiceBus")]`. Processor startup separately reads `AzureWebJobsHcoServiceBus` for its own Service Bus service.
+ 
+Uploaded via auto PAF for ADD NPP to Facility 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Acceptance Criteria
+Existing sanction records are not duplicated.
+New sanction records are created when absent.
+Image attached successfully.
+Naming standards followed.
+Exception Handling
+Missing sanction document.
+Duplicate sanction record detected.
+Attachment failure logged.
 
-For database connections, processor startup reads `ConnectionStrings:CactusDb` for VisualCACTUS and `ConnectionStrings:PafDb` for the PAF database. The processor’s checked-in VS Code tasks provide a build task, but no run task; no processor `local.settings.json` is present in the repository. The test Development settings show `PafDb` using LocalDB; do not assume the processor’s active `CactusDb` target is local. The PAF API Development config contains credential literals; I’m not reproducing them here. Treat those values as sensitive and handle/rotate them according to your team’s policy.
 
-**C. Local CVI UAT Path**
 
-- Run PAF API with a non-Development `ASPNETCORE_ENVIRONMENT`.
-- Supply an approved nonproduction `HcoServiceBus` connection for the API sender.
-- Start PAF Processor locally with Azure Functions Core Tools (`func host start`) and its required local settings.
-- Configure the function trigger’s `HcoServiceBus` and processor sender’s `AzureWebJobsHcoServiceBus`.
-- Configure `ConnectionStrings:CactusDb` and `ConnectionStrings:PafDb` for the intended UAT targets.
-- Confirm the Service Bus and VisualCACTUS targets before submitting: this path publishes a real queue message and can write to the configured VisualCACTUS database.
+Child stories
 
-No general synchronous product processing path was found. The only direct `CactusUpdater.UpdateCactusFromPafAsync` call found is in a processor integration test, not a local operational API.
+132679 NPP: Sanction Check
 
-**D. Confirmation**
+User Story 7.1 – Validate Existing Sanction Check Record
+As a Credentialing Specialist
+I want sanction checks verified before creation
+So that duplicate records are avoided.
 
-No files were changed.
+Acceptance Criteria
+Given a sanction check record exists with:
+
+ 
+LICENSE_RTK.PROVIDERLICENSES = S3PK02GTA1 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Then no new sanction record is created.
+
+
+
+132681 NPP: Sanction Check  Attach Sanctions Documentation
+User Story 7.3 – Attach Sanctions Documentation
+As an MSP
+I want sanctions documentation attached automatically
+So that supporting compliance evidence is retained.
+
+Acceptance Criteria
+Image Name: IMAGES_DESCRIPTION
+
+ 
+{LastName13}_{FirstName3}_Sanctions_MMDDYY 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Image Type:  IMAGES_TYPE_RTK  S3PK02WN8H
+
+ 
+Sanction Checks 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Image Notes: IMAGES_NOTES
+
+ 
+Uploaded via auto PAF for ADD NPP to Facility 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Exception Handling
+Missing sanction document generates warning.
+Attachment failure is logged.
+
+
+132680 NPP: Sanction Check Create Sanction Check Record
+User Story 7.2 – Create Sanction Check Record
+As a Credentialing Specialist
+I want sanction records automatically created when absent
+So that compliance tracking remains complete.
+
+Acceptance Criteria
+Given no sanction check exists PROVIDERLICENSES _ LICENSE_RTK   S3PK02GTA1
+When PAF processing occurs
+Then a sanction check record is created.
+
+
+
