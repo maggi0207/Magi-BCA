@@ -1,40 +1,49 @@
-You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
+**A. Call Chain**
 
-ROLE:
-Senior engineer. One session. Map Entity Assignment create/status/security/preserve for NPP. Do not implement. Do not start a second chat.
+For a completed existing-practitioner NPP, `CactusUpdater` calls `CreateStandardCviRecordsAsync`. That shared method iterates `Paf.SelectedFacilities` and calls `CrudEntityAssignmentOperation` for each facility. Net-new processing also reaches the shared CVI/assignment path. No NPP-specific EA operation was found; the shared operation determines whether to insert or update.
 
-PRODUCT (132608–132626):
-- Create EA for facility selected on PAF (net-new).
-- Security Internal Use Only: ENTITYASSIGNMENTS_WEBPUBLISHSTATUS_RTK = RECFLT_INT
-- Status default NPP – Active when empty; update only if current is None, N/A, NPP–Inactive, NPP–Suspend, Inactive.
-- Do not modify inactive EA with start and end dates (historical privileges).
-- Facility not found → log + stop assignment; duplicate → update per existing logic.
+**B. Create + Facility**
 
-QUOTE:
-1. CactusUpdater / CrudEntityAssignmentOperation (or real) — new vs existing; any TaskType.Npp.
-2. Facility selection source on PAF — quote.
-3. RECFLT_INT / Internal Use Only — quote constant or absence.
-4. NPP – Active status RTK (known candidates M67G0Q3AIP etc. from Portal — quote Processor constants only; do not invent).
-5. Status update whitelist behavior today — quote.
-6. Historical inactive with start/end — quote preserve or gap.
-7. Gap vs tickets for Npp — Yes/No/Partial.
-8. Tests (names only). Files for implement / must-not.
+The facility source is `Paf.SelectedFacilities`; the updater passes `facility.FacilityKey` as `EntityKey`. The operation looks for an existing assignment by provider, entity, and record type:
 
-STOP AND REPORT:
-- If NPP–Active RTK missing in Processor — STOP list Ashley confirm; do not invent from Portal comments alone.
-- If NPP already creates EA via shared AddPractitioner path — quote gates.
+> `ea.PROVIDER_K = @ProviderK`  
+> `AND ea.ENTITY_K = @EntityKey`  
+> `AND ea.RECORDTYPE = 'E'`
 
-DO NOT:
-- Edit code
-- Invent status RTKs
-- Implement Address yet (next after this RETURN)
+> `if (existingRecord == null) return await InsertPractitionerEntityAssignmentsAsync();`
 
-RETURN (A–H):
-A. Call chain EA
-B. Create + facility — quote
-C. Security RECFLT_INT — quote
-D. Status default / whitelist — quote
-E. Historical preserve — quote
-F. Npp gap Yes/No/Partial
-G. Smallest implement shot or STOP
-H. Confirmation: no files changed
+A match follows the update path. I found no explicit “facility not found” log-and-stop handling; a missing facility lookup can lead to a null dereference when resolving the entity key during insert.
+
+**C. Security `RECFLT_INT`**
+
+The value appears as a literal, not a named constant. `ResolveWebPubishStatus()` returns `"RECFLT_INT"` only when `TaskSelected == Recruitment`; otherwise it returns `CommonCactusRtks.NoneRtk`. NPP therefore does **not** get the requested Internal Use Only setting on insert.
+
+**D. Status Default / Whitelist**
+
+No NPP–Active status RTK or requested status whitelist was found in the Processor. On insert, `ResolveStatusRtk()` falls through to:
+
+> `return CommonCactusRtks.ApplicantEntityAssignmentStatusRtk;`
+
+That constant is `DS6719BK9U`, not an NPP–Active value. Existing inactive assignments are reactivated and assigned the same resolved status in the general update path; there is no whitelist for current status values. **STOP: Ashley/ADO must confirm the NPP–Active RTK before implementation.** I will not infer it from Portal comments.
+
+Evidence: `CrudEntityAssignmentOperation.cs`, `CommonCactusRtks.cs`
+
+**E. Historical Preserve**
+
+The lookup does not filter out inactive assignments or assignments with start/end dates. For an inactive match, the general branch sets `Active = true`, assigns a resolved status, and updates status/category dates and `Dateentered`. There is no guard to preserve an inactive assignment with historical dates. The present-date fields are not explicitly rewritten in that branch, but the record is still modified.
+
+**F. NPP Gap: Partial**
+
+NPP already creates or updates an EA through the shared CVI path for each selected facility. The current defaults and update rules do not satisfy the ticket: NPP gets the Applicant status on insert, does not get `RECFLT_INT`, lacks the status whitelist, and can reactivate historical inactive assignments.
+
+**Tests:** `TestCrudEntityAssignmentsOperation_Save`; `TestCactusUpdater_NewNew`; `TestCactusUpdater_NewExisting`. No NPP-specific EA test was found.
+
+Likely implementation/test files: `CactusUpdater.cs`, `CrudEntityAssignmentOperation.cs`, `CactusOperationIntegrationTests.cs`. Must not regress `CrudPractitionerOperation.cs` provider preservation or the NPP sanction behavior in `CrudPractitionerLicensesOperation.cs`.
+
+**G. Smallest Implement Shot or STOP**
+
+**STOP pending Ashley/ADO confirmation of the NPP–Active RTK.** After confirmation, add the NPP-specific defaults and status whitelist at the existing assignment operation boundary, and guard historical inactive assignments before update. Do not change unrelated status RTKs or infer values from Portal comments.
+
+**H. Confirmation**
+
+No files were changed.
