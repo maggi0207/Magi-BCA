@@ -1,36 +1,40 @@
-**A. Summary: FIXES MADE**
+You are committing the HCA HCP Credentialing repository. One session. Do not push unless asked.
 
-Found and fixed two NPP-specific gate regressions. No unrelated dirty files were changed.
+ROLE:
+Senior engineer. Commit ONLY the uncommitted 132600 NPP CACTUS sync batch (Provider → License + pre-commit review fixes). Do not start a second chat.
 
-**B. Issues Found**
+BEFORE COMMIT:
+1. git status / git diff — list every modified/untracked file.
+2. Stage ONLY these (and related Processor test files if part of this batch):
+   - CactusUpdater.cs
+   - CrudPractitionerOperation.cs
+   - CrudPractitionerLicensesOperation.cs
+   - CrudPractitionerAddressOperation.cs
+   - CrudPractitionerSpecialtiesOperation.cs
+   - CrudEntityAssignmentOperation.cs
+   - CommonCactusRtks.cs
+   - CactusOperationIntegrationTests.cs
+   (Include any other file that is clearly part of this NPP CACTUS batch from git diff; if unsure, DO NOT stage — list it under Leftover.)
+3. DO NOT stage unrelated dirty UI, config, launchSettings, or other feature work.
 
-- **P2, fixed:** The NPP state-license helper processed state-license input even when the NPP form hides those fields. It now checks `NppTask.ShouldShowStateLicenses(nppTask)` and returns when false. This also prevents an irrelevant missing-selection warning from replacing the sanction warning.
-- **P2, fixed:** New-practitioner processing constructed the license operation with `IsAddPractitionerToFacility` left at its default `true`; the existing-NPP path explicitly passes `false`. Net-new NPP could therefore run Add-Practitioner’s default license checklist. The new-provider call now passes false only for NPP.
-- **P2, residual call-order risk:** In `UpdateFromNewAsync`, `CreateStandardCviRecordsAsync` still runs before the later generic license call. Existing NPP processes licenses before specialty/CVI, but net-new NPP’s shared path creates CVI/EA first. I left this unchanged because it predates this review and changing the shared ordering has broader transaction implications; verify the intended ordering before commit.
+COMMIT MESSAGE (use exactly):
 
-Other reviewed gates are consistent with the stated rules: existing NPP provider updates return the practitioner key without updating demographics; active matching licenses are not updated; the Primary address guard checks any active, non-ended Primary association; existing NPP specialties use create-if-missing rather than full reconciliation; historical inactive EAs with both dates return before update; sanction image failures are logged and do not prevent the state-license helper from running.
+Wire NPP PAF accept into CACTUS provider, licenses, address, specialty, and entity rules.
 
-**C. Files Changed**
+Preserve existing provider/address/license data, add sanction and state-license PSV attach, and keep Add-Practitioner paths unchanged.
 
-Changed in this review:
-- `CactusUpdater.cs`
-- `CrudPractitionerLicensesOperation.cs`
-- `CactusOperationIntegrationTests.cs`
+DO NOT:
+- Push
+- Amend prior commits
+- --no-verify
+- Commit NPI/PPI/enrollment unfinished work (should not exist)
 
-The repository has other pre-existing dirty files, including project/configuration and UI files; I left those untouched.
+AFTER:
+- git status — confirm clean for staged set; leftover dirty files listed
+- git log -1 --oneline
 
-**D. Tests and Build**
-
-The Processor and test project built successfully. The NPP-filtered test run reported **13 total, 10 passed, 0 failed, 3 skipped**. `git diff --check` passed for the reviewed Processor files and test file; editor diagnostics reported no errors. The aggregate test output did not name every skipped case; the Cactus integration environment has previously skipped image creation because its SQL account lacks `EXECUTE` permission on `dbo.GenB36Key`.
-
-**E. Residual Risks Before Commit**
-
-Confirm whether net-new NPP must create licenses before CVI/EA, since that shared new-provider call order remains different from the existing-NPP branch. The exact reasons for all three skipped tests were not available in the aggregate output.
-
-**F. Suggested Commit Message**
-
-`Align net-new NPP license processing with NPP rules`
-
-**G. Scope Confirmation**
-
-No NPI, PPI, or enrollment-RTK behavior was implemented. The new call-site flag and state-license applicability guard are NPP-only; Add-Practitioner and Recruitment paths were not intentionally changed.
+RETURN:
+1. Commit hash + subject
+2. Files committed (list)
+3. Leftover dirty files NOT committed
+4. Confirmation: not pushed
