@@ -1,12 +1,22 @@
--- 1) Recent NPP-type CVI rows on Credentialing
-SELECT TOP 30 *
-FROM VisualCACTUS.Credentialing
-WHERE TYPE_RTK = 'HCA0095563'
-   OR CREDENTIALINGSTATUS_RTK = 'UDP0000001'
-ORDER BY 1 DESC;
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
 
--- 2) Same on group table
-SELECT TOP 30 *
-FROM VisualCACTUS.CREDENTIALINGGROUP
-WHERE TYPE_RTK = 'HCA0095563'
-ORDER BY 1 DESC;
+ROLE:
+Senior engineer. One session. Find why PafProcessingService logs "in dev mode skipping processing queue". Do not start a second chat. Do not implement unless I ask after.
+
+UAT FACT:
+Paf.Api console:
+PafProcessingService - QueuePafForProcessingAsync - Request=[{"PafId":140021}]
+warn: ... in dev mode skipping processing queue
+No CVI rows in VisualCACTUS.Credentialing for HCA0095563 / UDP0000001.
+
+QUOTE:
+1. PafProcessingService.QueuePafForProcessingAsync — the branch that skips the queue in dev (exact condition + config key / env / IHostEnvironment check).
+2. appsettings / appsettings.Development / launchSettings values that control that skip.
+3. How to enable real queue locally without inventing a new mechanism (existing flag, or alternate sync process path if one exists).
+4. How Paf.Processor is started locally and which connection string name points at VISUALCACTUS / localdb.
+
+RETURN:
+A. Skip condition — quote
+B. Config key(s) — quote
+C. Steps to enable processing for local CVI UAT (names only)
+D. Confirmation: no files changed
