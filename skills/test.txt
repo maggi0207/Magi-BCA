@@ -1,49 +1,36 @@
-**A. Call Chain**
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
 
-- For a net-new practitioner, `CactusUpdater.UpdateFromNewAsync` creates the practitioner and then unconditionally calls `CrudPractitionerSpecialtiesOperation` under `// Specialties`. The operation’s `InternalExecuteAsync` routes `Practitioner.IsNew` to `SavePractitionerSpecialtiesAsync`.
-- For Add-Practitioner on an existing practitioner, the updater calls the specialty operation only when `SpecialtyTask.Status == Complete`; that operation routes to `UpdatePractitionerSpecialtiesAsync`.
-- The completed NPP branch calls `CrudPractitionerLicensesOperation` and then creates CVI records; it does **not** call the specialty operation. `CrudPractitionerOperation` also returns the existing practitioner key without updating the provider row for `TaskType.Npp`.
+ROLE:
+Senior engineer. One session. Map Primary Address create for NPP vs existing address ops. Do not implement. Do not start a second chat.
 
-Evidence: `CactusUpdater.cs`, `CrudPractitionerSpecialtiesOperation.cs`, `CrudPractitionerOperation.cs`
+PRODUCT (132627 / 132638 / 132629):
+- Create address from PAF when none exists (use existing logic).
+- Mapping: Primary→ADDRESSTYPE_RTK, Line1/2, City, State, Zip, Country, Phone, Extension, Fax, FaxExtension, Email.
+- If address already exists → no updates.
 
-**B. Primary Create**
+QUOTE:
+1. CactusUpdater / CrudPractitionerAddressOperation (or real) — new vs existing; any TaskType.Npp.
+2. Exist check for “no provider address” — quote.
+3. Field mapping today vs ticket table — quote.
+4. Preserve existing (no update) — quote Yes/No for Npp and for AddPractitioner.
+5. Does existing NPP path call address op? Quote.
+6. Gap vs 132638/132629 for Npp — Yes/No.
+7. Tests (names only). Files for implement / must-not (Sanction, Provider preserve, do not invent RTKs).
 
-For new practitioners, the existing operation creates a primary row from `Paf.SpecialtyTask.Primary`:
+STOP AND REPORT:
+- If ADDRESSTYPE_RTK for Primary already a constant — quote.
+- If NPP already creates address on net-new only — say Partial and quote.
 
-> `SavePractitionerSpecialtyAsync(providerSpecialties.Primary.Key, CommonCactusRtks.PrimaryProviderSpecialtyTypeRtk)`
+DO NOT:
+- Edit code
+- Implement License/Specialty/NPI (STOPPED/partial)
 
-The constant is present: `PrimaryProviderSpecialtyTypeRtk = "PRSPTYPRIM"`. The insert sets `Active = true`, but sets `SpecialtyStatusRtk = CommonCactusRtks.NoneRtk`. The code uses the `Primary` field; it does not promote an arbitrary “first specialty selected” itself.
-
-**C. Active Missing-Primary**
-
-No NPP-specific check for an existing primary specialty was found. Existing Add-Practitioner reconciliation compares current specialties with task selections; it can inactivate rows omitted from the task:
-
-> `// inactivate existing ones that are not in the task`
-
-The existing-practitioner NPP branch does not run that operation, which preserves existing specialties but also means it does not create a missing primary specialty.
-
-**D. PPI / APP-Other**
-
-`SpecialtyTask` contains `ProfessionalPracticeInterest`, but the specialty operation does not reference it. No `APP-Other` handling was found there. The insert assigns `SpecialtyStatusRtk = CommonCactusRtks.NoneRtk`; no `DS9Q12M4UO` use was found in the inspected specialty operation/constants. **Confirm the requested `DS9Q12M4UO` status RTK with Ashley/ADO before implementation.** I found `PRSPTYPRIM` in the repository, so it needs no RTK confirmation.
-
-**E. NPP Source Fields**
-
-The specialty operation reads `Paf.SpecialtyTask`: `Primary`, `Secondary`, `AlternateSpecialties`, and, through its reconciliation path, the specialty keys and types derived from that task. `NppTask` has no specialty fields. Its `ProfessionalPracticeInterest`-like value is not present there; the `ProfessionalPracticeInterest` property belongs to the separate `SpecialtyTask`.
-
-Evidence: `SpecialtyTask.cs`, `NppTask.cs`
-
-**F. NPP Gap**
-
-**Yes, partial.** Net-new NPP practitioners already reach the existing specialty-save operation, provided `SpecialtyTask.Primary` is populated. Existing NPP practitioners do not run specialty handling, so the required “create primary only when none exists” behavior is absent. A distinct inactive-practitioner path was not found; dispatch is based on `Practitioner.IsNew`, not an explicit inactive check. PPI mapping/status handling is also absent.
-
-**G. Smallest Implement Shot or STOP**
-
-**STOP pending confirmation** of the PPI status RTK and how an inactive practitioner is classified for this workflow. Then add NPP-specific specialty handling without invoking the existing reconciliation wholesale: that reconciliation can inactivate existing specialties and update their types, conflicting with NPP’s preservation rule. The NPP path should create the primary only for net-new/inactive cases, and for an existing active practitioner create only when no primary exists. Keep the sanction path and provider-preservation behavior unchanged.
-
-Relevant test names: `TestCrudPractitionerSpecialtiesCactusOperation_Save`; `NppSanctionLicenseIsCreatedOnceAndSanctionsAttachmentIsQueued`; `ExistingNppPractitionerDoesNotAccessProvidersRow`. No NPP specialty-specific test was found.
-
-Likely implementation/test files: `CactusUpdater.cs`, `CrudPractitionerSpecialtiesOperation.cs`, `CactusOperationIntegrationTests.cs`. Must not regress the existing NPP sanction path in `CrudPractitionerLicensesOperation.cs` or the provider-preservation behavior in `CrudPractitionerOperation.cs`.
-
-**H. Confirmation**
-
-No files were changed.
+RETURN (A–H):
+A. Call chain address
+B. Exist check — quote
+C. Mapping — quote
+D. Preserve — quote
+E. Npp gap Yes/No/Partial
+F. Tests
+G. Smallest implement shot or STOP
+H. Confirmation: no files changed
