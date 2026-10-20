@@ -1,62 +1,20 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+Implemented NPP sanction record creation and sanctions PSV image handling.
 
-ROLE:
-Senior engineer. One session. For accepted NPP PAFs: ensure Sanction Check license exists (S3PK02GTA1) without duplicate; attach sanctions PSV image per ticket. Do not start a second chat.
+**Files changed**
 
-PRODUCT / AC:
-- 132679: If LICENSE_RTK=S3PK02GTA1 exists for provider → do not create another.
-- 132680: If absent → create sanction check on PAF processing.
-- 132681: Attach image:
-  - Description: {LastName13}_{FirstName3}_Sanctions_MMDDYY
-  - Type RTK: S3PK02WN8H (from ADO — may not exist as named constant; use this literal or add constant next to other image RTKs)
-  - Notes: Uploaded via auto PAF for ADD NPP to Facility
-- Missing sanction document → warning (do not fail whole PAF if existing pattern warns/skips)
-- Attachment failure → log
+- `CrudPractitionerLicensesOperation.cs`
+- `CactusUpdater.cs`
+- `CactusOperationIntegrationTests.cs`
 
-OFFICE EVIDENCE (TASK 0):
-- CrudPractitionerLicensesOperation: Add-Practitioner defaults include "S3PK02GTA1"; lookup PROVIDER_K+LICENSE_RTK; InsertLicenseAsync / CreateOrUpdateRecruitmentLicense.
-- No TaskType.Npp branch today; SanctionsPsvAttachment unused.
-- Image pattern: CrudImagesOperation with ProviderLicense parent (Recruitment CV style).
-- S3PK02WN8H not found in Processor — ticket is source of truth for type.
+For completed NPP tasks, the license operation now looks up `S3PK02GTA1` by provider and license type, reuses an existing record, or inserts one if absent. It then creates the sanctions image through the existing `CrudImagesOperation` provider-license path, using the ticket’s `S3PK02WN8H`, the requested description and notes, and queues the PAF attachment for conversion. A missing attachment logs a warning; image creation errors are caught and logged. The existing-provider CactusUpdater path now invokes the license operation for completed NPP tasks.
 
-EXISTING PATTERN:
-Quote before coding: (1) how Add-Practitioner default sanction is inserted; (2) how Recruitment attaches a license image; (3) how NppTask is reached from CactusUpdater / license operation (TaskSelected / NppTask property).
+**Validation**
 
-SCOPE (may change):
-- CrudPractitionerLicensesOperation.cs
-- CactusUpdater.cs only if Npp never reaches the license op
-- CrudImagesOperation.cs only if a tiny helper/overload is required (prefer call as-is)
-- Constants file only if repo already groups image/license RTKs
-- Focused test in CactusOperationIntegrationTests or CactusUpdaterIntegrationTests
+The PAF Processor and test-project builds succeeded. The focused integration test’s sanction-count assertion ran, but image verification was **inconclusive**: the configured Cactus test account lacks `EXECUTE` permission on `dbo.GenB36Key`, which the existing image helper requires. The test checks this limitation and reports it as skipped/inconclusive. `git diff --check` passed.
 
-DO NOT CHANGE:
-- Add-Practitioner / Recruitment sanction behavior for non-Npp
-- NPI image (blocked — no TYPE_RTK)
-- Provider preserve (132604) except accidental conflict
-- Queue / IsDevMode
-- Invent RTKs other than S3PK02GTA1 and S3PK02WN8H
+**AC and remaining gaps**
 
-IMPLEMENTATION:
-1. BEFORE coding: quote task gates that decide whether SavePractitionerLicensesAsync / defaults run; quote NppTask.SanctionsPsvAttachment.
-2. For TaskType.Npp (accepted processing): ensure sanction check S3PK02GTA1 exists (reuse create-or-skip-duplicate logic). Prefer smallest hook (Npp arm calling existing CreateOrUpdate / default-list helper) over copy-paste.
-3. Load sanctions attachment bytes from PAF attachment store using SanctionsPsvAttachment (same pattern other tasks use for PafAttachment → bytes). If missing: warn/log per existing soft-fail image patterns; do not invent hard-fail unless that is the only existing pattern for required PSV.
-4. Attach via CrudImagesOperation to the sanction license record (or provider+license keys as Recruitment does). Set description/type/notes per AC. Name file consistently with description + real extension if helper requires FileName.
-5. Non-Npp: unchanged.
-
-TESTS:
-- Npp: no duplicate S3PK02GTA1 when one exists.
-- Npp: creates when absent (if integration harness allows).
-- Npp: image attach called with type S3PK02WN8H when attachment present (mock/assert metadata if full blob hard).
-- Missing attachment: warning path covered or documented if untestable in harness.
-
-VALIDATION:
-- build + focused tests
-- git diff — only intended files
-
-RETURN:
-1. Files changed
-2. Methods / gate quotes
-3. AC 132679/680/681 Yes/Partial/No
-4. Tests + results
-5. Remaining gaps
-6. Confirmation: non-Npp untouched
+- **132679/132680:** Covered by the existing-record lookup and insert-when-absent path; the focused test reached its count assertion.
+- **132681:** Code is implemented, but successful image creation and attachment conversion remain unverified until the Cactus test account has the required key-generation permission.
+- Missing-file warning is implemented; the integration test did not reach its second, missing-attachment run because image creation was inconclusive.
+- Add-Practitioner defaults and Recruitment sanction behavior were not changed. No files were committed.
