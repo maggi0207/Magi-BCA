@@ -1,31 +1,48 @@
-**1. Files Changed**
+You are implementing a change in the HCA HCP Credentialing repository.
 
-- `CrudEntityAssignmentOperation.cs`
-- `CommonCactusRtks.cs`
-- `CactusOperationIntegrationTests.cs`
+ROLE:
+Senior engineer. One session. For existing NPP: create Primary specialty only when none exists. Do not start a second chat.
 
-**2. Gates**
+PRODUCT / AC:
+- 132632: Net-new already reaches SavePractitionerSpecialtiesAsync via UpdateFromNewAsync — leave unless broken.
+- 132634: Existing active practitioner, no primary specialty → create primary from SpecialtyTask.Primary (PRSPTYPRIM).
+- Do NOT run full Add-Practitioner specialty reconciliation (it inactivates omitted rows).
+- 132635 PPI / APP-Other / DS9Q12M4UO — OUT OF SCOPE this task.
 
-For NPP, `ResolveWebPubishStatus()` now returns `RECFLT_INT`; the Recruitment branch remains intact. `ResolveStatusRtk()` resolves to `M67G0Q3AIP` on insert and when an existing status is empty, None, generic Inactive (`D2C60WXO1T`), NPP–Inactive (`M6LH0Z2G0S`), or NPP–Suspend (`M6LH0Z2GHZ`). Other current statuses are retained.
+OFFICE EVIDENCE:
+- Existing NPP branch calls licenses + CVI only — never CrudPractitionerSpecialtiesOperation.
+- PrimaryProviderSpecialtyTypeRtk = "PRSPTYPRIM".
+- Source: Paf.SpecialtyTask.Primary.
 
-Before update processing, the operation returns the existing EA unchanged when it is an NPP assignment that is inactive and has both `PresentdateFrom` and `PresentdateTo` populated.
+EXISTING PATTERN:
+Quote UpdateFromExistingAsync NPP branch; SavePractitionerSpecialtyAsync for Primary; how to detect existing primary specialty.
 
-**3. Acceptance Criteria**
+SCOPE (may change):
+- CactusUpdater.cs (call specialty op or focused helper for Npp existing when SpecialtyTask Complete / Primary set)
+- CrudPractitionerSpecialtiesOperation.cs (Npp create-if-missing-primary only — no inactivate)
+- Focused test
 
-- **132622:** Yes. NPP continues through the existing selected-facilities/CVI assignment path.
-- **132624:** Partial. NPP security and known status cases are implemented. An N/A status RTK is not defined in Processor code, so it is not guessed or included in the whitelist.
-- **132626:** Yes. Inactive historical assignments with both dates are preserved without update.
+DO NOT CHANGE:
+- Full reconciliation / inactivate path for non-Npp
+- Sanction, Address, Entity, Provider preserve
+- PPI
 
-**4. Tests + Results**
+IMPLEMENTATION:
+1. BEFORE coding: quote NPP existing branch and primary save.
+2. For TaskType.Npp + existing practitioner: if no primary specialty row exists and SpecialtyTask.Primary has a key → create primary only (PRSPTYPRIM, Active).
+3. If primary already exists → no specialty updates.
+4. Net-new: unchanged (already saves).
+5. Smallest diff.
 
-The PAF Processor clean/build succeeded. The focused suite ran **7 total: 6 passed, 0 failed, 1 skipped**. All 3 new `NppEntityAssignmentRuleTests` passed. Existing NPP address, sanction, and provider-preservation tests were included; the aggregate output did not identify which test was skipped.
+TESTS:
+- Existing Npp missing primary → create path invoked / primary inserted (as harness allows).
+- Existing Npp with primary → no specialty mutation.
+- Build + focused tests + git diff --check.
 
-`git diff --check` passed for the three changed files.
-
-**5. Remaining Gaps**
-
-The N/A status RTK is unresolved and must be confirmed before N/A records can be recognized as eligible for status update. The new tests exercise the resolver and preservation predicate; they do not perform a database insert/update integration assertion.
-
-**6. Non-NPP Confirmation**
-
-Non-NPP status resolution is unchanged; `RECFLT_INT` remains limited to Recruitment and NPP. The existing `CreateStandardCviRecordsAsync` call path remains in place. No Sanction, Address, or Provider-preservation code was changed. Temporary validation task entries were removed.
+RETURN:
+1. Files changed
+2. Gate quotes
+3. AC 132634 Yes/Partial; 132632 confirmation; 132635 still out
+4. Tests + results
+5. Remaining gaps
+6. Confirmation: non-Npp reconciliation untouched
