@@ -1,129 +1,74 @@
-132678 NPP: Sanction Check
-
-Feature 7: Create Sanction Check Records and Attachments
+132641 NPP: State License Records
+Feature 5: Create and Manage State License Records
 Description
 
-Create Sanction Check records and attach sanctions documentation when records do not already exist.
+Create State License records and associated license images from PAF submissions.
 
 Included Functionality
-Sanction record lookup.
-Record creation.
-Image attachment.
-Business Rules
-Check for existing Sanction Check record:
-LICENSE_RTK.PROVIDERLICENSES = S3PK02GTA1
-Create record if none exists.
-Attach sanctions image from PAF.
-Image Standards
-Name IMAGES_DESCRIPTION
+Duplicate checking.
+New license creation.
+License image attachment.
+Support inactive practitioner exception.
+Duplicate Criteria
+License Type
+License Number
+License State
+New License Defaults
+Field
 
- 
-{LastName13}_{FirstName3}_Sanctions_MMDDYY 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-Type  IMAGES _TYPE_RTK S3PK02WN8H
+Value
 
- 
-Sanction Checks 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-Notes IMAGES_NOTES
+PersistentVerification
 
- 
-Uploaded via auto PAF for ADD NPP to Facility 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-Acceptance Criteria
-Existing sanction records are not duplicated.
-New sanction records are created when absent.
-Image attached successfully.
-Naming standards followed.
-Exception Handling
-Missing sanction document.
-Duplicate sanction record detected.
-Attachment failure logged.
+T
 
+Type_RTK
 
+NPDSTATEx
+
+NPDBPrimaryLicense
+
+T
+
+License_RTK
+
+State License
+
+License Number
+
+PAF Value
+
+Award Date
+
+PAF Value
+
+Expiration Date
+
+PAF Value
+
+LicensureField_RTK
+
+PAF Value
+
+LICMONENROLLMENTSTATUS_RTK
+
+Requesting – Ready to enroll in LEMM
+
+--------------===========================================================
 
 Child stories
 
-132679 NPP: Sanction Check
-
-User Story 7.1 – Validate Existing Sanction Check Record
-As a Credentialing Specialist
-I want sanction checks verified before creation
-So that duplicate records are avoided.
-
-Acceptance Criteria
-Given a sanction check record exists with:
-
- 
-LICENSE_RTK.PROVIDERLICENSES = S3PK02GTA1 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-Then no new sanction record is created.
-
-
-
-132681 NPP: Sanction Check  Attach Sanctions Documentation
-User Story 7.3 – Attach Sanctions Documentation
+132646 NPP: State License Records Attach State License Image
+User Story 5.5 – Attach State License Image
 As an MSP
-I want sanctions documentation attached automatically
-So that supporting compliance evidence is retained.
+I want license documentation attached automatically
+So that supporting documents are available in Cactus.
 
 Acceptance Criteria
-Image Name: IMAGES_DESCRIPTION
+Image Name Format: IMAGES_DESCRIPTION
 
  
-{LastName13}_{FirstName3}_Sanctions_MMDDYY 
+{LastName13}_{FirstName3}_{State}_Lic_MMDDYY 
  
  
  
@@ -138,10 +83,10 @@ Image Name: IMAGES_DESCRIPTION
  
  
  
-Image Type:  IMAGES_TYPE_RTK  S3PK02WN8H
+Image Type: IMAGES _TYPE_RTK D2B50K69Z8 
 
  
-Sanction Checks 
+Medical License 
  
  
  
@@ -172,23 +117,92 @@ Uploaded via auto PAF for ADD NPP to Facility
  
  
  
- 
- 
-Exception Handling
-Missing sanction document generates warning.
-Attachment failure is logged.
-
-
-132680 NPP: Sanction Check Create Sanction Check Record
-User Story 7.2 – Create Sanction Check Record
-As a Credentialing Specialist
-I want sanction records automatically created when absent
-So that compliance tracking remains complete.
+132643 NPP: State License Records Create State License Record
+User Story 5.2 – Create State License Record
+As an MSP
+I want new state licenses added from the PAF
+So that licensing information is available for credentialing.
 
 Acceptance Criteria
-Given no sanction check exists PROVIDERLICENSES _ LICENSE_RTK   S3PK02GTA1
-When PAF processing occurs
-Then a sanction check record is created.
+Given no duplicate exists
+When a new license is submitted
+Then a state license record is created.
 
+Required Values
+Field
 
+Value
 
+PersistentVerification
+
+T
+
+Type_RTK
+
+NPDSTATEx
+
+NPDBPrimaryLicense
+
+T
+
+License_RTK
+
+State License
+
+License Number
+
+PAF Value
+
+Award Date
+
+PAF Value
+
+Expiration Date
+
+PAF Value
+
+LicensureField_RTK
+
+PAF Value
+
+LICMONENROLLMENTSTATUS_RTK
+
+Requesting – Ready to enroll in LEMM
+
+132644 NPP: State License Records Preserve Existing Active Practitioner State Licenses
+
+User Story 5.3 – Preserve Existing Active Practitioner State Licenses
+As a Credentialing Specialist
+I want prepopulated licenses preserved
+So that verified licensure information remains intact.
+
+Acceptance Criteria
+Given practitioner is active elsewhere
+When license exists
+Then no updates occur.
+
+132645 NPP: State License Records Process State Licenses for Existing Inactive Practitioners
+User Story 5.4 – Process State Licenses for Existing Inactive Practitioners
+As a Credentialing Specialist
+I want inactive practitioners treated like net-new practitioners
+So that missing licensing information can be created.
+
+Acceptance Criteria
+Given practitioner is inactive
+When PAF is accepted
+Then state license creation rules follow net-new logic.
+
+132642 NPP: State License Records Validate State License Duplicates
+User Story 5.1 – Validate State License Duplicates
+As a Credentialing Specialist
+I want duplicate licenses detected before creation
+So that duplicate credential records are not created.
+
+Acceptance Criteria
+Duplicate validation checks:
+
+License Type
+License Number
+License State
+Exception Handling
+Duplicate detected → record not created.
