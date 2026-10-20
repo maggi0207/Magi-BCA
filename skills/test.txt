@@ -1,56 +1,37 @@
-**A. Call Chain**
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
 
-- `CactusUpdater.InternalUpdateCactusFromPafAsync` routes an NPP PAF through the new-practitioner or existing-practitioner path according to `paf.Practitioner.IsNew`.
-- In the existing-practitioner NPP branch, the updater calls `CrudPractitionerLicensesOperation` with `IsAddPractitionerToFacility = false`, then creates the standard CVI records.
-- `SavePractitionerLicensesAsync` handles Add Practitioner defaults and Recruitment state licenses on their respective paths. For a completed NPP task, it calls `CreateOrAttachNppSanctionCheckAsync` after those sections. There is no NPP state-license create/update branch in that operation.
+ROLE:
+Senior engineer. One session. Map Provider Specialty create for NPP PAF accept vs Add-Practitioner / existing specialty ops. Do not implement. Do not start a second chat.
 
-Evidence: `CactusUpdater.cs`, `CrudPractitionerLicensesOperation.cs`
+PRODUCT (132631–132635):
+- Net-new / inactive: create primary Specialty_RTK = first specialty selected; SpecialtyType_RTK = PRSPTYPRIM; Active = Active.
+- Existing active: no updates unless no Primary Specialty exists — then create primary.
+- PPI: Specialty_RTK = APP-Other; SpecialtyStatus_RTK = Not Certified (DS9Q12M4UO).
 
-**B. Duplicate Check**
+QUOTE:
+1. CactusUpdater / CrudPractitionerSpecialtiesOperation (or real) — when specialties written for new vs existing; any TaskType.Npp.
+2. How primary specialty is detected/created; PRSPTYPRIM usage — quote.
+3. PPI / APP-Other / DS9Q12M4UO — quote existing or “absent”.
+4. Preserve existing active specialties — quote.
+5. NppTask / specialty task fields used as source (FormData specialty task vs NppTask) — quote.
+6. Gap vs tickets for Npp — Yes/No.
+7. Tests (names only). Files for implement / must-not (do not break Sanction/Provider preserve).
 
-The Recruitment state-license path checks provider plus license type, state, and number:
+STOP AND REPORT:
+- If PRSPTYPRIM or DS9Q12M4UO missing — list confirm needed; do not invent.
+- If NPP specialties already created elsewhere in updater — quote and say gap may be none.
 
-> `AND LICENSE_RTK = @LicenseTypeRtk`  
-> `AND STATE = @State`  
-> `AND LICENSENUMBER = @LicenseNumber`
+DO NOT:
+- Edit code
+- Invent RTKs
+- Implement License (STOPPED) or NPI
 
-This matches the requested duplicate fields, scoped to the practitioner. It does not filter by `ACTIVE`, so an inactive matching license is still considered a duplicate there.
-
-**C. Create Defaults**
-
-The existing Recruitment path uses the literal `"NPDBSTATEx"` and inserts with state and normalized number. The shared insert helper sets `Persistentverifications = true`, `Npdbprimarylicense = false`, `LicensurefieldRtk = CommonCactusRtks.NoneRtk`, and `Active = true`. Its signature does not accept effective/award date, expiration date, licensure field, or enrollment-status RTK.
-
-That does **not** match the ticket defaults: the ticket says `NPDSTATEx` (without the `B`), `NPDBPrimaryLicense=T`, and specifies dates, licensure field, and `LICMONENROLLMENTSTATUS_RTK`. No named State License RTK constant was found in the inspected operation constants; the existing Recruitment code uses the literal `NPDBSTATEx`. **Ashley/ADO confirmation is needed** for the ticket’s `NPDSTATEx` versus repository `NPDBSTATEx`, and for `LICMONENROLLMENTSTATUS_RTK` and its requested value. I will not infer or substitute those values.
-
-**D. Active Preserve / Inactive**
-
-There is no NPP state-license behavior to quote for 132644 or 132645. Today, the NPP operation does not read or update the selected/new state-license fields. Recruitment behaves differently: a matching license is set `Active = true` and passed to `UpdateLicenseAsync`; reusing that behavior for NPP could violate the “active practitioner elsewhere: no updates” requirement. NPP needs its own rules for preserving existing records and handling an inactive practitioner.
-
-**E. Image Path / `D2B50K69Z8`**
-
-`NppTask` contains `LicensePsvAttachment` and `LicensePsvAttachmentUrl`, but the NPP processor does not use them. The existing NPP sanction path demonstrates the image pattern: `CrudImagesOperation` creates a Provider License image, then the attachment is queued for conversion. It uses image type `S3PK02WN8H`, a `_Sanctions_` description, and notes `Uploaded via auto PAF for ADD NPP to Facility`. No State License image path or `D2B50K69Z8` use was found in the processor/tests inspected.
-
-**F. `NppTask` License Sources**
-
-The model defines `SelectedStateLicenseKey`, `NewLicenseState`, `NewLicenseEffectiveDate`, `NewLicenseNumber`, `NewLicenseStatusRtk`, `NewLicenseExpirationDate`, and `NewLicenseFieldOfLicensure`. It also defines `LicensePsvAttachment` and `LicensePsvAttachmentUrl`, separate from `SanctionsPsvAttachment` and `NpiPsvAttachment`. These are currently model/validation properties, not inputs consumed by `CrudPractitionerLicensesOperation`.
-
-Evidence: `NppTask.cs`
-
-**G. NPP Gap**
-
-**Yes.** NPP has no State License create/duplicate/preserve/inactive handling and no State License PSV image attachment path. The sanction-license path is separate and currently executes after the other license sections; it should remain intact.
-
-**H. Smallest Implement Shot or STOP**
-
-**STOP before implementation** until Ashley/ADO confirms the `NPDSTATEx`/`NPDBSTATEx` discrepancy and supplies the enrollment-status RTK/value. After confirmation, the smallest change is an NPP-specific State License branch inside the existing license operation: use the NPP task’s selected/new-license values, apply the type/number/state duplicate rule without mutating a matching active practitioner license, handle the inactive-practitioner case explicitly, and attach the license PSV through the existing image/queue mechanism. Keep it separate from the sanction path.
-
-**Tests to add:** focused tests for duplicate preservation, new-license defaults, inactive-practitioner behavior, and license image metadata/attachment queueing.
-
-**Existing test names:** `NppSanctionLicenseIsCreatedOnceAndSanctionsAttachmentIsQueued`; `ExistingNppPractitionerDoesNotAccessProvidersRow`; `RequiredFieldsAreValidatedWhenVisible`; `CorrectedFieldsBecomeValidAndHiddenLicenseFieldsAreOptional`.
-
-**Files to implement:** `CrudPractitionerLicensesOperation.cs`, likely `CactusOperationIntegrationTests.cs`.  
-**Must not break:** the existing NPP sanction license/attachment behavior in `CrudPractitionerLicensesOperation.cs` and NPP call order in `CactusUpdater.cs`.
-
-**I. Confirmation**
-
-No files were changed during this read-only inspection.
+RETURN (A–H):
+A. Call chain specialty
+B. Primary create — quote
+C. Active missing-primary — quote
+D. PPI APP-Other — quote
+E. Npp source fields — quote
+F. Npp gap Yes/No
+G. Smallest implement shot or STOP
+H. Confirmation: no files changed
