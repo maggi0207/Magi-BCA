@@ -1,51 +1,39 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+**1. Files Changed**
 
-ROLE:
-Senior engineer. One session. For NPP: create Primary address when none exists; if any Primary already exists, do not update. Do not start a second chat.
+This implementation touched:
+- `CactusUpdater.cs`
+- `CrudPractitionerAddressOperation.cs`
+- `CactusOperationIntegrationTests.cs`
 
-PRODUCT / AC (132638 / 132629):
-- Given no provider address record exists → create (use existing mapping/logic).
-- Given an address already exists → no updates.
-- Prefer “any active Primary association for provider” as exists (not only exact ADDRESS_K link).
+**2. Gate / Existence Rule**
 
-OFFICE EVIDENCE (TASK 0):
-- PrimaryAddressTypeRtk = "NPDBPRIMAR".
-- Net-new already creates via CrudAddressOperation + CrudPractitionerAddressOperation.
-- Existing: exact link type+provider+address key; matched link still UpdateAsync; can insert another Primary if different key.
-- ADDRESSES content not updated when key present.
+Added a check before `CrudAddressOperation` in both updater address loops. It applies only when `TaskSelected == TaskType.Npp` and the address type is `CommonCactusRtks.PrimaryAddressTypeRtk`. The query checks for any active, non-ended Primary association for that provider:
 
-EXISTING PATTERN:
-Quote before coding: address block in CactusUpdater (new + existing); CrudPractitionerAddressOperation exist query; how TaskType.Npp is detected.
+> `PROVIDER_K = @ProviderK`  
+> `AND ADDRESSTYPE_RTK = @AddressTypeRtk`  
+> `AND ACTIVE = 1`  
+> `AND TODATE IS NULL`
 
-SCOPE (may change):
-- CrudPractitionerAddressOperation.cs and/or CactusUpdater.cs
-- Focused test in processor test project
+A match causes the updater to `continue`, skipping both address creation and provider-address update. With no match, the existing creation flow proceeds.
 
-DO NOT CHANGE:
-- Non-Npp address update behavior
-- Sanction NPP path, Provider preserve
-- Entity / License / Specialty / NPI
-- Invent RTKs
+**3. AC 132638 / 132629**
 
-IMPLEMENTATION:
-1. BEFORE coding: quote current exist query and UpdateAsync on match.
-2. For TaskType.Npp + Primary: if provider already has an active Primary (ADDRESSTYPE_RTK=NPDBPRIMAR, ACTIVE=1, TODATE null) → skip insert and skip update (full preserve).
-3. If none → use existing create path (CrudAddress + link).
-4. Non-Npp: unchanged.
-5. Smallest diff.
+**Yes in the code path:** existing NPP Primary associations are preserved; if none exists, the existing create flow runs. Non-NPP processing bypasses the guard.
 
-TESTS:
-- Npp existing with Primary → no provider-address update/insert (or no DB write to PROVIDERADDRESSES/ADDRESSES as harness allows).
-- Npp missing Primary → create path still runs (if harness allows).
+**4. Tests + Results**
 
-VALIDATION:
-- build + focused tests
-- git diff — intended files only
+Added `NppExistingPrimaryAddressIsPreserved` and `NppMissingPrimaryAddressDoesNotSkipCreation`. They cover the guard’s existing/missing decisions; they do not execute the full updater address flow.
 
-RETURN:
-1. Files changed
-2. Gate / exist rule quote
-3. AC 132638/132629 Yes/Partial/No
-4. Tests + results
-5. Remaining gaps
-6. Confirmation: non-Npp untouched; Sanction/Provider preserve untouched
+Validation is incomplete:
+- `get_errors` reported no editor errors in the three changed files.
+- The test tool reported no tests found for the integration file.
+- The registered PAF API build failed because running Server/API processes locked output DLLs. The dedicated PAF Processor task could not find a terminal.
+- I could not obtain a focused build/test result or a `git diff` check in this environment.
+
+**5. Remaining Gaps**
+
+The focused tests and build still need to run after the locked processes are stopped. The missing-Primary test confirms the guard returns false, but does not itself verify the database create path.
+
+**6. Confirmation**
+
+Non-NPP behavior is unchanged by the guard condition. Sanction and provider-preservation code were not changed. The patch operation touched only the three files listed above; a separate `git diff` verification could not be completed.
