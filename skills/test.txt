@@ -1,97 +1,82 @@
-132627 NPP:  Primary Address Record
-
-Feature 3: Create Provider Address Records
+132608 NPP: Entity Assignment Record
+Feature 2: Create and Maintain Entity Assignment Records
 Description
 
-Create provider address records from PAF information when no address record exists.
+Create and update Entity Assignment records associated with the facility selected on the PAF.
 
 Included Functionality
-Create address records for new practitioners.
-Do not modify existing address records.
+Create assignment for net-new practitioners.
+Apply security rules.
+Set status when appropriate.
+Preserve historical privilege records.
+Business Rules
+Record security defaults to Internal Use Only.
+Do not modify inactive entity assignments with historical start/end dates.
+Status defaults to NPP – Active when not currently populated.
+Status updates only occur when current status is:
+None
+N/A
+NPP – Inactive
+NPP – Suspend
+Inactive
 Acceptance Criteria
-Address is created using PAF mapping.
-Existing addresses remain unchanged.
-All address attributes populate correctly.
+Assignment record is created for selected facility.
+Internal Use Only security is applied.
+Existing privilege history remains unchanged.
+Status updates follow defined rules.
+Invalid statuses are not overwritten.
 Exception Handling
-Missing required address fields generate validation error.
-Invalid state/country values are logged.
+Facility not found → log error and stop assignment creation.
+Duplicate assignment detected → update per existing logic rather than create duplicate.
 
 
-Child storeies
-
-132638 NPP: Primary Address Record Create New Provider Address
-
-User Story 3.1 – Create New Provider Address
+132622 NPP: Entity Assignment Record
+User Story 2.1 – Create Entity Assignment for Net-New Practitioner
 As an MSP
-I want provider address information copied from the PAF
-So that practitioner contact information exists in Cactus.
+I want an Entity Assignment record automatically created
+So that practitioners are associated to the selected facility.
 
 Acceptance Criteria
-Given no provider address record exists
-When the PAF is accepted
-Then a new address record is created. (Use existing logic)
+Given a net-new practitioner
+When a PAF is accepted
+Then an Entity Assignment record is created for the facility selected on the PAF.
 
-Field Mapping
-PAF Field
+And security is set to Internal Use Only = ENTITYASSIGNMENTS_WEBPUBLISHSTATUS_RTK:RECFLT_INT
 
-Cactus Field
+Exception Handling
+Invalid facility mappings generate errors.
+Duplicate assignments are prevented.
 
-Primary Address
-
-ADDRESSTYPE_RTK
-
-Address Line 1
-
-ADDRESSLINE1
-
-Address Line 2
-
-ADDRESSLINE2
-
-City
-
-CITY
-
-State
-
-STATE
-
-Zip
-
-ZIPCODE
-
-Country
-
-COUNTRY
-
-Phone
-
-PHONE
-
-Extension
-
-EXTENSION
-
-Fax
-
-FAX
-
-Fax Extension
-
-FAXEXTENSION
-
-Email
-
-EMAIL
-
-132629 NPP: Primary Address Record Preserve Existing Provider Addresses
-User Story 3.2 – Preserve Existing Provider Addresses
+132624 NPP: Entity Assignment Record - Set Default Entity Status
+User Story 2.2 – Set Default Entity Status
 As an MSP
-I want existing addresses unchanged
-So that verified address information is not overwritten.
+I want Entity Assignment status initialized appropriately
+So that practitioner onboarding status is accurate.
 
 Acceptance Criteria
-Given an address already exists
-When the PAF is accepted
-Then no updates occur.
+Given no status currently exists
+When the Entity Assignment is created
+Then STATUS_RTK is set to NPP – Active.
+
+Acceptance Criteria – Status Update Rules
+Status updates are allowed only when current status is:
+
+None
+N/A
+NPP – Inactive
+NPP – Suspend
+Inactive
+Exception Handling
+All other statuses remain unchanged.
+
+132626 NPP: Entity Assignment Record Preserve Historical Privileges
+User Story 2.3 – Preserve Historical Privileges
+As a Credentialing Administrator
+I want historical privilege records preserved
+So that privilege history remains intact.
+
+Acceptance Criteria
+Given an inactive Entity Assignment with start and end dates exists
+When processing occurs
+Then the record is not modified.
 
