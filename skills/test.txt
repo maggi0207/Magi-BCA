@@ -1,208 +1,121 @@
-132641 NPP: State License Records
-Feature 5: Create and Manage State License Records
+132631 NPP: Specialty Records
+
+Feature 4: Create Provider Specialty Records
 Description
 
-Create State License records and associated license images from PAF submissions.
+Create specialty records for net-new and inactive practitioners based on PAF selections.
 
 Included Functionality
-Duplicate checking.
-New license creation.
-License image attachment.
-Support inactive practitioner exception.
-Duplicate Criteria
-License Type
-License Number
-License State
-New License Defaults
+Primary Specialty creation.
+PPI handling.
+Specialty activation.
+Business Rules
+Existing Active Practitioner
+No updates unless no Primary Specialty exists.
+Net New / Inactive Practitioner
+Create specialty:
+
 Field
 
 Value
 
-PersistentVerification
+Specialty_RTK
 
-T
+First Specialty selected
 
-Type_RTK
+SpecialtyType_RTK
 
-NPDSTATEx
+PRSPTYPRIM
 
-NPDBPrimaryLicense
+Active
 
-T
+Active
 
-License_RTK
 
-State License
-
-License Number
-
-PAF Value
-
-Award Date
-
-PAF Value
-
-Expiration Date
-
-PAF Value
-
-LicensureField_RTK
-
-PAF Value
-
-LICMONENROLLMENTSTATUS_RTK
-
-Requesting – Ready to enroll in LEMM
-
---------------===========================================================
-
-Child stories
-
-132646 NPP: State License Records Attach State License Image
-User Story 5.5 – Attach State License Image
-As an MSP
-I want license documentation attached automatically
-So that supporting documents are available in Cactus.
-
-Acceptance Criteria
-Image Name Format: IMAGES_DESCRIPTION
-
- 
-{LastName13}_{FirstName3}_{State}_Lic_MMDDYY 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-Image Type: IMAGES _TYPE_RTK D2B50K69Z8 
-
- 
-Medical License 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-Image Notes: IMAGES_NOTES
-
- 
-Uploaded via auto PAF for ADD NPP to Facility 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-132643 NPP: State License Records Create State License Record
-User Story 5.2 – Create State License Record
-As an MSP
-I want new state licenses added from the PAF
-So that licensing information is available for credentialing.
-
-Acceptance Criteria
-Given no duplicate exists
-When a new license is submitted
-Then a state license record is created.
-
-Required Values
+PPI Selection
 Field
 
 Value
 
-PersistentVerification
+Specialty_RTK
 
-T
+APP-Other
 
-Type_RTK
+SpecialtyStatus_RTK
 
-NPDSTATEx
-
-NPDBPrimaryLicense
-
-T
-
-License_RTK
-
-State License
-
-License Number
-
-PAF Value
-
-Award Date
-
-PAF Value
-
-Expiration Date
-
-PAF Value
-
-LicensureField_RTK
-
-PAF Value
-
-LICMONENROLLMENTSTATUS_RTK
-
-Requesting – Ready to enroll in LEMM
-
-132644 NPP: State License Records Preserve Existing Active Practitioner State Licenses
-
-User Story 5.3 – Preserve Existing Active Practitioner State Licenses
-As a Credentialing Specialist
-I want prepopulated licenses preserved
-So that verified licensure information remains intact.
+Not Certified
 
 Acceptance Criteria
-Given practitioner is active elsewhere
-When license exists
-Then no updates occur.
+Primary specialty is created when applicable.
+PPI creates APP-Other specialty.
+Existing active specialties remain unchanged.
 
-132645 NPP: State License Records Process State Licenses for Existing Inactive Practitioners
-User Story 5.4 – Process State Licenses for Existing Inactive Practitioners
-As a Credentialing Specialist
-I want inactive practitioners treated like net-new practitioners
-So that missing licensing information can be created.
+child storiess
 
-Acceptance Criteria
-Given practitioner is inactive
-When PAF is accepted
-Then state license creation rules follow net-new logic.
-
-132642 NPP: State License Records Validate State License Duplicates
-User Story 5.1 – Validate State License Duplicates
-As a Credentialing Specialist
-I want duplicate licenses detected before creation
-So that duplicate credential records are not created.
+132635 NPP: Specialty Records Create APP-Other Specialty for PPI Selection
+User Story 4.3 – Create APP-Other Specialty for PPI Selection
+As an MSP
+I want Professional Practice Interest selections handled appropriately
+So that non-specialty selections are represented correctly.
 
 Acceptance Criteria
-Duplicate validation checks:
+Given a PPI selection exists
+When processing occurs
+Then Specialty_RTK = APP-Other.
 
-License Type
-License Number
-License State
-Exception Handling
-Duplicate detected → record not created.
+And
+
+Field	Value
+Field
+
+Value
+
+PROVIDERSPECIALTIES_SpecialtyStatus_RTK
+
+Not Certified (DS9Q12M4UO )
+
+132622 NPP: Specialty Records Create Primary Specialty for Net-New Practitioner
+User Story 4.1 – Create Primary Specialty for Net-New Practitioner
+As an MSP
+I want a specialty record created from the PAF selection
+So that specialty information exists in Cactus.
+
+Acceptance Criteria
+Given the practitioner is net-new or inactive
+When a primary specialty is selected
+Then a specialty record is created.
+
+And
+Field
+
+Value
+
+Specialty_RTK
+
+First Specialty selected
+
+SpecialtyType_RTK
+
+PRSPTYPRIM
+
+Active
+
+Active
+
+132634 NPP: Specialty Records Create Specialty for Existing Active Practitioner Missing Primary Specialty
+User Story 4.2 – Create Specialty for Existing Active Practitioner Missing Primary Specialty
+As an MSP
+I want missing primary specialties populated
+So that practitioner records remain complete.
+
+Acceptance Criteria
+Given an active practitioner exists
+And no primary specialty exists
+When processing occurs
+Then a primary specialty record is created.
+
+
+     
+
+
+
