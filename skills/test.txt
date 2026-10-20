@@ -1,20 +1,41 @@
-Implemented NPP sanction record creation and sanctions PSV image handling.
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
 
-**Files changed**
+ROLE:
+Senior engineer. One session. Map State License create/duplicate/preserve/inactive + license image for NPP. Do not implement. Do not start a second chat.
 
-- `CrudPractitionerLicensesOperation.cs`
-- `CactusUpdater.cs`
-- `CactusOperationIntegrationTests.cs`
+PRODUCT (132641–132646):
+- Duplicate = License Type + License Number + License State → do not create.
+- Create when no duplicate with defaults: PersistentVerification=T, Type_RTK=NPDSTATEx, NPDBPrimaryLicense=T, License_RTK=State License, Number/Award/Expiration/LicensureField from PAF, LICMONENROLLMENTSTATUS_RTK=Requesting – Ready to enroll in LEMM.
+- 132644: active practitioner elsewhere + license exists → no updates.
+- 132645: inactive practitioner → net-new license logic.
+- 132646 image: Description {LastName13}_{FirstName3}_{State}_Lic_MMDDYY; Type D2B50K69Z8 (Medical License); Notes Uploaded via auto PAF for ADD NPP to Facility.
 
-For completed NPP tasks, the license operation now looks up `S3PK02GTA1` by provider and license type, reuses an existing record, or inserts one if absent. It then creates the sanctions image through the existing `CrudImagesOperation` provider-license path, using the ticket’s `S3PK02WN8H`, the requested description and notes, and queues the PAF attachment for conversion. A missing attachment logs a warning; image creation errors are caught and logged. The existing-provider CactusUpdater path now invokes the license operation for completed NPP tasks.
+QUOTE:
+1. CrudPractitionerLicensesOperation (or real) — state license create/update for AddPractitioner / other; any TaskType.Npp.
+2. Duplicate check fields (type/number/state) — quote.
+3. Defaults applied on insert — quote vs ticket table (NPDSTATEx, PersistentVerification, etc.).
+4. Active preserve / inactive net-new — quote existing behavior or gap.
+5. License image attach — helper, type D2B50K69Z8 presence, naming — quote.
+6. NppTask license list / PSV attachment source properties — quote.
+7. Interaction with new NPP Sanction path (S3PK02GTA1) — must not break; quote call order.
+8. Tests (names only). Files for implement / must-not.
 
-**Validation**
+STOP AND REPORT:
+- If State License RTK is a named constant — quote value (do not invent “State License” string if code uses RTK).
+- If LICMONENROLLMENTSTATUS_RTK / NPDSTATEx missing in repo — list as Ashley/ADO confirm; do not invent.
 
-The PAF Processor and test-project builds succeeded. The focused integration test’s sanction-count assertion ran, but image verification was **inconclusive**: the configured Cactus test account lacks `EXECUTE` permission on `dbo.GenB36Key`, which the existing image helper requires. The test checks this limitation and reports it as skipped/inconclusive. `git diff --check` passed.
+DO NOT:
+- Edit code
+- Invent RTKs
+- Re-implement Sanction or NPI in this inspect
 
-**AC and remaining gaps**
-
-- **132679/132680:** Covered by the existing-record lookup and insert-when-absent path; the focused test reached its count assertion.
-- **132681:** Code is implemented, but successful image creation and attachment conversion remain unverified until the Cactus test account has the required key-generation permission.
-- Missing-file warning is implemented; the integration test did not reach its second, missing-attachment run because image creation was inconclusive.
-- Add-Practitioner defaults and Recruitment sanction behavior were not changed. No files were committed.
+RETURN (A–I):
+A. Call chain state license
+B. Duplicate check — quote
+C. Create defaults — quote vs ticket
+D. Active preserve / inactive — quote
+E. Image path / D2B50K69Z8 — quote
+F. NppTask license sources — quote
+G. Npp gap Yes/No
+H. Smallest implement shot or STOP
+I. Confirmation: no files changed
