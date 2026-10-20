@@ -1,29 +1,5 @@
-You are committing in the HCA HCP Credentialing repository.
-
-ROLE:
-Senior engineer. One session. Commit ONLY the 131784 CPC Completed Type filter change. Do not push. Do not start a second chat. Do not edit product code.
-
-INCLUDE (stage only these if dirty):
-- PafQueueSearchCriteria.razor.cs
-- PafQueueSearch.razor.cs
-
-EXCLUDE:
-- Everything else (tooling, csproj, skills, 132275 leftovers, wizard files, unrelated dirty files).
-
-STEPS:
-1. git status — confirm only INCLUDE are intended for this commit; list anything else left unstaged.
-2. git add the two INCLUDE paths (full paths from status).
-3. git commit with message:
-
-Add Add NPP to Facility to CPC Completed Type filter
-
-Expose TaskType.Npp as "Add NPP to Facility" only for CPC Completed queue so CPC can filter completed NPP PAFs without leaking the option to Open or MSP.
-
-4. Do NOT --no-verify, --amend (unless hook auto-fix and amend rules fully met — prefer new commit if unsure), force push, or git config.
-5. git status after commit.
-
-RETURN:
-1. Paths committed
-2. Dirty files left unstaged
-3. Commit hash + full message
-4. Confirmation: no push
+SELECT s.name AS schema_name, t.name AS table_name
+FROM sys.tables t
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE t.name LIKE '%CREDENTIALING%'
+ORDER BY t.name;
