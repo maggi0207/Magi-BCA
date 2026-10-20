@@ -1,32 +1,42 @@
-**1. Files Changed**
+You are reviewing uncommitted NPP CACTUS sync changes in the HCA HCP Credentialing repository. READ-ONLY first; then fix only clear bugs / regressions. Do not start a second chat.
 
-- `CrudPractitionerLicensesOperation.cs`
-- `CactusOperationIntegrationTests.cs`
+ROLE:
+Senior engineer. Pre-commit review of the 132600 batch (Provider → License). Prefer smallest safe fixes. Do not expand scope to NPI/PPI/enrollment RTKs.
 
-**2. NPP Gates**
+SCOPE — review these areas (and any related uncommitted diffs you find):
+- CrudPractitionerOperation.cs (Npp existing provider preserve)
+- CrudPractitionerLicensesOperation.cs (Sanction S3PK02GTA1 + State License NPDBSTATEx + images)
+- CrudPractitionerAddressOperation.cs / CactusUpdater address guard (Npp Primary preserve)
+- CrudPractitionerSpecialtiesOperation.cs / CactusUpdater (Npp missing Primary only)
+- CrudEntityAssignmentOperation.cs / CommonCactusRtks.cs (RECFLT_INT, M67G0Q3AIP, historical)
+- CactusUpdater.cs (Npp existing branch call order)
+- CactusOperationIntegrationTests.cs (new Npp tests)
 
-For a completed NPP task, the existing sanction operation still runs first, followed by the new state-license operation. The state-license logic uses `NPDBSTATEx` and checks duplicates by provider, license type, state, and number. Active practitioners with a matching license are not updated; the license can still receive the submitted PSV attachment. Missing licenses are inserted, then their PSV is attached using `D2B50K69Z8` and queued for conversion.
+DO NOT CHANGE:
+- Unrelated dirty worktree files
+- NPI attach, PPI APP-Other, invent RTKs
+- Queue / IsDevMode behavior
+- Non-Npp AddPractitioner/Recruitment behavior except accidental breakage
 
-The shared key-returning insert helper now accepts optional NPP status, award/expiration dates, licensure field, and primary-license values. Defaults for existing callers remain unchanged.
+REVIEW CHECKLIST (quote findings):
+1. TaskType.Npp gates correct; non-Npp paths unchanged.
+2. Call order safe: Provider preserve → licenses (sanction then state license) → address/specialty as intended → EA/CVI; no double-insert / accidental skip of sanction.
+3. Preserve rules: existing provider demographics not updated; active license not updated; Primary address skip when any Primary exists; specialty no full reconciliation/inactivate; historical EA with both dates skipped.
+4. Image attach: missing file warns; failures logged; types S3PK02WN8H / D2B50K69Z8 only where intended.
+5. Null/edge: missing SpecialtyTask.Primary, missing SelectedFacilities, missing license fields, GenB36Key failures already handled.
+6. Tests: compile; focused Npp tests; note skips.
+7. Ugly/risk: copy-paste, wrong constant, swallowed exceptions that hide failures, Npp branch never reached.
 
-**3. AC Status**
+FIX:
+- Only clear bugs / regressions / broken gates found in this batch.
+- After fixes: build Processor + run focused Npp tests you can; git diff --check on touched files.
+- If no fixes needed, say CLEAN.
 
-- **132642, duplicate check:** Yes. Matching type/state/number prevents another insert.
-- **132643, create and supported defaults:** Yes for effective date, expiration date, license status, licensure field, persistent verification, and primary-license flag.
-- **132644, active practitioner preserve:** Yes. A matching license is not updated for an active practitioner.
-- **132645, net-new/inactive:** Partial. `Practitioner.IsNew` and inactive (`Active == false`) use the update path when a matching license exists; otherwise missing licenses are created. The create path is implemented, but database verification was blocked by SQL permissions.
-- **132646, PSV image:** Implemented with the requested description pattern, image type, notes, and attachment queueing; integration verification was permission-limited.
-
-**4. Tests and Validation**
-
-The PAF Processor and test project compiled successfully. The duplicate-license test passed. The create-and-image test was skipped as inconclusive because the Cactus test login lacks `EXECUTE` permission on `dbo.GenB36Key`. The existing sanction regression was included in a focused run; the two-test run reported 1 passed, 0 failed, 1 skipped. No editor diagnostics were reported.
-
-Scoped `git diff --check` passed for the two changed files.
-
-**5. Remaining Gaps**
-
-`LICMONENROLLMENTSTATUS_RTK` and the “Requesting – Ready to enroll in LEMM” value are not present in the repository, so they were not added. The actual license insert and PSV image assertions need rerunning with a Cactus account authorized to execute `dbo.GenB36Key`.
-
-**6. Sanction Behavior**
-
-The existing sanction path and its image/queue behavior were not changed; state-license processing follows it. Temporary validation task entries were removed.
+RETURN:
+A. Summary — CLEAN or FIXES MADE
+B. Issues found (severity + file/method quote)
+C. Files changed (or none)
+D. Tests/build results
+E. Residual risks before commit
+F. Suggested commit message (1–2 sentences, why-focused)
+G. Confirmation: NPI/PPI/enrollment not implemented; non-Npp untouched
