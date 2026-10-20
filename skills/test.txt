@@ -1,5 +1,12 @@
-SELECT s.name AS schema_name, t.name AS table_name
-FROM sys.tables t
-JOIN sys.schemas s ON s.schema_id = t.schema_id
-WHERE t.name LIKE '%CREDENTIALING%'
-ORDER BY t.name;
+-- 1) Recent NPP-type CVI rows on Credentialing
+SELECT TOP 30 *
+FROM VisualCACTUS.Credentialing
+WHERE TYPE_RTK = 'HCA0095563'
+   OR CREDENTIALINGSTATUS_RTK = 'UDP0000001'
+ORDER BY 1 DESC;
+
+-- 2) Same on group table
+SELECT TOP 30 *
+FROM VisualCACTUS.CREDENTIALINGGROUP
+WHERE TYPE_RTK = 'HCA0095563'
+ORDER BY 1 DESC;
