@@ -1,82 +1,39 @@
-132608 NPP: Entity Assignment Record
-Feature 2: Create and Maintain Entity Assignment Records
-Description
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
 
-Create and update Entity Assignment records associated with the facility selected on the PAF.
+ROLE:
+Senior engineer. One session. Map how CactusUpdater creates or skips PROVIDERS rows for NPP (TaskType.Npp) vs Add-Practitioner. Do not start a second chat. Do not implement.
 
-Included Functionality
-Create assignment for net-new practitioners.
-Apply security rules.
-Set status when appropriate.
-Preserve historical privilege records.
-Business Rules
-Record security defaults to Internal Use Only.
-Do not modify inactive entity assignments with historical start/end dates.
-Status defaults to NPP – Active when not currently populated.
-Status updates only occur when current status is:
-None
-N/A
-NPP – Inactive
-NPP – Suspend
-Inactive
-Acceptance Criteria
-Assignment record is created for selected facility.
-Internal Use Only security is applied.
-Existing privilege history remains unchanged.
-Status updates follow defined rules.
-Invalid statuses are not overwritten.
-Exception Handling
-Facility not found → log error and stop assignment creation.
-Duplicate assignment detected → update per existing logic rather than create duplicate.
+PRODUCT:
+- 132601 / CRD-FTR-001: detect exist; create net-new; leave existing unchanged.
+- 132602 AC: Given practitioner does not exist in Cactus, When PAF accepted, Then new Provider created. Map First/Last/Suffix/Degree/Category/NPI (ticket lists PROVIDERS.* columns).
+- 132604 AC: Given matching Provider exists, When PAF accepted, Then no Provider demographic fields updated. Match failures logged; processing continues downstream.
 
+QUOTE:
+1. CactusUpdater.UpdateCactusFromPafAsync — where practitioner/provider create is invoked; any TaskType.Npp branch.
+2. CrudPractitionerOperation (or real name) — exist check + insert + update paths. Quote how “exists” is decided (Provider_K / NPI / other).
+3. For net-new vs existing practitioner PAF: does NPP reuse the same create path as AddPractitionerToFacility?
+4. Field mapping today for First/Last/Suffix/Degree/Category/NPI — quote source properties from PAF FormData / Practitioner.
+5. Does existing-provider path already skip updates (preserve)? Quote.
+6. Gaps for 132601 when TaskSelected == Npp (missing call, wrong fields, always update, never create, etc.).
+7. Tests covering provider create/preserve (names only).
+8. Files that would change for 132602/132604 (names only). Files that must not.
 
-132622 NPP: Entity Assignment Record
-User Story 2.1 – Create Entity Assignment for Net-New Practitioner
-As an MSP
-I want an Entity Assignment record automatically created
-So that practitioners are associated to the selected facility.
+STOP AND REPORT:
+- If NPP never reaches CrudPractitionerOperation because Dev queue skip or missing Npp arm — quote; do not invent a sync API.
+- If ticket “PAF Source PROVIDERS.*” means destination columns only — say so and quote actual PAF→Cactus mapping sources.
 
-Acceptance Criteria
-Given a net-new practitioner
-When a PAF is accepted
-Then an Entity Assignment record is created for the facility selected on the PAF.
+DO NOT:
+- Edit code
+- Invent RTKs or new PROVIDERS columns
+- Implement 132647+ other children in this inspect
 
-And security is set to Internal Use Only = ENTITYASSIGNMENTS_WEBPUBLISHSTATUS_RTK:RECFLT_INT
-
-Exception Handling
-Invalid facility mappings generate errors.
-Duplicate assignments are prevented.
-
-132624 NPP: Entity Assignment Record - Set Default Entity Status
-User Story 2.2 – Set Default Entity Status
-As an MSP
-I want Entity Assignment status initialized appropriately
-So that practitioner onboarding status is accurate.
-
-Acceptance Criteria
-Given no status currently exists
-When the Entity Assignment is created
-Then STATUS_RTK is set to NPP – Active.
-
-Acceptance Criteria – Status Update Rules
-Status updates are allowed only when current status is:
-
-None
-N/A
-NPP – Inactive
-NPP – Suspend
-Inactive
-Exception Handling
-All other statuses remain unchanged.
-
-132626 NPP: Entity Assignment Record Preserve Historical Privileges
-User Story 2.3 – Preserve Historical Privileges
-As a Credentialing Administrator
-I want historical privilege records preserved
-So that privilege history remains intact.
-
-Acceptance Criteria
-Given an inactive Entity Assignment with start and end dates exists
-When processing occurs
-Then the record is not modified.
-
+RETURN (A–I):
+A. Call chain submit → provider write
+B. Exist check — quote
+C. Create path — quote
+D. Preserve/skip existing — quote
+E. Field mapping PAF → PROVIDERS — quote
+F. Npp-specific gap vs Add-Practitioner — Yes/No + quote
+G. Tests
+H. Smallest implement shot (names only) or STOP
+I. Confirmation: no files changed
