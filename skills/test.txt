@@ -1,48 +1,33 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+**1. Files Changed**
 
-ROLE:
-Senior engineer. One session. For existing NPP: create Primary specialty only when none exists. Do not start a second chat.
+- `CactusUpdater.cs`
+- `CrudPractitionerSpecialtiesOperation.cs`
+- `CactusOperationIntegrationTests.cs`
 
-PRODUCT / AC:
-- 132632: Net-new already reaches SavePractitionerSpecialtiesAsync via UpdateFromNewAsync — leave unless broken.
-- 132634: Existing active practitioner, no primary specialty → create primary from SpecialtyTask.Primary (PRSPTYPRIM).
-- Do NOT run full Add-Practitioner specialty reconciliation (it inactivates omitted rows).
-- 132635 PPI / APP-Other / DS9Q12M4UO — OUT OF SCOPE this task.
+**2. Gate**
 
-OFFICE EVIDENCE:
-- Existing NPP branch calls licenses + CVI only — never CrudPractitionerSpecialtiesOperation.
-- PrimaryProviderSpecialtyTypeRtk = "PRSPTYPRIM".
-- Source: Paf.SpecialtyTask.Primary.
+The existing NPP updater branch runs license processing and CVI creation; it now invokes specialty handling only for an existing active practitioner when the Specialty task is complete and `SpecialtyTask.Primary.Key` is populated.
 
-EXISTING PATTERN:
-Quote UpdateFromExistingAsync NPP branch; SavePractitionerSpecialtyAsync for Primary; how to detect existing primary specialty.
+The operation routes existing NPP practitioners to a dedicated create-if-missing path. Its existence check looks for the provider’s `PRSPTYPRIM` specialty type. If one exists, it returns without mutation; otherwise it inserts `SpecialtyTask.Primary.Key` using the existing save helper, which sets `ACTIVE = true`. It does not run full specialty reconciliation.
 
-SCOPE (may change):
-- CactusUpdater.cs (call specialty op or focused helper for Npp existing when SpecialtyTask Complete / Primary set)
-- CrudPractitionerSpecialtiesOperation.cs (Npp create-if-missing-primary only — no inactivate)
-- Focused test
+**3. Acceptance Criteria**
 
-DO NOT CHANGE:
-- Full reconciliation / inactivate path for non-Npp
-- Sanction, Address, Entity, Provider preserve
-- PPI
+- **132634: Yes in implementation.** Existing active NPP practitioners get a Primary specialty only when the Primary type is absent. Runtime insert verification is blocked by the test database permission noted below.
+- **132632: Confirmed.** Net-new practitioners still take the existing `SavePractitionerSpecialtiesAsync` path; it was not changed.
+- **132635:** Remains out of scope.
 
-IMPLEMENTATION:
-1. BEFORE coding: quote NPP existing branch and primary save.
-2. For TaskType.Npp + existing practitioner: if no primary specialty row exists and SpecialtyTask.Primary has a key → create primary only (PRSPTYPRIM, Active).
-3. If primary already exists → no specialty updates.
-4. Net-new: unchanged (already saves).
-5. Smallest diff.
+**4. Tests + Results**
 
-TESTS:
-- Existing Npp missing primary → create path invoked / primary inserted (as harness allows).
-- Existing Npp with primary → no specialty mutation.
-- Build + focused tests + git diff --check.
+- PAF Processor standalone build: **passed**.
+- `ExistingNppPrimarySpecialtyIsNotChanged`: **passed**.
+- `ExistingNppWithoutPrimarySpecialtyCreatesPrimary`: **skipped/inconclusive** because the Cactus test account lacks `EXECUTE` permission on `dbo.GenB36Key`.
+- Combined focused pair: **2 total, 1 passed, 0 failed, 1 skipped**. The test project compiled successfully.
+- Scoped `git diff --check`: **passed**. No editor diagnostics found in the changed files.
 
-RETURN:
-1. Files changed
-2. Gate quotes
-3. AC 132634 Yes/Partial; 132632 confirmation; 132635 still out
-4. Tests + results
-5. Remaining gaps
-6. Confirmation: non-Npp reconciliation untouched
+**5. Remaining Gaps**
+
+The database-backed creation assertion needs rerunning with a Cactus account authorized to execute `dbo.GenB36Key`. The Primary existence query considers any row of type `PRSPTYPRIM`, including inactive specialty rows, to avoid creating a duplicate Primary row.
+
+**6. Non-NPP Confirmation**
+
+The existing non-NPP reconciliation and its inactivation behavior remain unchanged. Sanction, Address, Provider-preservation, and PPI code were not modified. Temporary validation task entries were removed.
