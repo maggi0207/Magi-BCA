@@ -1,42 +1,57 @@
-You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
+**A. Call Chain: Sanction Record**
 
-ROLE:
-Senior engineer. One session. Map Sanction Check record create + sanctions image attach for NPP PAF accept. Do not implement. Do not start a second chat.
+After acceptance is processed, `PafProcessorFunction.RunAsync` calls `CactusUpdater.UpdateCactusFromPafAsync`. The updater dispatches to new- or existing-practitioner handling; either route can invoke `CrudPractitionerLicensesOperation`, depending on its task gates. In that operation, `SavePractitionerLicensesAsync` handles Add-Practitioner defaults when `IsAddPractitionerToFacility` is true and an Add-Practitioner task is present. It also calls `CreateOrUpdateRecruitmentLicenses` when `RecruitmentPsvTask` is present.
 
-PRODUCT (132678–132681):
-- Lookup existing Sanction: LICENSE_RTK.PROVIDERLICENSES = S3PK02GTA1 — do not duplicate.
-- Create sanction check when absent.
-- Attach sanctions image from PAF:
-  - IMAGES_DESCRIPTION: {LastName13}_{FirstName3}_Sanctions_MMDDYY
-  - IMAGES_TYPE_RTK: S3PK02WN8H (Sanction Checks)
-  - IMAGES_NOTES: Uploaded via auto PAF for ADD NPP to Facility
-- Missing sanction document → warning; attachment failure logged.
+For the Add-Practitioner default list, the operation includes:
 
-QUOTE:
-1. Where CactusUpdater / CrudPractitionerLicensesOperation (or real name) creates Sanction / PROVIDERLICENSES with LICENSE_RTK S3PK02GTA1 — quote Recruitment or AddPractitioner path.
-2. Any TaskType.Npp branch or exclusion for sanction create/attach.
-3. Exist/duplicate check for S3PK02GTA1 — quote.
-4. Sanctions image attach today — helper, type RTK, naming — quote or “none”.
-5. PAF source of sanctions file on NppTask (property names) — quote.
-6. Gap vs 132679/680/681 for Npp — Yes/No + quote.
-7. Tests (names only).
-8. Files that would change (names only). Files that must not.
+> `"S3PK02GTA1", // Sanction Checks`
 
-STOP AND REPORT:
-- If sanction record create exists only under Recruitment — quote extension point; do not invent new Crud class.
-- If image type S3PK02WN8H already used — quote constant name/location.
+**B. Existence Check for S3PK02GTA1**
 
-DO NOT:
-- Edit code
-- Invent RTKs beyond S3PK02GTA1 / S3PK02WN8H from this ticket
-- Implement NPI (blocked) or License in this inspect
+The shared lookup is by practitioner/provider key and license RTK:
 
-RETURN (A–H):
-A. Call chain sanction record
-B. Exist check S3PK02GTA1 — quote
-C. Create path — quote
-D. Image attach path / gap — quote
-E. NppTask sanctions attachment source — quote
-F. Npp gap Yes/No
-G. Smallest implement shot (names only) or STOP
-H. Confirmation: no files changed
+> `WHERE PROVIDER_K = @ProviderK`  
+> `AND LICENSE_RTK = @LicenseTypeRtk`
+
+The Add-Practitioner default-list path checks existing licenses and avoids inserting a duplicate. If an existing matching record is nonpersistent, it updates that record. Recruitment’s `CreateOrUpdateRecruitmentLicense` uses the same lookup, reactivates/updates a match, or inserts when no match exists.
+
+**C. Create Path**
+
+Sanction-check creation is **not exclusive to Recruitment**. Add-Practitioner includes it in its default checklist path; Recruitment also calls:
+
+> `await CreateOrUpdateRecruitmentLicense("S3PK02GTA1");`
+
+The insertion is through the existing `InsertLicenseAsync(...)` method in `CrudPractitionerLicensesOperation`; no new CRUD class is needed. There is no NPP-specific call or `TaskType.Npp` branch in the processor. Whether the Add-Practitioner defaults run for an NPP PAF depends on the existing caller and task-presence/status gates.
+
+**D. Sanctions Image Path / Gap**
+
+No NPP sanctions-image attachment path was found. The reusable helper is `CrudImagesOperation`: it accepts `ParentFileK`, `ParentK`, `RecordK`, `ImageTypeRtk`, `ImageDescription`, `Notes`, `FileName`, and `ImageContents`, inserts image metadata/content records, and supports associating an image with a provider-license record. Existing Recruitment CV handling demonstrates the license-image pattern: it uses `ImageParentFileKValues.ProviderLicense`, a provider key, the license record key, then queues the image with its attachment ID.
+
+The ticket RTK `S3PK02WN8H` was not found in the PAF Processor source. No sanctions image description formatter or notes value matching the ticket was found. The existing generic PAF-image helper attaches a PAF PDF, not the NPP sanctions document.
+
+**E. NPP Task Attachment Source**
+
+The NPP model supplies:
+
+> `public PafAttachment SanctionsPsvAttachment { get; set; }`  
+> `[CustomValidation(...)] public string SanctionsPsvAttachmentUrl { get; set; }`
+
+The file metadata is represented by `PafAttachment`; the NPP processor path does not currently read this property. The UI marks the sanctions URL required, but that does not result in a processor-side attachment.
+
+**F. NPP Gap**
+
+**Yes.** There is no NPP-specific sanction record or sanctions-image processing branch. The existing record creation/duplicate-check implementation can be reused, but the processor does not consume `NppTask.SanctionsPsvAttachment`, produce the requested description/notes, or attach an image with `S3PK02WN8H`. Since that attachment is not consumed today, a missing sanctions file currently causes no processor-side warning, skip, or throw.
+
+**G. Smallest Implement Shot**
+
+- `CrudPractitionerLicensesOperation.cs`
+- `CactusUpdater.cs` only if the existing license operation’s caller/task gates do not invoke the sanction path for accepted NPP PAFs
+- A focused sanctions-record/image test in `CactusOperationIntegrationTests.cs` or `CactusUpdaterIntegrationTests.cs`
+
+Reuse `CrudImagesOperation` and the existing `CreateOrUpdateRecruitmentLicense` / license lookup patterns. The ticket supplies the image RTK, so no repository RTK discovery is needed.
+
+Existing processor tests found: `TestCrudPractitionerCactusOperation_Save`, `TestCactusUpdater_NewNew`, and `TestCactusUpdater_NewExisting` (the latter currently has its body commented out). No sanction-specific tests were found.
+
+**H. Confirmation**
+
+No files were changed.
