@@ -1,27 +1,26 @@
-You are validating the HCA HCP Credentialing repository. Do not change product code unless a compile error in the Address NPP guard requires a one-line fix.
+**A. Build**
 
-ROLE:
-Senior engineer. One session. Unlock/stop locking processes if needed, then build PAF Processor + run focused Address/NPP tests. Do not start a second chat. Do not implement Entity/License/NPI.
+The PAF Processor build succeeded (`net10.0`). The focused `dotnet test` invocation also built `Hca.Credentialing.Paf.Processor.Tests` successfully.
 
-CONTEXT:
-- Recent uncommitted NPP address guard in CactusUpdater / CrudPractitionerAddressOperation.
-- Tests: NppExistingPrimaryAddressIsPreserved; NppMissingPrimaryAddressDoesNotSkipCreation.
-- Prior session: API/Server locked DLLs; test discovery failed.
+**B. Tests**
 
-DO:
-1. Stop processes locking Hca.Credentialing.Paf.* output DLLs if safe (or tell user which PIDs).
-2. Build PAF Processor + its test project.
-3. Run the two Address NPP tests (and NppSanction / ExistingNppPractitionerDoesNotAccessProvidersRow if quick).
-4. git diff --check on changed files (list paths).
+Ran `NppExistingPrimaryAddressIsPreserved`, `NppMissingPrimaryAddressDoesNotSkipCreation`, `NppSanctionLicenseIsCreatedOnceAndSanctionsAttachmentIsQueued`, and `ExistingNppPractitionerDoesNotAccessProvidersRow`.
 
-DO NOT:
-- Commit
-- Implement Entity/License/Specialty/NPI
-- Broad refactor
+Result: **4 total, 3 passed, 0 failed, 1 skipped.** The task output did not identify which test was skipped or give its reason. The VS Code test-discovery tool separately reported no tests found for the file.
 
-RETURN:
-A. Build result
-B. Tests run + pass/fail
-C. git diff --check
-D. Any one-line fixes made (or none)
-E. Remaining gaps
+**C. `git diff --check`**
+
+Passed with no whitespace errors. Checked only:
+- `CactusUpdater.cs`
+- `CrudPractitionerAddressOperation.cs`
+- `CactusOperationIntegrationTests.cs`
+
+Temporary task entries used to run validation were removed. No process termination was needed for the successful processor build and focused test run.
+
+**D. One-Line Fixes**
+
+None. No compile errors required a fix.
+
+**E. Remaining Gaps**
+
+The added tests verify the guard’s existing/missing decision, but do not exercise the full updater path to prove that an existing Primary causes zero writes or that a missing Primary creates both address records. The skipped test’s identity and reason were not reported. Non-NPP behavior is gated out of the new check; sanction and provider-preservation code were not changed.
