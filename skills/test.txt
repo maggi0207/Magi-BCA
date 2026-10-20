@@ -1,121 +1,97 @@
-132631 NPP: Specialty Records
+132627 NPP:  Primary Address Record
 
-Feature 4: Create Provider Specialty Records
+Feature 3: Create Provider Address Records
 Description
 
-Create specialty records for net-new and inactive practitioners based on PAF selections.
+Create provider address records from PAF information when no address record exists.
 
 Included Functionality
-Primary Specialty creation.
-PPI handling.
-Specialty activation.
-Business Rules
-Existing Active Practitioner
-No updates unless no Primary Specialty exists.
-Net New / Inactive Practitioner
-Create specialty:
-
-Field
-
-Value
-
-Specialty_RTK
-
-First Specialty selected
-
-SpecialtyType_RTK
-
-PRSPTYPRIM
-
-Active
-
-Active
-
-
-PPI Selection
-Field
-
-Value
-
-Specialty_RTK
-
-APP-Other
-
-SpecialtyStatus_RTK
-
-Not Certified
-
+Create address records for new practitioners.
+Do not modify existing address records.
 Acceptance Criteria
-Primary specialty is created when applicable.
-PPI creates APP-Other specialty.
-Existing active specialties remain unchanged.
+Address is created using PAF mapping.
+Existing addresses remain unchanged.
+All address attributes populate correctly.
+Exception Handling
+Missing required address fields generate validation error.
+Invalid state/country values are logged.
 
-child storiess
 
-132635 NPP: Specialty Records Create APP-Other Specialty for PPI Selection
-User Story 4.3 – Create APP-Other Specialty for PPI Selection
+Child storeies
+
+132638 NPP: Primary Address Record Create New Provider Address
+
+User Story 3.1 – Create New Provider Address
 As an MSP
-I want Professional Practice Interest selections handled appropriately
-So that non-specialty selections are represented correctly.
+I want provider address information copied from the PAF
+So that practitioner contact information exists in Cactus.
 
 Acceptance Criteria
-Given a PPI selection exists
-When processing occurs
-Then Specialty_RTK = APP-Other.
+Given no provider address record exists
+When the PAF is accepted
+Then a new address record is created. (Use existing logic)
 
-And
+Field Mapping
+PAF Field
 
-Field	Value
-Field
+Cactus Field
 
-Value
+Primary Address
 
-PROVIDERSPECIALTIES_SpecialtyStatus_RTK
+ADDRESSTYPE_RTK
 
-Not Certified (DS9Q12M4UO )
+Address Line 1
 
-132622 NPP: Specialty Records Create Primary Specialty for Net-New Practitioner
-User Story 4.1 – Create Primary Specialty for Net-New Practitioner
+ADDRESSLINE1
+
+Address Line 2
+
+ADDRESSLINE2
+
+City
+
+CITY
+
+State
+
+STATE
+
+Zip
+
+ZIPCODE
+
+Country
+
+COUNTRY
+
+Phone
+
+PHONE
+
+Extension
+
+EXTENSION
+
+Fax
+
+FAX
+
+Fax Extension
+
+FAXEXTENSION
+
+Email
+
+EMAIL
+
+132629 NPP: Primary Address Record Preserve Existing Provider Addresses
+User Story 3.2 – Preserve Existing Provider Addresses
 As an MSP
-I want a specialty record created from the PAF selection
-So that specialty information exists in Cactus.
+I want existing addresses unchanged
+So that verified address information is not overwritten.
 
 Acceptance Criteria
-Given the practitioner is net-new or inactive
-When a primary specialty is selected
-Then a specialty record is created.
-
-And
-Field
-
-Value
-
-Specialty_RTK
-
-First Specialty selected
-
-SpecialtyType_RTK
-
-PRSPTYPRIM
-
-Active
-
-Active
-
-132634 NPP: Specialty Records Create Specialty for Existing Active Practitioner Missing Primary Specialty
-User Story 4.2 – Create Specialty for Existing Active Practitioner Missing Primary Specialty
-As an MSP
-I want missing primary specialties populated
-So that practitioner records remain complete.
-
-Acceptance Criteria
-Given an active practitioner exists
-And no primary specialty exists
-When processing occurs
-Then a primary specialty record is created.
-
-
-     
-
-
+Given an address already exists
+When the PAF is accepted
+Then no updates occur.
 
