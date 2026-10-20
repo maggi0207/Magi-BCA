@@ -1,22 +1,37 @@
-You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
+**A. Skip Condition**
 
-ROLE:
-Senior engineer. One session. Find why PafProcessingService logs "in dev mode skipping processing queue". Do not start a second chat. Do not implement unless I ask after.
+`PafProcessingService.QueuePafForProcessingAsync` skips publishing when:
 
-UAT FACT:
-Paf.Api console:
-PafProcessingService - QueuePafForProcessingAsync - Request=[{"PafId":140021}]
-warn: ... in dev mode skipping processing queue
-No CVI rows in VisualCACTUS.Credentialing for HCA0095563 / UDP0000001.
+```csharp
+if (_settings.IsDevMode)
+{
+    ...
+    _logger.LogWarning("... in dev mode skipping processing queue");
+    return;
+}
+```
 
-QUOTE:
-1. PafProcessingService.QueuePafForProcessingAsync — the branch that skips the queue in dev (exact condition + config key / env / IHostEnvironment check).
-2. appsettings / appsettings.Development / launchSettings values that control that skip.
-3. How to enable real queue locally without inventing a new mechanism (existing flag, or alternate sync process path if one exists).
-4. How Paf.Processor is started locally and which connection string name points at VISUALCACTUS / localdb.
+`Paf.Api/Startup.cs` sets that value with `settings.IsDevMode = Environment.IsDevelopment();`. The PAF API launch profile sets `ASPNETCORE_ENVIRONMENT` to `Development`, so the skip is expected. There is no `IsDevMode` appsettings switch.
 
-RETURN:
-A. Skip condition — quote
-B. Config key(s) — quote
-C. Steps to enable processing for local CVI UAT (names only)
-D. Confirmation: no files changed
+**B. Configuration Keys**
+
+The PAF API gets its Service Bus sender connection from `HcoServiceBus`. Its Development appsettings contains that key, but it cannot override the Development-mode skip.
+
+The PAF Processor function trigger is configured as `[ServiceBusTrigger("paf-processing", Connection = "HcoServiceBus")]`. Processor startup separately reads `AzureWebJobsHcoServiceBus` for its own Service Bus service.
+
+For database connections, processor startup reads `ConnectionStrings:CactusDb` for VisualCACTUS and `ConnectionStrings:PafDb` for the PAF database. The processor’s checked-in VS Code tasks provide a build task, but no run task; no processor `local.settings.json` is present in the repository. The test Development settings show `PafDb` using LocalDB; do not assume the processor’s active `CactusDb` target is local. The PAF API Development config contains credential literals; I’m not reproducing them here. Treat those values as sensitive and handle/rotate them according to your team’s policy.
+
+**C. Local CVI UAT Path**
+
+- Run PAF API with a non-Development `ASPNETCORE_ENVIRONMENT`.
+- Supply an approved nonproduction `HcoServiceBus` connection for the API sender.
+- Start PAF Processor locally with Azure Functions Core Tools (`func host start`) and its required local settings.
+- Configure the function trigger’s `HcoServiceBus` and processor sender’s `AzureWebJobsHcoServiceBus`.
+- Configure `ConnectionStrings:CactusDb` and `ConnectionStrings:PafDb` for the intended UAT targets.
+- Confirm the Service Bus and VisualCACTUS targets before submitting: this path publishes a real queue message and can write to the configured VisualCACTUS database.
+
+No general synchronous product processing path was found. The only direct `CactusUpdater.UpdateCactusFromPafAsync` call found is in a processor integration test, not a local operational API.
+
+**D. Confirmation**
+
+No files were changed.
