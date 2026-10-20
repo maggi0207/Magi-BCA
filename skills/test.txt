@@ -1,47 +1,42 @@
-**A. Call Chain for Image Attachment**
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
 
-`PafProcessorFunction.RunAsync` receives the `paf-processing` Service Bus message and calls `CactusUpdater.UpdateCactusFromPafAsync`. The updater dispatches on `Practitioner.IsNew` to `UpdateFromNewAsync` or `UpdateFromExistingAsync`; neither dispatch has an NPP-specific image branch.
+ROLE:
+Senior engineer. One session. Map Sanction Check record create + sanctions image attach for NPP PAF accept. Do not implement. Do not start a second chat.
 
-- **New provider:** `UpdateFromNewAsync` inserts through `CrudPractitionerOperation`, then processes specialties/CVIs, licenses and addresses, and later PERF/delegate authorization. It does not call the provider PAF-image helper.
-- **Existing provider:** `UpdateFromExistingAsync` runs applicable task operations, then calls `UploadPafImageToProviderAsync` only when `shouldAttachPafImageToProvider` is true. That flag is set for `TaskType.ManagePersonalInfo`, not NPP. The helper calls `CrudImagesOperation` with `ParentFileK = ImageParentFileKValues.Provider` and queues that image for PAF PDF generation.
+PRODUCT (132678–132681):
+- Lookup existing Sanction: LICENSE_RTK.PROVIDERLICENSES = S3PK02GTA1 — do not duplicate.
+- Create sanction check when absent.
+- Attach sanctions image from PAF:
+  - IMAGES_DESCRIPTION: {LastName13}_{FirstName3}_Sanctions_MMDDYY
+  - IMAGES_TYPE_RTK: S3PK02WN8H (Sanction Checks)
+  - IMAGES_NOTES: Uploaded via auto PAF for ADD NPP to Facility
+- Missing sanction document → warning; attachment failure logged.
 
-**B. NPI-Specific Path or Generic**
+QUOTE:
+1. Where CactusUpdater / CrudPractitionerLicensesOperation (or real name) creates Sanction / PROVIDERLICENSES with LICENSE_RTK S3PK02GTA1 — quote Recruitment or AddPractitioner path.
+2. Any TaskType.Npp branch or exclusion for sanction create/attach.
+3. Exist/duplicate check for S3PK02GTA1 — quote.
+4. Sanctions image attach today — helper, type RTK, naming — quote or “none”.
+5. PAF source of sanctions file on NppTask (property names) — quote.
+6. Gap vs 132679/680/681 for Npp — Yes/No + quote.
+7. Tests (names only).
+8. Files that would change (names only). Files that must not.
 
-There is **no NPI-specific image path**, and no `TaskType.Npp` image-attach branch was found. The reusable generic helper is `UploadPafImageToProviderAsync`; it stores the provider’s PAF image, not the NPP NPI PSV attachment.
+STOP AND REPORT:
+- If sanction record create exists only under Recruitment — quote extension point; do not invent new Crud class.
+- If image type S3PK02WN8H already used — quote constant name/location.
 
-`CrudImagesOperation` accepts `FileName`, `ImageTypeRtk`, `ImageDescription`, `Notes`, and `ImageContents`. If no type is supplied, it defaults to `"D2MQ0MQ2SX"` (“Provider Action Form”).
+DO NOT:
+- Edit code
+- Invent RTKs beyond S3PK02GTA1 / S3PK02WN8H from this ticket
+- Implement NPI (blocked) or License in this inspect
 
-**C. Naming, Type, Notes Today**
-
-The generic PAF image description is generated as:
-
-> `"{LastName≤13}_{FirstName≤3}_PAF_{facility abbreviation}_{MMDDYY}.pdf"`
-
-The general `CrudImagesOperation` metadata uses its default Provider Action Form type, sets source to `"NOTVER2IMG"`, and derives notes from the selected task and applicable address/delegate/personal-info changes. Other task-specific image paths provide explicit type and metadata, but none handles NPI PSV. No NPI image type RTK or `{LastName13}_{FirstName3}_NPI_MMDDYY` formatter exists in the inspected path.
-
-**D. PAF Source of NPI File**
-
-`NppTask` contains:
-
-> `public PafAttachment NpiPsvAttachment { get; set; }`
-
-and a required `NpiPsvAttachmentUrl` property. The shared `PafAttachment` model holds the attachment ID and filename. The upload API stores attachment bytes in the PAF attachment repository. However, the processor has no reference to `NppTask.NpiPsvAttachment` or code that retrieves those bytes for a provider image.
-
-**E. NPP Gap vs 132648**
-
-**Yes, the NPI attach behavior is missing.** A present NPP NPI attachment is not read or attached to the provider; a missing attachment also causes no NPI-specific warning, skip, or throw in the processor, because that field is not consumed there. Existing provider PAF-image attachment is a separate, Manage-Personal-Info-only path.
-
-**F. Tests**
-
-- `TestCrudPractitionerCactusOperation_Save`
-- `TestCactusUpdater_NewNew`
-- `TestCactusUpdater_NewExisting` (currently has its body commented out)
-- No NPI image-attach test was found.
-
-**G. Smallest Implementation Shot**
-
-**STOP: need the authoritative NPI image `IMAGES.TYPE_RTK` from Ashley before implementing 132648.** Do not reuse the generic Provider Action Form RTK or infer a different image-type value. Once confirmed, the likely implementation surface is `CactusUpdater.cs` plus a focused test in `CactusUpdaterIntegrationTests.cs` or a dedicated processor test file; use the existing `CrudImagesOperation` helper.
-
-**H. Confirmation**
-
-No files were changed.
+RETURN (A–H):
+A. Call chain sanction record
+B. Exist check S3PK02GTA1 — quote
+C. Create path — quote
+D. Image attach path / gap — quote
+E. NppTask sanctions attachment source — quote
+F. Npp gap Yes/No
+G. Smallest implement shot (names only) or STOP
+H. Confirmation: no files changed
