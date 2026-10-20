@@ -1,29 +1,37 @@
-Implemented existing-provider preservation for NPP.
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
 
-1. **Files changed**
-   - `CrudPractitionerOperation.cs`
-   - `CactusOperationIntegrationTests.cs`
+ROLE:
+Senior engineer. One session. Map NPI image attach on PAF accept for NPP vs existing Add-Practitioner image logic. Do not implement. Do not start a second chat.
 
-2. **Method and gate**
-   
-   `UpdatePractitionerAsync` now returns the existing practitioner key before fetching or persisting the provider row when:
-   ```csharp
-   if (paf.TaskSelected == Shared.Data.Model.Paf.TaskType.Npp)
-       return practitionerKey;
-   ```
-   The caller still dispatches by `Practitioner.IsNew`; the NPP check is only in the existing-practitioner method.
+PRODUCT (132647 / 132648):
+- Attach NPI documentation to provider records.
+- IMAGES_DESCRIPTION naming: {LastName13}_{FirstName3}_NPI_MMDDYY
+- As MSP: NPI docs attached automatically so verification docs stored with provider.
 
-3. **AC 132604**
-   
-   **Yes for NPP existing practitioners:** the provider row is not fetched, audited, or updated, preserving all PROVIDERS fields. Non-NPP existing-provider updates continue through the prior update logic.
+QUOTE:
+1. Where CactusUpdater (or Crud* / image helper) attaches images after provider create/update — method names + call order for UpdateFromNewAsync / UpdateFromExistingAsync.
+2. Any TaskType.Npp branch or exclusion for image attach.
+3. How image type / description / notes are set today for NPI (or equivalent) — quote RTK constants, naming formatters, IMAGES_* fields.
+4. Source of NPI document bytes on PAF (which task/file field) — quote.
+5. Gap vs naming {LastName13}_{FirstName3}_NPI_MMDDYY and “attach on accept” for Npp.
+6. Tests covering NPI/image attach (names only).
+7. Files that would change for 132648 (names only). Files that must not.
 
-4. **Validation**
-   - Focused test `ExistingNppPractitionerDoesNotAccessProvidersRow`: **passed** (1 passed, 0 failed).
-   - The test run built `Hca.Credentialing.Paf.Processor` and its test project successfully.
-   - `git diff --check` passed for both changed files.
-   - No explicit non-NPP existing-provider preservation test was found; the NPP test specifically verifies no provider DB command is issued.
+STOP AND REPORT:
+- If no NPI image path exists and only generic image attach exists — quote the reusable helper; do not invent RTKs.
+- If NPI doc is missing from PAF — quote current missing-file behavior (warn/skip/throw).
 
-5. **Remaining gaps**
-   - New-practitioner matching failures still throw and stop downstream processing; 132604’s “match failure → continue” behavior remains unimplemented as requested.
-   - Development-mode queue skipping remains out of scope; this change does not enable or bypass the queue.
-   - Existing unrelated dirty files remain in the worktree; nothing was staged or committed.
+DO NOT:
+- Edit code
+- Invent IMAGES_TYPE_RTK values
+- Implement Sanction/License/other image types in this inspect
+
+RETURN (A–H):
+A. Call chain for image attach after provider write
+B. NPI-specific path or reusable generic — quote
+C. Naming / type / notes today — quote
+D. PAF source of NPI file — quote
+E. Npp gap vs 132648 — Yes/No + quote
+F. Tests
+G. Smallest implement shot (names only) or STOP (need RTK from Ashley)
+H. Confirmation: no files changed
