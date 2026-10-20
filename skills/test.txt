@@ -1,26 +1,62 @@
-**A. Build**
+You are implementing a change in the HCA HCP Credentialing repository.
 
-The PAF Processor build succeeded (`net10.0`). The focused `dotnet test` invocation also built `Hca.Credentialing.Paf.Processor.Tests` successfully.
+ROLE:
+Senior engineer. One session. NPP Entity Assignment: Internal Use Only, NPP–Active default, status whitelist, preserve historical inactive. Do not start a second chat.
 
-**B. Tests**
+PRODUCT / AC (132622 / 132624 / 132626):
+- Create EA for PAF SelectedFacilities (already via CreateStandardCviRecordsAsync — keep that call path).
+- Security on insert/update for NPP: WEBPUBLISHSTATUS = RECFLT_INT (Internal Use Only).
+- Status: when empty/unset → NPP – Active = M67G0Q3AIP (NPP V5 § Entity Assignment; also Portal.Api comments).
+- Status updates ONLY when current status is one of: None, N/A, NPP–Inactive, NPP–Suspend, Inactive.
+  Known RTKs from Portal.Api comments (use if already in repo constants; else literal with comment citing V5/Portal):
+  - NPP–Active: M67G0Q3AIP
+  - NPP–Inactive: M6LH0Z2G0S
+  - NPP–Suspend: M6LH0Z2GHZ
+  For None / N/A / Inactive: quote existing CommonCactusRtks or repo literals already used for those labels — do not invent new ones; if missing, update only when current is null/empty/NoneRtk and list Remaining gap for N/A/Inactive RTKs.
+- Do NOT modify inactive EA that has historical start AND end dates (preserve privileges).
+- Duplicate EA → update per existing logic but apply NPP rules above (no reactivate of historical dated inactive).
 
-Ran `NppExistingPrimaryAddressIsPreserved`, `NppMissingPrimaryAddressDoesNotSkipCreation`, `NppSanctionLicenseIsCreatedOnceAndSanctionsAttachmentIsQueued`, and `ExistingNppPractitionerDoesNotAccessProvidersRow`.
+OFFICE EVIDENCE (TASK 0):
+- Shared CrudEntityAssignmentOperation; NPP already reaches it via CVI path.
+- RECFLT_INT only for Recruitment today; NPP gets NoneRtk.
+- Insert status → Applicant DS6719BK9U.
+- Inactive match reactivated — violates 132626.
 
-Result: **4 total, 3 passed, 0 failed, 1 skipped.** The task output did not identify which test was skipped or give its reason. The VS Code test-discovery tool separately reported no tests found for the file.
+EXISTING PATTERN:
+Quote ResolveWebPubishStatus, ResolveStatusRtk, insert/update branches, TaskType.Npp detection before coding.
 
-**C. `git diff --check`**
+SCOPE (may change):
+- CrudEntityAssignmentOperation.cs
+- CommonCactusRtks.cs only if adding named constants next to existing ones
+- CactusUpdater.cs only if required to pass TaskSelected
+- Focused NPP EA test(s)
 
-Passed with no whitespace errors. Checked only:
-- `CactusUpdater.cs`
-- `CrudPractitionerAddressOperation.cs`
-- `CactusOperationIntegrationTests.cs`
+DO NOT CHANGE:
+- Recruitment RECFLT_INT behavior
+- Applicant default for non-Npp
+- Sanction / Address / Provider preserve paths
+- Invent RTKs beyond the V5/Portal list above
 
-Temporary task entries used to run validation were removed. No process termination was needed for the successful processor build and focused test run.
+IMPLEMENTATION:
+1. BEFORE coding: quote current ResolveWebPubishStatus / ResolveStatusRtk / inactive update.
+2. For TaskType.Npp: web publish RECFLT_INT; status M67G0Q3AIP when creating or when current status is whitelist-eligible / empty.
+3. For TaskType.Npp: if existing EA is inactive WITH start and end dates populated → skip modification entirely.
+4. Non-Npp: unchanged.
+5. Smallest diff.
 
-**D. One-Line Fixes**
+TESTS:
+- Npp insert/resolve → RECFLT_INT + M67G0Q3AIP (unit or integration as harness allows).
+- Historical inactive dated → no update (assert skip).
+- Build Processor + run focused tests.
 
-None. No compile errors required a fix.
+VALIDATION:
+- build + tests
+- git diff --check
 
-**E. Remaining Gaps**
-
-The added tests verify the guard’s existing/missing decision, but do not exercise the full updater path to prove that an existing Primary causes zero writes or that a missing Primary creates both address records. The skipped test’s identity and reason were not reported. Non-NPP behavior is gated out of the new check; sanction and provider-preservation code were not changed.
+RETURN:
+1. Files changed
+2. Gate quotes (security/status/historical)
+3. AC 132622/624/626 Yes/Partial/No
+4. Tests + results
+5. Remaining gaps (whitelist RTKs if any unresolved)
+6. Confirmation: non-Npp untouched
