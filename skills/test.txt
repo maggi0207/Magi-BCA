@@ -1,39 +1,68 @@
-You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
+**A. Call Chain: Submit to Provider Write**
 
-ROLE:
-Senior engineer. One session. Map how CactusUpdater creates or skips PROVIDERS rows for NPP (TaskType.Npp) vs Add-Practitioner. Do not start a second chat. Do not implement.
+The submit strategy queues accepted PAFs with `_pafProcessingService.QueuePafForProcessingAsync(FormData.FormId)` in `SubmitPafStrategy.cs:113`. The service’s Development-mode branch returns before it sends a message:
 
-PRODUCT:
-- 132601 / CRD-FTR-001: detect exist; create net-new; leave existing unchanged.
-- 132602 AC: Given practitioner does not exist in Cactus, When PAF accepted, Then new Provider created. Map First/Last/Suffix/Degree/Category/NPI (ticket lists PROVIDERS.* columns).
-- 132604 AC: Given matching Provider exists, When PAF accepted, Then no Provider demographic fields updated. Match failures logged; processing continues downstream.
+> `if (_settings.IsDevMode) ... _logger.LogWarning("... in dev mode skipping processing queue"); return;`
 
-QUOTE:
-1. CactusUpdater.UpdateCactusFromPafAsync — where practitioner/provider create is invoked; any TaskType.Npp branch.
-2. CrudPractitionerOperation (or real name) — exist check + insert + update paths. Quote how “exists” is decided (Provider_K / NPI / other).
-3. For net-new vs existing practitioner PAF: does NPP reuse the same create path as AddPractitionerToFacility?
-4. Field mapping today for First/Last/Suffix/Degree/Category/NPI — quote source properties from PAF FormData / Practitioner.
-5. Does existing-provider path already skip updates (preserve)? Quote.
-6. Gaps for 132601 when TaskSelected == Npp (missing call, wrong fields, always update, never create, etc.).
-7. Tests covering provider create/preserve (names only).
-8. Files that would change for 132602/132604 (names only). Files that must not.
+Otherwise it sends through Service Bus. The `PafProcessorFunction.cs:39` listens on `paf-processing` and calls `CactusUpdater.UpdateCactusFromPafAsync`. That method loads the PAF, then `InternalUpdateCactusFromPafAsync` chooses manual processing, `UpdateFromNewAsync` when `Practitioner.IsNew`, or `UpdateFromExistingAsync` otherwise. The new and existing paths invoke `CrudPractitionerOperation` under different conditions.
 
-STOP AND REPORT:
-- If NPP never reaches CrudPractitionerOperation because Dev queue skip or missing Npp arm — quote; do not invent a sync API.
-- If ticket “PAF Source PROVIDERS.*” means destination columns only — say so and quote actual PAF→Cactus mapping sources.
+**STOP for Current Local UAT:** the PAF API launch profile sets `ASPNETCORE_ENVIRONMENT` to `Development`, and startup derives `IsDevMode` from `Environment.IsDevelopment()`. Therefore, the reported UAT submit cannot reach the processor/provider operation in that local run: the queue message is skipped. This is a queue gate, not a missing NPP arm. I did not infer or propose a synchronous product path.
 
-DO NOT:
-- Edit code
-- Invent RTKs or new PROVIDERS columns
-- Implement 132647+ other children in this inspect
+**B. Exist Check**
 
-RETURN (A–I):
-A. Call chain submit → provider write
-B. Exist check — quote
-C. Create path — quote
-D. Preserve/skip existing — quote
-E. Field mapping PAF → PROVIDERS — quote
-F. Npp-specific gap vs Add-Practitioner — Yes/No + quote
-G. Tests
-H. Smallest implement shot (names only) or STOP
-I. Confirmation: no files changed
+`CrudPractitionerOperation` branches on the loaded PAF practitioner’s `IsNew` flag:
+
+> `if (practitioner.IsNew) { if (!await PractitionerValidations.IsUniqueAsync(practitioner)) ThrowPafProcessingError("New provider already exist"); return await SavePractitionerAsync(); } return await UpdatePractitionerAsync();`
+
+The new-practitioner duplicate check queries `VISUALCACTUS.PROVIDERS` by SSN and then NPI. It does not look up a matching record by Provider_K; the existing-practitioner path uses the PAF practitioner’s `Key`.
+
+**C. Create Path**
+
+For a net-new practitioner, `UpdateFromNewAsync` invokes `CrudPractitionerOperation`, which generates a Provider key and executes an `INSERT INTO VISUALCACTUS.PROVIDERS`. No `TaskType.Npp` exclusion is present in this path. Thus, when a queued NPP PAF has `Practitioner.IsNew == true`, the same create path used for other net-new PAFs is selected.
+
+**D. Preserve/Skip Existing**
+
+The existing path retrieves the provider by key and deep-copies it, but does **not** preserve all demographic fields. It subsequently updates and persists a changed record. First name, last name, suffix, display degrees, and NPI are commented out in the update method; however SSN, date of birth, sex, category, contact email, and cell phone are assigned from the PAF demographic task before `UpdateAsync`.
+
+That conflicts with 132604’s “no Provider demographic fields updated” acceptance criterion when this operation runs. It is not an unconditional “existing provider unchanged” path.
+
+**E. PAF to PROVIDERS Mapping**
+
+The ticket’s `PROVIDERS.*` names are destination columns. The actual source values are from `PafDataContext.Paf.PractitionerDemographicTask` (`prac`), not `NppTask`:
+
+- `FIRSTNAME` ← `prac.FirstName`
+- `LASTNAME` ← `prac.LastName`
+- `SUFFIX` ← `prac.Suffix`
+- `DISPLAYDEGREES` and `DISPLAYDEGREES_SHORT` ← `prac.Degrees`
+- `NPI` ← `prac.Npi`
+- `CATEGORY_RTK` ← `prac.GetPractitionerCategoryRtk()`, which maps `prac.Category`
+
+The insert also derives `LONGNAME` and `SORTNAME` from the demographic task.
+
+**F. NPP-Specific Gap vs Add-Practitioner**
+
+**No missing NPP processor arm** was found: create/existing dispatch is based on `Practitioner.IsNew`, with no NPP-specific exclusion around `CrudPractitionerOperation`.
+
+**Yes, a behavior gap exists for 132604:** the shared existing-provider update changes several provider fields instead of preserving all demographics. The current local Development queue skip additionally prevents this operation from being reached in the reported UAT run.
+
+Duplicate-match failures are thrown as `PafProcessingException`, caught and logged by `CactusUpdater`, recorded in PAF history, and leave the update unsuccessful; they do not continue into downstream provider/CVI processing.
+
+**G. Tests**
+
+- `TestCrudPractitionerCactusOperation_Save`
+- `TestCactusUpdater_NewNew`
+- `TestCactusUpdater_NewExisting` (currently returns `Task.CompletedTask`; test body is commented out)
+
+No explicit existing-provider demographic-preservation test was found.
+
+**H. Smallest Implementation Files**
+
+- `CactusUpdater.cs`
+- `CrudPractitionerOperation.cs`
+- `PractitionerValidations.cs` (only if the required existing-provider match-failure behavior changes)
+- `CactusUpdaterIntegrationTests.cs`
+- `CactusOperationIntegrationTests.cs`
+
+**I. Confirmation**
+
+No files were changed.
