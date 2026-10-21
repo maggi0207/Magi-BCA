@@ -1,28 +1,25 @@
-**1. Files Changed**
+You are committing the HCA HCP Credentialing repository. One session. Do not push unless asked.
 
-- `CommonCactusRtks.cs`
-- `CrudPractitionerSpecialtiesOperation.cs`
-- `CactusUpdater.cs`
-- `CactusOperationIntegrationTests.cs`
+ROLE:
+Commit ONLY the uncommitted 132635 PPI → APP-Other specialty changes. Do not start a second chat.
 
-**2. Gates and Key Resolution**
+STAGE ONLY (if part of this change):
+- CommonCactusRtks.cs
+- CrudPractitionerSpecialtiesOperation.cs
+- CactusUpdater.cs
+- CactusOperationIntegrationTests.cs
+Do not stage unrelated dirty files.
 
-PPI is detected as non-empty free text: `SpecialtyTask.ProfessionalPracticeInterest` is a `string`, populated from the PPI text area. Actual selected specialties normally use `PractitionerSpecialty.Key`; no `APP-Other` key or RTK mapping was found in the repository, so the ticket’s literal is used.
+COMMIT MESSAGE (use exactly):
 
-For NPP, processing now creates `APP-Other` only when PPI text exists and no row for that provider/specialty value exists. It uses `DS9Q12M4UO` for Not Certified. The specialty type uses `AlternateProviderSpecialtyTypeRtk`, matching the existing non-primary specialty pattern; no PPI-specific type was specified.
+Create APP-Other specialty with Not Certified status when NPP PPI text is present.
 
-New practitioners reach this from the existing `SavePractitionerSpecialtiesAsync` path. The existing-practitioner NPP operation retains its create-if-missing-primary behavior and also handles PPI; the updater now invokes that operation for PPI-only submissions with a completed Specialty task.
+Avoids duplicate APP-Other rows and leaves non-NPP specialty reconciliation unchanged.
 
-**3. AC 132635**
+DO NOT: push, amend, --no-verify
 
-**Implemented.** PPI creates the ticket-specified APP-Other value with Not Certified status. Existing APP-Other rows are not duplicated. No repository mapping for APP-Other exists, so its literal use remains tied to the supplied ticket value.
-
-**4. Tests and Validation**
-
-The PAF Processor and test project built successfully. The focused PPI tests reported **2 total, 1 passed, 0 failed, 1 skipped**. The no-PPI case passed; creation was skipped because the Cactus test account lacks `EXECUTE` permission on `dbo.GenB36Key`. Scoped `git diff --check` passed, and no editor diagnostics were found.
-
-**5. Remaining Gaps**
-
-The database-backed creation assertion needs rerunning with a Cactus account authorized to execute `dbo.GenB36Key`. The APP-Other identifier is not defined in repository data/constants; implementation uses the supplied literal as requested.
-
-The non-NPP reconciliation and its inactivation behavior were not changed. The existing NPP missing-primary behavior remains in the same operation path.
+RETURN:
+1. Commit hash + subject
+2. Files committed
+3. Leftover dirty files
+4. Not pushed confirmation
