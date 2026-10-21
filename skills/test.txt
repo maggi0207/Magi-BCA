@@ -1,30 +1,27 @@
-**Files Changed**
-- `PafController.cs`
-- `TaskController.cs`
-- `SubmitPafStrategy.cs`
-- `Hca.Credentialing.Paf.Api.Tests.csproj`
-- `NppAuthorizationTests.cs`
+You are committing the HCA HCP Credentialing repository. One session. Do not push unless asked.
 
-**Gate Quotes**
-Before coding, the add/update actions were dispatching directly to their strategy factories. Submit dispatched MSP users to the NPP path, CPC users to CPC processing except for Recruitment tasks, and Recruitment-role users to `ProcessSubmitForRecruitmentAsync` without checking `TaskSelected`.
+ROLE:
+Commit ONLY 131729 MSP-only NPP API authorization changes + new Paf.Api.Tests. Do not start a second chat.
 
-The new checks return `Forbid()` for non-MSP NPP add/update requests and NPP facility-list requests. Non-MSP submit checks both the posted task and the persisted PAF task. CPC may proceed only when both identify NPP and the persisted status is `SubmittedByMsp`, `ResubmittedByMsp`, or `UnderReviewByCpc`. Recruiter strategy dispatch now requires `TaskSelected == Recruitment`.
+STAGE (if present in diff):
+- PafController.cs
+- TaskController.cs
+- SubmitPafStrategy.cs
+- Hca.Credentialing.Paf.Api.Tests/** (csproj + NppAuthorizationTests.cs + any project files)
+- Solution file ONLY if you cleanly add the test project without unrelated .sln churn; else leave .sln out and note Remaining
 
-**AC Status**
-- **AC1:** Not assessable; its criteria were not included in the request.
-- **AC2:** Yes. Non-MSP NPP AddTask is denied.
-- **AC3:** Yes. UI Begin NPP visibility, route redirect, and server-derived available-task MSP mode were untouched.
-- **AC4:** Yes. Non-MSP NPP UpdateTask is denied.
-- **AC5:** Yes at the API code level. Non-MSP initial NPP submit is denied, including a posted task-type mismatch against a persisted NPP PAF.
-- **AC6:** Partial. SubmitterName behavior was not changed.
+DO NOT stage unrelated dirty UI/config/CACTUS files.
 
-**Validation**
-The new standalone API test project passed **9/9 tests**, including non-MSP add/update/submit denial, persisted-task mismatch denial, MSP add/submit pass-through, facility-picker denial, and CPC review preservation. `git diff --check` passed, and editor diagnostics found no errors.
+COMMIT MESSAGE (use exactly):
 
-The normal API build task could not copy referenced DLLs because the running PAF API process held them open. The API and test project built successfully and tests ran using a temporary output directory; I did not stop the running process.
+Enforce MSP-only authorization for NPP add, update, and submit API paths.
 
-**Remaining Gaps**
-- AC6 SubmitterName authority remains unchanged.
-- AC5 was not verified against a live environment’s role claims.
-- No API test project previously existed. I added a focused one, but left it out of the already-dirty solution file; run it directly with `dotnet test Hca.Credentialing/Hca.Credentialing.Paf.Api.Tests/Hca.Credentialing.Paf.Api.Tests.csproj`.
-- Confirmed: UI MSP hide/redirect behavior is untouched, and the persisted CPC review path remains available.
+Blocks non-MSP and recruiter bypass while preserving UI gates and CPC review of submitted NPP PAFs.
+
+DO NOT: push, amend, --no-verify
+
+RETURN:
+1. Commit hash + subject
+2. Files committed
+3. Leftover dirty / .sln note
+4. Not pushed confirmation
