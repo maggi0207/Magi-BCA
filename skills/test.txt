@@ -1,24 +1,38 @@
-**1. Files Changed**
+You are committing the HCA HCP Credentialing repository. One session. Do not push unless asked.
 
-- `CrudPractitionerLicensesOperation.cs`
-- `CactusOperationIntegrationTests.cs`
+ROLE:
+Senior engineer. Commit ONLY the uncommitted 132600 NPP CACTUS sync batch (Provider → License + NPI + pre-commit review fixes). Do not start a second chat.
 
-**2. Gate and Parent**
+BEFORE COMMIT:
+1. git status / git diff — list every modified/untracked file.
+2. Stage ONLY CACTUS/NPP processor files from this batch, typically:
+   - CactusUpdater.cs
+   - CrudPractitionerOperation.cs
+   - CrudPractitionerLicensesOperation.cs
+   - CrudPractitionerAddressOperation.cs
+   - CrudPractitionerSpecialtiesOperation.cs
+   - CrudEntityAssignmentOperation.cs
+   - CommonCactusRtks.cs
+   - CactusOperationIntegrationTests.cs
+   (Include any other file clearly part of this NPP CACTUS batch; if unsure, DO NOT stage — list under Leftover.)
+3. DO NOT stage unrelated dirty UI/config.
 
-For completed NPP tasks, NPI attachment processing now follows sanction and state-license processing. It reads `NppTask.NpiPsvAttachment`; if absent, it logs a warning. The image uses `ParentFileK = ImageParentFileKValues.Provider` and `ParentK = PractitionerKey`, making it provider-level rather than license-level.
+COMMIT MESSAGE (use exactly):
 
-The helper uses type `D2MQ0MQHOY`, description `{LastName13}_{FirstName3}_NPI_MMDDYY`, notes `Uploaded via auto PAF for ADD NPP to Facility`, and a generated original filename consisting of that description plus the uploaded file’s extension. It queues the attachment ID for the existing conversion worker, which retrieves the actual bytes from the PAF attachment store. Attachment/image exceptions are logged and do not fail the NPP processing operation.
+Wire NPP PAF accept into CACTUS provider, licenses, address, specialty, entity, and NPI image attach.
 
-**3. AC 132648**
+Preserve existing provider/address/license data, attach sanction/license/NPI PSV images, and keep Add-Practitioner paths unchanged.
 
-**Yes, implemented.** The type used is `D2MQ0MQHOY`, not the default Provider Action Form type `D2MQ0MQ2SX`.
+DO NOT:
+- Push
+- Amend
+- --no-verify
 
-**4. Tests and Validation**
+AFTER:
+- git status + git log -1 --oneline
 
-The Processor and test project built successfully. Focused tests reported **3 total, 1 passed, 0 failed, 2 skipped**. The missing-NPI warning test passed. The NPI image metadata test was skipped because the Cactus test account lacks `EXECUTE` permission on `dbo.GenB36Key`; the existing sanction image test was also skipped for the same environment limitation. `git diff --check` passed, and no editor diagnostics were found.
-
-**5. Remaining Gaps**
-
-Run the NPI image metadata and queue assertions against a Cactus account with `dbo.GenB36Key` execute permission. The conversion worker performs the actual attachment-byte retrieval asynchronously using the queued attachment ID, consistent with the existing PSV pipeline.
-
-Sanction and state-license behavior were not otherwise changed.
+RETURN:
+1. Commit hash + subject
+2. Files committed
+3. Leftover dirty files
+4. Confirmation: not pushed
