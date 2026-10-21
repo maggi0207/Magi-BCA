@@ -1,49 +1,28 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+**1. Files Changed**
 
-ROLE:
-Senior engineer. One session. When NPP SpecialtyTask has Professional Practice Interest (PPI), create APP-Other specialty with Not Certified status. Do not start a second chat.
+- `CommonCactusRtks.cs`
+- `CrudPractitionerSpecialtiesOperation.cs`
+- `CactusUpdater.cs`
+- `CactusOperationIntegrationTests.cs`
 
-PRODUCT / AC (132635):
-- Given a PPI selection exists, When processing occurs, Then Specialty_RTK = APP-Other.
-- PROVIDERSPECIALTIES SpecialtyStatus_RTK = Not Certified = DS9Q12M4UO (ADO 132635).
-- Do not invent other RTKs. If APP-Other is stored as a specialty key/RTK constant in repo, quote and reuse; otherwise use the ticket literal and note how specialty keys are resolved today.
+**2. Gates and Key Resolution**
 
-OFFICE EVIDENCE:
-- SpecialtyTask.ProfessionalPracticeInterest exists; specialty op does not reference it.
-- Primary path uses PRSPTYPRIM; existing NPP create-if-missing-primary already added — keep it.
-- Full Add-Practitioner reconciliation inactivates omitted rows — do NOT use that for NPP PPI.
+PPI is detected as non-empty free text: `SpecialtyTask.ProfessionalPracticeInterest` is a `string`, populated from the PPI text area. Actual selected specialties normally use `PractitionerSpecialty.Key`; no `APP-Other` key or RTK mapping was found in the repository, so the ticket’s literal is used.
 
-EXISTING PATTERN:
-Quote SpecialtyTask.ProfessionalPracticeInterest; SavePractitionerSpecialtyAsync / insert fields (SpecialtyStatusRtk); NPP specialty call sites (new + existing missing-primary).
+For NPP, processing now creates `APP-Other` only when PPI text exists and no row for that provider/specialty value exists. It uses `DS9Q12M4UO` for Not Certified. The specialty type uses `AlternateProviderSpecialtyTypeRtk`, matching the existing non-primary specialty pattern; no PPI-specific type was specified.
 
-SCOPE (may change):
-- CrudPractitionerSpecialtiesOperation.cs
-- CactusUpdater.cs only if NPP paths must invoke PPI handling
-- CommonCactusRtks.cs only if adding named constants next to existing specialty RTKs
-- Focused test(s)
+New practitioners reach this from the existing `SavePractitionerSpecialtiesAsync` path. The existing-practitioner NPP operation retains its create-if-missing-primary behavior and also handles PPI; the updater now invokes that operation for PPI-only submissions with a completed Specialty task.
 
-DO NOT CHANGE:
-- Non-Npp reconciliation / inactivate behavior
-- Provider preserve, licenses, address, entity, NPI
-- Invent RTKs beyond APP-Other / DS9Q12M4UO from ticket
+**3. AC 132635**
 
-IMPLEMENTATION:
-1. BEFORE coding: quote how Primary specialty key is saved; quote ProfessionalPracticeInterest type/shape; how “PPI selection exists” is detected (non-empty / specific values).
-2. For TaskType.Npp when Specialty processing runs (net-new save and/or existing NPP specialty path): if PPI selection exists, ensure an APP-Other specialty row exists with SpecialtyStatusRtk = DS9Q12M4UO. Prefer create-if-missing; do not wipe other specialties.
-3. If PPI absent → do nothing for APP-Other.
-4. Specialty type for APP-Other: quote existing pattern (primary vs alternate); if ticket is silent, match how non-primary specialties are typed today or leave type as existing helper default — document choice.
-5. Smallest diff.
+**Implemented.** PPI creates the ticket-specified APP-Other value with Not Certified status. Existing APP-Other rows are not duplicated. No repository mapping for APP-Other exists, so its literal use remains tied to the supplied ticket value.
 
-TESTS:
-- Npp + PPI set → APP-Other + status DS9Q12M4UO created or asserted.
-- Npp without PPI → no APP-Other forced.
-- Build + focused tests + git diff --check.
-- GenB36Key skip OK with note.
+**4. Tests and Validation**
 
-RETURN:
-1. Files changed
-2. Gate quotes (how PPI detected; APP-Other key resolution)
-3. AC 132635 Yes/Partial/No
-4. Tests + results
-5. Remaining gaps
-6. Confirmation: non-Npp reconciliation untouched; missing-primary path still works
+The PAF Processor and test project built successfully. The focused PPI tests reported **2 total, 1 passed, 0 failed, 1 skipped**. The no-PPI case passed; creation was skipped because the Cactus test account lacks `EXECUTE` permission on `dbo.GenB36Key`. Scoped `git diff --check` passed, and no editor diagnostics were found.
+
+**5. Remaining Gaps**
+
+The database-backed creation assertion needs rerunning with a Cactus account authorized to execute `dbo.GenB36Key`. The APP-Other identifier is not defined in repository data/constants; implementation uses the supplied literal as requested.
+
+The non-NPP reconciliation and its inactivation behavior were not changed. The existing NPP missing-primary behavior remains in the same operation path.
