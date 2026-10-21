@@ -1,54 +1,33 @@
-1. **Files added**
-   - `NppActivityReportGeneration.cs`
-   - `NppActivityReportTests.cs`
+TASK 2-132688 — UAT / smoke Monthly Add NPP Report
 
-   Recruitment report code was not changed. The Background.Tests project file has a pre-existing dirty change; I left it untouched.
+Do not commit. Do not change Recruitment. Report only.
 
-2. **Period and inclusive dates**
+Goal: Verify NppActivityReportGeneration matches Laura definitions and emails both DLs (or captures the outbound notification in Dev).
 
-   The function uses the requested timer expression:
+Steps:
+1) Force-run NppActivityReportGeneration locally (same entry pattern as Recruitment monthly report — quote how you triggered it).
+2) Confirm period = previous calendar month, inclusive first–last day (quote the computed PeriodStart / EndExclusive / displayed range).
+3) With known ADD NPP PAFs in that period (or seed/fixture if Dev has none):
+   a) Total received = count of TaskType.Npp with IndexedSubmittedDate in period
+   b) Routed to CPC = subset where FormData.CreatedOrUpdatedCvis has ≥1 item
+   c) % = (routed ÷ received) × 100, two decimals; 0.00% if received = 0
+   Manually spot-check SQL or known PAF IDs vs email HTML numbers.
+4) Confirm QueueEmailAsync / notification payload To includes BOTH:
+   PARADLAmericanSSCCPCFOMGMT@Parallon.com
+   PARA.CredentialReporting@Parallon.com
+5) Zero-activity case: empty period (or mock) still sends 0 / 0 / 0.00%.
+6) Confirm RecruitmentReportGeneration still unchanged / still builds.
 
-   ```csharp
-   [TimerTrigger("0 0 8 1 * *", UseMonitor = false)]
-   ```
+STOP AND REPORT if:
+- Function cannot be force-run locally — quote how Recruitment is run and what blocked NPP.
+- CreatedOrUpdatedCvis is empty for PAFs that should have CVIs — quote FormData sample; do not invent a fix in this task.
+- Email path fails — quote exception / notification sink.
 
-   It calculates the prior month’s first day and the current month’s first day as an exclusive bound:
-
-   ```csharp
-   var currentMonthStart = new DateTime(date.Year, date.Month, 1, 0, 0, 0, date.Kind);
-   return (currentMonthStart.AddMonths(-1), currentMonthStart);
-   ```
-
-   The query uses `IndexedSubmittedDate >= @PeriodStart` and `< @PeriodEndExclusive`, which includes the entire prior month, including its last day. The displayed period ends on `EndExclusive.AddDays(-1)`.
-
-3. **NPP filter**
-
-   The query filters by the existing indexed task field:
-
-   ```sql
-   WHERE paf.IndexedTaskSelected = @NppTaskType
-   ```
-
-   `@NppTaskType` is `(int)TaskType.Npp`; submission date uses `IndexedSubmittedDate`, which the model indexes from `SubmittedDate`.
-
-4. **CVI-created detection**
-
-   The report counts each matching PAF once when its stored `FormData` JSON contains at least one `CreatedOrUpdatedCvis` item:
-
-   ```sql
-   FROM OPENJSON(paf.FormData, '$.CreatedOrUpdatedCvis')
-   ```
-
-   This reuses the existing persisted collection: CactusUpdater loads the affected `CREDENTIALING_K` records into `CviSummaryResult` values, and `PafDataContext.UpdatePaf` stores them in `CreatedOrUpdatedCvis`. The NPP Cactus path inserts the NPP `CREDENTIALING` record. The query does not invent a new flag or join.
-
-5. **Recipients and email path**
-
-   Recipients are exactly `PARADLAmericanSSCCPCFOMGMT@Parallon.com` and `PARA.CredentialReporting@Parallon.com`. The function builds the HTML table using `TemplatedNotificationRequestBuilder`, then calls `QueueEmailAsync` through the existing Service Bus notification path. The aggregate query still returns zero-valued counts for an empty period, so the report is sent when activity is zero.
-
-6. **STOP hits**
-
-   **No.** The existing indexed NPP field and persisted PAF-to-CVI collection provide the required signals. The percentage is formatted to two decimals and returns `0.00%` when received count is zero.
-
-7. **Build/tests**
-
-   The Background and Background.Tests projects built; the focused report tests passed **3/3**. The build emitted the existing ImageSharp license warning. Editor diagnostics reported no errors; the new test file’s no-index whitespace check produced no whitespace findings.
+Return:
+1. How you force-ran (quote)
+2. Period used (start / end exclusive / display)
+3. Received / routed / % from email (or payload) vs your manual count
+4. Recipients on outbound message (quote)
+5. Zero-activity result (pass/fail)
+6. PASS / FAIL / PARTIAL + blockers
+7. Commit? NO (defer to final)
