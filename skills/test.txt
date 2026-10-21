@@ -1,50 +1,24 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+**1. Files Changed**
 
-ROLE:
-Senior engineer. One session. For accepted NPP PAFs: attach NPI PSV image to the provider using ADO type D2MQ0MQHOY. Do not start a second chat.
+- `CrudPractitionerLicensesOperation.cs`
+- `CactusOperationIntegrationTests.cs`
 
-PRODUCT / AC (132647 / 132648):
-- Attach NPI documentation from PAF to provider record.
-- IMAGES_DESCRIPTION: {LastName13}_{FirstName3}_NPI_MMDDYY
-- IMAGES_TYPE_RTK: D2MQ0MQHOY (NPI) — from ADO 132647 Description (authoritative)
-- IMAGES_NOTES: Uploaded via auto PAF for ADD NPP to Facility
-- Source: NppTask.NpiPsvAttachment / NpiPsvAttachmentUrl
-- Missing NPI doc → warn (same soft pattern as Sanctions); attachment failure → log
+**2. Gate and Parent**
 
-OFFICE EVIDENCE:
-- No processor consumer of NpiPsvAttachment today.
-- Reuse CrudImagesOperation + Sanction NPP image/queue pattern (not ManagePersonalInfo PAF PDF helper).
-- Do NOT use default type D2MQ0MQ2SX (Provider Action Form).
+For completed NPP tasks, NPI attachment processing now follows sanction and state-license processing. It reads `NppTask.NpiPsvAttachment`; if absent, it logs a warning. The image uses `ParentFileK = ImageParentFileKValues.Provider` and `ParentK = PractitionerKey`, making it provider-level rather than license-level.
 
-EXISTING PATTERN:
-Quote CreateOrAttachNppSanctionCheckAsync (or current sanctions image attach) and NppTask.NpiPsvAttachment before coding.
+The helper uses type `D2MQ0MQHOY`, description `{LastName13}_{FirstName3}_NPI_MMDDYY`, notes `Uploaded via auto PAF for ADD NPP to Facility`, and a generated original filename consisting of that description plus the uploaded file’s extension. It queues the attachment ID for the existing conversion worker, which retrieves the actual bytes from the PAF attachment store. Attachment/image exceptions are logged and do not fail the NPP processing operation.
 
-SCOPE (may change):
-- CrudPractitionerLicensesOperation.cs and/or CactusUpdater.cs (wherever Sanction NPP image is attached — prefer same NPP completed path)
-- Constants next to other image RTKs if repo groups them
-- Focused test in CactusOperationIntegrationTests
+**3. AC 132648**
 
-DO NOT CHANGE:
-- Sanction / State License / Provider preserve / Address / Entity / Specialty behavior except calling NPI attach in the same NPP completed flow
-- Invent other RTKs
-- Queue / IsDevMode
+**Yes, implemented.** The type used is `D2MQ0MQHOY`, not the default Provider Action Form type `D2MQ0MQ2SX`.
 
-IMPLEMENTATION:
-1. BEFORE coding: quote sanctions image attach + NpiPsvAttachment.
-2. For completed NppTask: load NPI attachment bytes; attach via CrudImagesOperation to provider (ParentFileK Provider — quote Sanction vs license parent; NPI is provider-level per ticket “provider record”).
-3. Set description/type/notes per AC. FileName aligned with description + real extension.
-4. Missing attachment → warn; errors logged; do not fail whole PAF if sanctions pattern is soft-fail.
-5. Smallest diff. Call after or with other NPP image work without breaking sanction/license order.
+**4. Tests and Validation**
 
-TESTS:
-- Npp with NpiPsvAttachment → image metadata type D2MQ0MQHOY (or skip on GenB36Key with note).
-- Missing NPI → warning path.
-- Build Processor + focused tests + git diff --check.
+The Processor and test project built successfully. Focused tests reported **3 total, 1 passed, 0 failed, 2 skipped**. The missing-NPI warning test passed. The NPI image metadata test was skipped because the Cactus test account lacks `EXECUTE` permission on `dbo.GenB36Key`; the existing sanction image test was also skipped for the same environment limitation. `git diff --check` passed, and no editor diagnostics were found.
 
-RETURN:
-1. Files changed
-2. Gate / parent-key quotes
-3. AC 132648 Yes/Partial/No
-4. Tests + results
-5. Remaining gaps
-6. Confirmation: type is D2MQ0MQHOY not D2MQ0MQ2SX; Sanction/License untouched in behavior
+**5. Remaining Gaps**
+
+Run the NPI image metadata and queue assertions against a Cactus account with `dbo.GenB36Key` execute permission. The conversion worker performs the actual attachment-byte retrieval asynchronously using the queued attachment ID, consistent with the existing PSV pipeline.
+
+Sanction and state-license behavior were not otherwise changed.
