@@ -1,103 +1,191 @@
-**A. Recruitment/PSG Exception**
+132687 : NPP Reports
 
-In `PractitionerSearchForm.razor.cs`, flexible mode is exactly:
+Title: Generate and Distribute Monthly Add NPP Activity Report
 
-```csharp
-private bool IsFlexiblePafUser() => _isRecruitmentUser || _isPsgUser;
-```
+Objective
+Provide an automated monthly report that summarizes Add NPP request activity for the prior month and distributes it to the required reporting groups on the 1st of each month.
 
-The exception form shows Reason, SSN, First Name, Last Name, DOB, and Practitioner Email; it omits NPI. The current reason list has one entry: `"Practitioner does not have NPI"`.
+Business Value
+This feature gives the business consistent oversight of Add NPP request volume and CPC routing activity, reduces manual reporting effort, and improves operational tracking.
 
-```csharp
-var hasAtLeastOneAdditionalCriterion =
-    !string.IsNullOrWhiteSpace(_model.PractitionerFirstName) ||
-    _model.DateOfBirth.HasValue ||
-    _model.HasAnySsn() ||
-    !string.IsNullOrWhiteSpace(_model.PractitionerEmail);
+Scope
+The report shall:
 
-return !string.IsNullOrWhiteSpace(_selectedReason)
-    && !string.IsNullOrWhiteSpace(_model.PractitionerLastName)
-    && hasAtLeastOneAdditionalCriterion;
-```
+Run automatically on the 1st of each month.
+Use the previous calendar month as the reporting period.
+Include:
+Total number of Add NPP requests received.
+Total number of Add NPP requests routed to CPC.
+Percentage of received Add NPP requests routed to CPC.
+Distribute the report to:
+PARA.DL American SSC CPC FO MGMT
+PARA Credential Reporting
+Business Rules
+The report is generated monthly.
+The reporting period is the prior calendar month.
+If no requests were received, the report still generates and shows zero values.
+Percentage routed to CPC must not fail on divide-by-zero; display 0% when no requests were received.
+Report distribution is automated.
 
-For flexible users, Last Name is required and must be at least two trimmed characters; First Name is optional. The UI also requires the selected Reason and at least one of First Name, DOB, SSN, or Email. The exception request logs the reason, names, DOB, and whether SSN/email were supplied, but does not send the reason in the search parameters.
 
-`ShowNoNpiOption` is separate: in `AddNewPractitionerForm.razor`, it controls an add-new wizard choice between “Enter NPI” and “No NPI,” with its own two reasons (“Provider currently in training program” and “Unknown”). It is not the exception-search Reason control.
 
-**B. MSP Exception**
+Child stories
 
-The non-flexible exception UI has NPI, SSN, First Name, and Last Name. It does not show Reason, DOB, or Email. Its button rule is:
+132688 : NPP: Reports Monthly Add NPP Request Activity Report
+User Story: Monthly Add NPP Request Activity Report
+Title
+Generate and Distribute Monthly Add NPP Request Activity Report
 
-```csharp
-return (_model.HasAnyNpi() || _model.HasAnySsn() ||
-    (!string.IsNullOrWhiteSpace(_model.PractitionerFirstName) && !string.IsNullOrWhiteSpace(_model.PractitionerLastName)));
-```
+User Story
+As a Credentialing Operations Leader
 
-Switching to exception mode clears NPI, so MSP exception search effectively requires SSN or both First and Last Name. Existing MSP validators also allow SSN to bypass the name requirements.
+I want a monthly report generated and automatically distributed
 
-**C. `/Npp` Behavior Today**
+So that leadership and reporting teams can monitor Add NPP request volume, CPC routing activity, and operational performance.
 
-`PractitionerSearchPage.razor.cs` identifies the NPP route and redirects users without the MSP role:
+Business Requirement
+The system shall generate a monthly Add NPP Activity Report summarizing activity for the previous calendar month.
 
-```csharp
-if (_isNppEntry && !_currentUser.IsInRole(nameof(HcoApplicationRole.Msp)))
-{
-    NavigationManager.NavigateTo(PageUri.RootUri);
-    return;
-}
-```
+The report shall be automatically generated and distributed on the 1st day of each month.
 
-`PractitionerSearchPage.razor` passes `ForceNpiSearchMode="@_isNppEntry"`. In `PractitionerSearchForm.razor.cs`, that flag only prevents the initial MSP auto-switch:
+The report is intended to provide oversight and operational tracking of Add NPP request processing and routing activities.
 
-```csharp
-if (!_isRecruitmentUser && !_isPsgUser && !ForceNpiSearchMode)
-{
-    SwitchToExceptionSearch();
-}
-```
+Report Schedule
+Requirement	Value
+Frequency	Monthly
+Run Date	1st day of each month
+Reporting Period	Previous calendar month
+Distribution Method	Automated Email Distribution
+Example
+Run Date: August 1
 
-It does not disable the always-rendered “No NPI available?” link or block `SwitchToExceptionSearch`. Also, `SwitchToNpiSearch` calls browser `history.back` for non-flexible users rather than changing the form mode. Thus `/Npp` starts in NPI mode, but the shared exception toggle remains available and Cancel is not guaranteed to return to NPI mode.
+Reporting Period: July 1 – July 31
 
-**D. Shared API vs. 131785 License Match**
+Report Metrics
+The report shall include the following metrics for the reporting period:
 
-`PractitionerSearchForm.razor.cs` builds the existing exception request as:
+Metric 1
+Total Number of Add NPP Requests Received
 
-```csharp
-searchParams.SearchType = PractitionerSearchType.Recruitment;
-searchParams.LastName = _model.PractitionerLastName;
-searchParams.FirstName = _model.PractitionerFirstName;
-searchParams.DateOfBirth = _model.DateOfBirth;
-searchParams.EmailAddress = _model.PractitionerEmail;
-searchParams.Ssn = ssnRawValue;
-```
+Definition:
 
-The form then calls `OnSearchCallback`; `PractitionerSearchTable.razor.cs` calls `SearchExistingPractitionersAsync`. The shared `PractitionerSearchParameters.cs` has no State, license number, or exception-reason property.
+Count of all Add NPP requests received during the reporting period.
 
-`PractitionerSearchType.Recruitment` dispatches to `RecruitmentMatchSearchPagedQueryBuilder` in `PractitionerRepository.cs`. Its exception branch matches LastName and any supplied FirstName, SSN, Email, or DOB using `AND` criteria. It has no State/license-number match.
+Metric 2
+Total Number of Add NPP Requests Routed to CPC
 
-Practitioner-license APIs do exist, but the inspected contracts do not provide that reverse lookup. `PractitionerLicenseSearchParameters.cs` accepts PractitionerKey, DelegateEmail, Name, and paging. `PractitionerLicenseController.cs` exposes state-license retrieval by practitioner key and searches for expired, unverified, or verified license items. The state-license repository query filters by practitioner key and a specific license RTK; it is not a state-plus-license-number-to-practitioner search. I found no existing `PROVIDERLICENSES` search usable for the 131785 exception match.
+Definition:
 
-**E. Safe NPP-Only Reuse Plan**
+Count of all Add NPP requests routed to CPC during the reporting period.
 
-Reuse the shared search UI and transport mechanics, but keep NPP out of `IsFlexiblePafUser`:
+Metric 3
+Percentage Routed to CPC
 
-- `PractitionerSearchPage._isNppEntry`, `PractitionerSearchPage.OnInitializedAsync`
-- `PractitionerSearchForm.ForceNpiSearchMode`, `SwitchToExceptionSearch`, `SwitchToNpiSearch`, `IsExceptionButtonEnabled`, `OnFinish`
-- `PractitionerSearchTable.ExecuteSearch`, `LoadPractitionersAsync`
-- `PractitionerClient.SearchExistingPractitionersAsync`
-- `PractitionerRepository.SearchPractitionersAsync` as the dispatch point for a dedicated NPP search path
-- Existing NPP modal hooks: `PractitionerSearchTable.IsNppRequest`, `ConfirmationWizardModal.IsNppRequest`, `AddNewPractitionerForm.IsNppRequest`
+Calculation:
 
-Add NPP-specific exception state/validation and an NPP-isolated search contract/query path rather than changing Recruitment/PSG flexibility or reusing `PractitionerSearchType.Recruitment`.
+Percentage Routed to CPC =
+(Total Routed to CPC ÷ Total Requests Received) × 100
 
-**F. Do Not Reuse / Stop Items**
+Display as percentage rounded to two decimal places.
 
-- Do not make NPP an `IsFlexiblePafUser`; that property deliberately means Recruitment or PSG.
-- Do not use the current `PractitionerSearchType.Recruitment` query as the final NPP search path; it is not NPP-isolated and has no license criteria.
-- Do not treat `ShowNoNpiOption` or the add-new wizard’s NPI reasons as the NPP exception-search controls.
-- Stop before implementing the license “VC” match until the product meaning of “VC,” supported VisualCACTUS lookup path, matching/normalization rules, and multiple/no-match behavior are confirmed. No provider-license search API was inferred.
-- Stop before implementing audit until the required durable audit event, identity/timestamp, retained criteria, and handling of sensitive values are specified. The current exception path emits a UI `Logger.LogInformation`; it does not pass Reason in its search request or queue the audit event used by the separate affiliation-verification path.
+Example:
 
-**G. No Files Changed**
+Received = 100
 
-No files were changed by this inspection. The worktree already had modifications in two ConfirmationWizard files; they were left untouched.
+Routed to CPC = 35
+
+Percentage = 35.00%
+
+Distribution Requirements
+The completed report shall be automatically distributed to the following distribution groups:
+
+Distribution List 1
+PARA.DL American SSC CPC FO MGMT
+
+Distribution List 2
+PARA Credential Reporting
+
+Acceptance Criteria
+Scenario 1 – Monthly Report Generation
+Given Add NPP request activity exists during the reporting period
+
+When the scheduled report executes on the 1st of the month
+
+Then a report is generated containing all required metrics.
+
+Scenario 2 – Previous Month Reporting
+Given the report runs on the 1st day of a month
+
+When the report is generated
+
+Then only activity from the previous calendar month is included.
+
+Scenario 3 – CPC Routing Count
+Given requests were routed to CPC during the reporting period
+
+When the report is generated
+
+Then the total routed count is displayed.
+
+Scenario 4 – CPC Routing Percentage Calculation
+Given requests were received and routed
+
+When the report is generated
+
+Then the percentage routed to CPC is correctly calculated.
+
+Scenario 5 – Automated Distribution
+Given the report is generated successfully
+
+When report processing completes
+
+Then the report is emailed to:
+
+PARA.DL American SSC CPC FO MGMT
+
+PARA Credential Reporting
+
+Scenario 6 – No Activity During Reporting Period
+Given no Add NPP requests were received during the reporting period
+
+When the report is generated
+
+Then the report displays:
+
+Total Requests Received = 0
+
+Total Routed to CPC = 0
+
+Percentage Routed to CPC = 0%
+
+And the report is still distributed.
+
+Exception Handling
+Report Generation Failure
+Failure details shall be logged.
+
+Notification shall be sent to the support team or reporting administrator.
+
+Email Distribution Failure
+Distribution errors shall be logged.
+
+Failed recipient groups shall be identified in the log.
+
+Data Extraction Failure
+Report generation shall terminate gracefully.
+
+Error details shall be captured for support review.
+
+Divide-by-Zero Handling
+If Total Requests Received = 0
+
+Percentage Routed to CPC shall display as 0%
+
+No calculation errors shall occur.
+
+Reporting Layout (Recommended)
+Metric	Value
+Reporting Period	MM/DD/YYYY – MM/DD/YYYY
+Total Add NPP Requests Received	###
+Total Add NPP Requests Routed to CPC	###
+Percentage Routed to CPC	##.##%
