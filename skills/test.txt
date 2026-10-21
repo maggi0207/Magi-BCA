@@ -1,80 +1,41 @@
-User Story: Restrict NPP PAF Submission Access to MSP User Role
-Title:
-Configure Role-Based Access Control for NPP PAF Submission – MSP Users Only
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
 
-Description:
-As a system administrator, I need to restrict the ability to submit an ADD NPP PAF request so that only users assigned to the MSP role can create and submit Non-Defined Practitioner (NPP) PAFs, ensuring compliance with business rules and preventing unauthorized submissions.
+ROLE:
+Senior engineer. One session. Map existing MSP role gates for Begin NPP / ADD NPP / Submit NPP vs 131729 AC. Do not implement. Do not start a second chat.
 
-Business Value:
-Ensures NPP onboarding requests are initiated only by authorized MSP users, improving governance, reducing processing errors, and maintaining compliance with credentialing workflows.
+PRODUCT (131729):
+- Only MSP may create and submit ADD NPP PAF.
+- Non-MSP: no access / initiate / submit / complete.
+- UI + API enforcement; unauthorized messaging; deny if role unknown.
+- AC6: submit records user + timestamp (audit) — quote if already present on PAF submit.
 
-Requirements
-Only users assigned to the MSP role may create and submit an ADD NPP PAF.
+QUOTE:
+1. Begin NPP PAF button / route — any role check (MSP, PSG, Authorize). Quote file/method.
+2. ADD NPP to Facility PAF Action radio — IsInRole(Msp) or equivalent; server vs client. Quote.
+3. CreateAddTaskStrategy(Npp) / begin PAF for Npp — server authorization. Quote.
+4. Submit PAF for TaskType.Npp — any MSP-only check on API; what happens for non-MSP. Quote.
+5. Unauthorized UX: hidden vs disabled vs error message — quote existing pattern.
+6. Fail-closed if role missing — Yes/No + quote.
+7. AC6 audit (submitter user + timestamp) — where recorded today.
+8. Gaps vs AC1–AC6 (UI and API). Tests covering NPP MSP auth (names only).
+9. Files that would change for remaining gaps (names only). Files that must not.
 
-Non-MSP users must not be able to access, initiate, submit, or complete the ADD NPP PAF process.
+STOP AND REPORT:
+- If MSP gate exists only on UI — list API endpoints still open.
+- If PSG can Begin NPP today — quote; do not invent product rule beyond ticket (MSP only).
 
-Access restrictions must be enforced at both the UI and service/API layers.
+DO NOT:
+- Edit code
+- Invent new roles beyond MSP
+- Implement in this inspect
 
-Appropriate messaging must be displayed when unauthorized users attempt to access the functionality.
-
-Security configuration must be consistent across DEV, QA, and PROD environments.
-
-Acceptance Criteria
-AC1 – MSP Users Can Submit ADD NPP PAF
-Given a user is assigned the MSP role
-When the user accesses the NPP functionality
-Then the user can create and submit an ADD NPP PAF request.
-
-AC2 – Non-MSP Users Cannot Submit ADD NPP PAF
-Given a user is not assigned the MSP role
-When the user attempts to access or submit an ADD NPP PAF
-Then access is denied and the request cannot be submitted.
-
-AC3 – UI Security Enforcement
-Given a non-MSP user is logged in
-When the user navigates to the NPP workflow
-Then the ADD NPP PAF option is hidden or disabled based on application standards.
-
-AC4 – Backend Security Enforcement
-Given a non-MSP user attempts to bypass the UI and directly invoke the submission service
-When the request is processed
-Then the system rejects the request and returns an authorization error.
-
-AC5 – Consistent Security Configuration
-Given role-based security has been configured
-When validation is performed in DEV, QA, and PROD
-Then only MSP users have permission to submit ADD NPP PAF requests in all environments.
-
-AC6 – Auditability
-Given an ADD NPP PAF submission is made
-When the request is successfully submitted
-Then the system records the submitting user and timestamp for audit purposes.
-
-Technical Tasks
-Identify the ADD NPP PAF workflow entry point(s).
-
-Update role-based security configuration to allow MSP role access only.
-
-Implement UI-level access restrictions.
-
-Implement API/service-level authorization validation.
-
-Configure and validate security in DEV.
-
-Promote and validate security in QA.
-
-Promote and validate security in PROD.
-
-Perform positive and negative access testing.
-
-Update security and workflow documentation.
-
-Exception Handling
-If a user's role cannot be determined, deny access by default.
-
-If the authorization service is unavailable, deny submission and log the error.
-
-If a non-MSP user attempts direct API submission, reject the request and return an authorization error.
-
-Any security configuration discrepancies between environments must be resolved before deployment approval.
-
+RETURN (A–I):
+A. Entry points for ADD NPP
+B. UI MSP gates — quote
+C. API MSP gates — quote
+D. Submit path auth — quote
+E. Unauthorized message / hide pattern — quote
+F. Audit submitter — quote
+G. Gap matrix AC1–AC6 Yes/Partial/No
+H. Smallest implement shot or CLEAN
+I. Confirmation: no files changed
