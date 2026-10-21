@@ -1,27 +1,26 @@
-You are committing the HCA HCP Credentialing repository. One session. Do not push unless asked.
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
 
 ROLE:
-Commit ONLY 131729 MSP-only NPP API authorization changes + new Paf.Api.Tests. Do not start a second chat.
+Senior engineer. One session. Re-map existing No-NPI / Exception search for Recruitment, PSG, and MSP vs what NPP 131785 needs. Quote reuse points. Do not implement. Do not invent PROVIDERLICENSES APIs.
 
-STAGE (if present in diff):
-- PafController.cs
-- TaskController.cs
-- SubmitPafStrategy.cs
-- Hca.Credentialing.Paf.Api.Tests/** (csproj + NppAuthorizationTests.cs + any project files)
-- Solution file ONLY if you cleanly add the test project without unrelated .sln churn; else leave .sln out and note Remaining
+PRODUCT:
+- 131785 NPP Exception Search: Reason, Last, optional First, paired State+License, license-based VC match, Cancel back to NPI, NPP-isolated.
+- We believe Recruitment/PSG already have No-NPI exception — confirm and contrast.
 
-DO NOT stage unrelated dirty UI/config/CACTUS files.
+QUOTE:
+1. IsFlexiblePafUser / ShowNoNpiOption / Recruitment / PSG — exception field list and validation (exact).
+2. MSP non-flexible exception fields and IsExceptionButtonEnabled.
+3. SwitchToExceptionSearch + ForceNpiSearchMode on /Npp.
+4. SearchExistingPractitionersAsync exception payload (SearchType + parameters). Any State/License fields anywhere?
+5. Any PractitionerLicense* or PROVIDERLICENSES search usable for exception (quote or “none”).
+6. Safe NPP-only reuse plan without enabling IsFlexiblePafUser for NPP (files/methods names only).
+7. Still STOP items for full 131785 (license VC + audit).
 
-COMMIT MESSAGE (use exactly):
-
-Enforce MSP-only authorization for NPP add, update, and submit API paths.
-
-Blocks non-MSP and recruiter bypass while preserving UI gates and CPC review of submitted NPP PAFs.
-
-DO NOT: push, amend, --no-verify
-
-RETURN:
-1. Commit hash + subject
-2. Files committed
-3. Leftover dirty / .sln note
-4. Not pushed confirmation
+RETURN (A–G):
+A. Recruitment/PSG exception — quote
+B. MSP exception — quote
+C. /Npp behavior today — quote
+D. Shared API capabilities vs 131785 license match
+E. Reuse list (do reuse)
+F. Do-not-reuse / STOP list
+G. Confirmation: no files changed
