@@ -1,41 +1,91 @@
-You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
+**A. Entry Points**
 
-ROLE:
-Senior engineer. One session. Map existing MSP role gates for Begin NPP / ADD NPP / Submit NPP vs 131729 AC. Do not implement. Do not start a second chat.
+- The queue’s **Begin NPP PAF** button navigates to `/Practitioner/Search/Npp`. It is displayed only when `IsMspOnlyUser` is true.
+- `PractitionerSearchPage` detects that route and redirects users who are not in the MSP role to the root page.
+- The PAF Action radio is populated from `GetAvailableTaskList`; `TaskDeterminationService` adds NPP only when the MSP flag is true.
+- The NPP action is ultimately added through `PUT api/Paf/AddTaskToPaf?task=Npp`.
 
-PRODUCT (131729):
-- Only MSP may create and submit ADD NPP PAF.
-- Non-MSP: no access / initiate / submit / complete.
-- UI + API enforcement; unauthorized messaging; deny if role unknown.
-- AC6: submit records user + timestamp (audit) — quote if already present on PAF submit.
+**B. UI MSP Gates**
 
-QUOTE:
-1. Begin NPP PAF button / route — any role check (MSP, PSG, Authorize). Quote file/method.
-2. ADD NPP to Facility PAF Action radio — IsInRole(Msp) or equivalent; server vs client. Quote.
-3. CreateAddTaskStrategy(Npp) / begin PAF for Npp — server authorization. Quote.
-4. Submit PAF for TaskType.Npp — any MSP-only check on API; what happens for non-MSP. Quote.
-5. Unauthorized UX: hidden vs disabled vs error message — quote existing pattern.
-6. Fail-closed if role missing — Yes/No + quote.
-7. AC6 audit (submitter user + timestamp) — where recorded today.
-8. Gaps vs AC1–AC6 (UI and API). Tests covering NPP MSP auth (names only).
-9. Files that would change for remaining gaps (names only). Files that must not.
+The queue button is conditional:
 
-STOP AND REPORT:
-- If MSP gate exists only on UI — list API endpoints still open.
-- If PSG can Begin NPP today — quote; do not invent product rule beyond ticket (MSP only).
+> `@if (IsMspOnlyUser)`
 
-DO NOT:
-- Edit code
-- Invent new roles beyond MSP
-- Implement in this inspect
+`IsMspOnlyUser()` uses the exact MSP role:
 
-RETURN (A–I):
-A. Entry points for ADD NPP
-B. UI MSP gates — quote
-C. API MSP gates — quote
-D. Submit path auth — quote
-E. Unauthorized message / hide pattern — quote
-F. Audit submitter — quote
-G. Gap matrix AC1–AC6 Yes/Partial/No
-H. Smallest implement shot or CLEAN
-I. Confirmation: no files changed
+> `return _currentUser?.IsInRole(nameof(HcoApplicationRole.Msp)) ?? false;`
+
+The NPP route also redirects non-MSP users:
+
+> `if (_isNppEntry && !_currentUser.IsInRole(nameof(HcoApplicationRole.Msp))) { NavigationManager.NavigateTo(PageUri.RootUri); return; }`
+
+The available-task API overwrites the client-supplied MSP mode from the authenticated principal and fails closed for listing if principal resolution fails:
+
+> `listParameters.IsMspUserMode = currentUser.IsInRole(nameof(HcoApplicationRole.Msp));`
+
+> `catch (Exception ex) { listParameters.IsMspUserMode = false; ... }`
+
+The task determination service then adds `TaskType.Npp` only for that server-derived mode.
+
+**C. API MSP Gates**
+
+The API controllers have `[Authorize]`, which requires authentication, not the MSP role. There is no MSP-specific gate in these action methods:
+
+- `PafController.AddTaskToPafAsync`
+- `PafController.CreateNewPafAsync`
+- `PafController.UpdateTaskAndSavePafAsync`
+- `PafController.SubmitPafAsync`
+- `TaskController.GetAvailableFacilityListAsync`
+
+`CreateAddTaskStrategy` maps NPP directly to the shared Add-Practitioner strategy:
+
+> `TaskType.Npp => new AddTaskAddPractitionerToFacilityStrategy(this)`
+
+That strategy has a PSG-specific branch which adds a `PerfTask` for eligible practitioners. Thus, PSG cannot use the normal NPP entry point or see NPP in the server-derived list, but an authenticated PSG (or other authenticated caller) can directly call `AddTaskToPaf?task=Npp`; the server will build the NPP task. Direct `UpdateTaskAndSavePaf?task=Npp` likewise has no MSP role check.
+
+**D. Submit Path Auth**
+
+The `SubmitPaf` endpoint delegates directly to `SubmitPafStrategy`. For MSP users, NPP receives its NPP submit handling. But the role dispatch is not NPP-exclusive:
+
+- CPC users enter `ProcessSubmitForCpcAsync`, the review/decision flow.
+- Recruiter users enter `ProcessSubmitForRecruitmentAsync` without checking that `TaskSelected` is Recruitment. That branch can reach success and set `SubmittedByRecruiter` for an NPP form.
+
+Unknown/PSG users generally leave the result at its initial `Failure`, so that case fails closed in effect, but returns HTTP 200 with a failure result. The recruiter path is a clear MSP-only submit gap; CPC review/accept appears to be the existing review workflow, not initial MSP submission.
+
+**E. Unauthorized UX / Fail-Closed**
+
+- Begin NPP is hidden for non-MSP; direct NPP route access redirects to root. No explicit unauthorized message is shown.
+- A generic failed submit displays **“PAF Submission Failed”** and usually the fallback **“Unexpected error. Please try again.”**
+- The task-list endpoint logs and hides NPP if it cannot resolve the current user. That fail-closed behavior is limited to task listing.
+- Direct API task-add/update paths lack the MSP gate; submit handling can dispatch recruiters to a successful non-MSP branch.
+
+**F. Submitter Audit**
+
+There is server-side timestamp and user audit. On successful MSP submission, `SetSubmitInfoAsync` sets:
+
+> `formData.SubmittedDate = DateTime.UtcNow;`
+
+The strategy’s base save path calls `SetLastUpdatedInfo(StrategyContext)`, which sets `LastUpdatedBy` from the current authenticated user’s username. Status history copies `LastUpdatedBy` into `UpdatedByName` and writes `UpdatedOn = DateTime.UtcNow`.
+
+Caveat: `SetSubmitInfoAsync` only fills `SubmitterName` from the authenticated principal when the field is blank; a nonblank value supplied in the form is retained. The history audit identity is server-derived, but the display submitter name is not always authoritative.
+
+**G. Gap Matrix**
+
+| AC | Status | Evidence |
+|---|---|---|
+| AC1: MSP-only NPP creation | **Partial** | UI and task-list gates exist; direct `AddTaskToPaf?task=Npp` has only authentication. |
+| AC2: MSP-only NPP submit | **No** | Recruiter submit dispatch is not restricted by `TaskSelected`; an NPP can reach the recruiter success path. |
+| AC3: Non-MSP cannot access/initiate | **Partial** | NPP route redirects and task-list hides it, but API task creation/facility listing can be called directly. |
+| AC4: Non-MSP cannot complete | **No** | `UpdateTaskAndSavePaf?task=Npp` has no MSP-specific authorization gate. |
+| AC5: UI and API enforcement | **Partial** | UI protections exist; API authorization is authenticated-user-only for these routes. |
+| AC6: Submit user and timestamp audit | **Yes, with caveat** | Server records `SubmittedDate` and status history’s `UpdatedByName`/`UpdatedOn`; form `SubmitterName` may remain client-supplied. |
+
+No NPP MSP authorization tests were found. The workspace has no `Hca.Credentialing.Paf.Api.Tests` project; existing NPP tests are in the PAF Processor tests and do not cover API role enforcement.
+
+**H. Smallest Implement Shot**
+
+Add server-side MSP authorization for NPP at the API boundary, especially `AddTaskToPaf`, `UpdateTaskAndSavePaf` for NPP, and the initial NPP branch of `SubmitPaf`. Also restrict recruiter submit dispatch to Recruitment task forms. Keep the CPC review/decision path distinct. Apply MSP role validation to facility-list requests for `TaskType.Npp`, and return a consistent 403/unauthorized result rather than a generic HTTP-200 failure. Add PAF API authorization tests; that test project is not present in the workspace.
+
+**I. Read-Only Confirmation**
+
+No files were changed.
