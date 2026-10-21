@@ -1,25 +1,80 @@
-You are committing the HCA HCP Credentialing repository. One session. Do not push unless asked.
+User Story: Restrict NPP PAF Submission Access to MSP User Role
+Title:
+Configure Role-Based Access Control for NPP PAF Submission – MSP Users Only
 
-ROLE:
-Commit ONLY the uncommitted 132635 PPI → APP-Other specialty changes. Do not start a second chat.
+Description:
+As a system administrator, I need to restrict the ability to submit an ADD NPP PAF request so that only users assigned to the MSP role can create and submit Non-Defined Practitioner (NPP) PAFs, ensuring compliance with business rules and preventing unauthorized submissions.
 
-STAGE ONLY (if part of this change):
-- CommonCactusRtks.cs
-- CrudPractitionerSpecialtiesOperation.cs
-- CactusUpdater.cs
-- CactusOperationIntegrationTests.cs
-Do not stage unrelated dirty files.
+Business Value:
+Ensures NPP onboarding requests are initiated only by authorized MSP users, improving governance, reducing processing errors, and maintaining compliance with credentialing workflows.
 
-COMMIT MESSAGE (use exactly):
+Requirements
+Only users assigned to the MSP role may create and submit an ADD NPP PAF.
 
-Create APP-Other specialty with Not Certified status when NPP PPI text is present.
+Non-MSP users must not be able to access, initiate, submit, or complete the ADD NPP PAF process.
 
-Avoids duplicate APP-Other rows and leaves non-NPP specialty reconciliation unchanged.
+Access restrictions must be enforced at both the UI and service/API layers.
 
-DO NOT: push, amend, --no-verify
+Appropriate messaging must be displayed when unauthorized users attempt to access the functionality.
 
-RETURN:
-1. Commit hash + subject
-2. Files committed
-3. Leftover dirty files
-4. Not pushed confirmation
+Security configuration must be consistent across DEV, QA, and PROD environments.
+
+Acceptance Criteria
+AC1 – MSP Users Can Submit ADD NPP PAF
+Given a user is assigned the MSP role
+When the user accesses the NPP functionality
+Then the user can create and submit an ADD NPP PAF request.
+
+AC2 – Non-MSP Users Cannot Submit ADD NPP PAF
+Given a user is not assigned the MSP role
+When the user attempts to access or submit an ADD NPP PAF
+Then access is denied and the request cannot be submitted.
+
+AC3 – UI Security Enforcement
+Given a non-MSP user is logged in
+When the user navigates to the NPP workflow
+Then the ADD NPP PAF option is hidden or disabled based on application standards.
+
+AC4 – Backend Security Enforcement
+Given a non-MSP user attempts to bypass the UI and directly invoke the submission service
+When the request is processed
+Then the system rejects the request and returns an authorization error.
+
+AC5 – Consistent Security Configuration
+Given role-based security has been configured
+When validation is performed in DEV, QA, and PROD
+Then only MSP users have permission to submit ADD NPP PAF requests in all environments.
+
+AC6 – Auditability
+Given an ADD NPP PAF submission is made
+When the request is successfully submitted
+Then the system records the submitting user and timestamp for audit purposes.
+
+Technical Tasks
+Identify the ADD NPP PAF workflow entry point(s).
+
+Update role-based security configuration to allow MSP role access only.
+
+Implement UI-level access restrictions.
+
+Implement API/service-level authorization validation.
+
+Configure and validate security in DEV.
+
+Promote and validate security in QA.
+
+Promote and validate security in PROD.
+
+Perform positive and negative access testing.
+
+Update security and workflow documentation.
+
+Exception Handling
+If a user's role cannot be determined, deny access by default.
+
+If the authorization service is unavailable, deny submission and log the error.
+
+If a non-MSP user attempts direct API submission, reject the request and return an authorization error.
+
+Any security configuration discrepancies between environments must be resolved before deployment approval.
+
