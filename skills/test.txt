@@ -1,40 +1,50 @@
-You are committing the HCA HCP Credentialing repository. One session. Do not push unless asked.
+You are implementing a change in the HCA HCP Credentialing repository.
 
 ROLE:
-Senior engineer. Commit ONLY the uncommitted 132600 NPP CACTUS sync batch (Provider → License + pre-commit review fixes). Do not start a second chat.
+Senior engineer. One session. For accepted NPP PAFs: attach NPI PSV image to the provider using ADO type D2MQ0MQHOY. Do not start a second chat.
 
-BEFORE COMMIT:
-1. git status / git diff — list every modified/untracked file.
-2. Stage ONLY these (and related Processor test files if part of this batch):
-   - CactusUpdater.cs
-   - CrudPractitionerOperation.cs
-   - CrudPractitionerLicensesOperation.cs
-   - CrudPractitionerAddressOperation.cs
-   - CrudPractitionerSpecialtiesOperation.cs
-   - CrudEntityAssignmentOperation.cs
-   - CommonCactusRtks.cs
-   - CactusOperationIntegrationTests.cs
-   (Include any other file that is clearly part of this NPP CACTUS batch from git diff; if unsure, DO NOT stage — list it under Leftover.)
-3. DO NOT stage unrelated dirty UI, config, launchSettings, or other feature work.
+PRODUCT / AC (132647 / 132648):
+- Attach NPI documentation from PAF to provider record.
+- IMAGES_DESCRIPTION: {LastName13}_{FirstName3}_NPI_MMDDYY
+- IMAGES_TYPE_RTK: D2MQ0MQHOY (NPI) — from ADO 132647 Description (authoritative)
+- IMAGES_NOTES: Uploaded via auto PAF for ADD NPP to Facility
+- Source: NppTask.NpiPsvAttachment / NpiPsvAttachmentUrl
+- Missing NPI doc → warn (same soft pattern as Sanctions); attachment failure → log
 
-COMMIT MESSAGE (use exactly):
+OFFICE EVIDENCE:
+- No processor consumer of NpiPsvAttachment today.
+- Reuse CrudImagesOperation + Sanction NPP image/queue pattern (not ManagePersonalInfo PAF PDF helper).
+- Do NOT use default type D2MQ0MQ2SX (Provider Action Form).
 
-Wire NPP PAF accept into CACTUS provider, licenses, address, specialty, and entity rules.
+EXISTING PATTERN:
+Quote CreateOrAttachNppSanctionCheckAsync (or current sanctions image attach) and NppTask.NpiPsvAttachment before coding.
 
-Preserve existing provider/address/license data, add sanction and state-license PSV attach, and keep Add-Practitioner paths unchanged.
+SCOPE (may change):
+- CrudPractitionerLicensesOperation.cs and/or CactusUpdater.cs (wherever Sanction NPP image is attached — prefer same NPP completed path)
+- Constants next to other image RTKs if repo groups them
+- Focused test in CactusOperationIntegrationTests
 
-DO NOT:
-- Push
-- Amend prior commits
-- --no-verify
-- Commit NPI/PPI/enrollment unfinished work (should not exist)
+DO NOT CHANGE:
+- Sanction / State License / Provider preserve / Address / Entity / Specialty behavior except calling NPI attach in the same NPP completed flow
+- Invent other RTKs
+- Queue / IsDevMode
 
-AFTER:
-- git status — confirm clean for staged set; leftover dirty files listed
-- git log -1 --oneline
+IMPLEMENTATION:
+1. BEFORE coding: quote sanctions image attach + NpiPsvAttachment.
+2. For completed NppTask: load NPI attachment bytes; attach via CrudImagesOperation to provider (ParentFileK Provider — quote Sanction vs license parent; NPI is provider-level per ticket “provider record”).
+3. Set description/type/notes per AC. FileName aligned with description + real extension.
+4. Missing attachment → warn; errors logged; do not fail whole PAF if sanctions pattern is soft-fail.
+5. Smallest diff. Call after or with other NPP image work without breaking sanction/license order.
+
+TESTS:
+- Npp with NpiPsvAttachment → image metadata type D2MQ0MQHOY (or skip on GenB36Key with note).
+- Missing NPI → warning path.
+- Build Processor + focused tests + git diff --check.
 
 RETURN:
-1. Commit hash + subject
-2. Files committed (list)
-3. Leftover dirty files NOT committed
-4. Confirmation: not pushed
+1. Files changed
+2. Gate / parent-key quotes
+3. AC 132648 Yes/Partial/No
+4. Tests + results
+5. Remaining gaps
+6. Confirmation: type is D2MQ0MQHOY not D2MQ0MQ2SX; Sanction/License untouched in behavior
