@@ -1,54 +1,30 @@
-You are implementing a change in the HCA HCP Credentialing repository.
+**Files Changed**
+- `PafController.cs`
+- `TaskController.cs`
+- `SubmitPafStrategy.cs`
+- `Hca.Credentialing.Paf.Api.Tests.csproj`
+- `NppAuthorizationTests.cs`
 
-ROLE:
-Senior engineer. One session. Enforce MSP-only for ADD NPP at API/service layer per 131729. Do not start a second chat.
+**Gate Quotes**
+Before coding, the add/update actions were dispatching directly to their strategy factories. Submit dispatched MSP users to the NPP path, CPC users to CPC processing except for Recruitment tasks, and Recruitment-role users to `ProcessSubmitForRecruitmentAsync` without checking `TaskSelected`.
 
-PRODUCT / AC:
-- AC2/AC4/AC5: Non-MSP cannot AddTask Npp, UpdateTask Npp, or successfully submit NPP as initial submitter.
-- AC3 UI already mostly OK — do not break Begin NPP / route redirect / task-list MSP derivation.
-- Deny if role unknown. Prefer HTTP 403 (or existing Authorize pattern) over HTTP 200 + Failure for auth denial when adding new gates.
-- Keep CPC review/decision path for CPC users on already-submitted NPP (do not block legitimate CPC accept).
-- Recruiter ProcessSubmitForRecruitmentAsync: only when TaskSelected is Recruitment — not for TaskType.Npp.
+The new checks return `Forbid()` for non-MSP NPP add/update requests and NPP facility-list requests. Non-MSP submit checks both the posted task and the persisted PAF task. CPC may proceed only when both identify NPP and the persisted status is `SubmittedByMsp`, `ResubmittedByMsp`, or `UnderReviewByCpc`. Recruiter strategy dispatch now requires `TaskSelected == Recruitment`.
 
-OFFICE EVIDENCE (TASK 0):
-- UI: IsMspOnlyUser + NPP route redirect + server IsMspUserMode on available-task list.
-- API: AddTaskToPaf, UpdateTaskAndSavePaf, SubmitPaf, GetAvailableFacilityList — Authorize only, no MSP for Npp.
-- Recruiter submit branch can succeed on NPP forms.
+**AC Status**
+- **AC1:** Not assessable; its criteria were not included in the request.
+- **AC2:** Yes. Non-MSP NPP AddTask is denied.
+- **AC3:** Yes. UI Begin NPP visibility, route redirect, and server-derived available-task MSP mode were untouched.
+- **AC4:** Yes. Non-MSP NPP UpdateTask is denied.
+- **AC5:** Yes at the API code level. Non-MSP initial NPP submit is denied, including a posted task-type mismatch against a persisted NPP PAF.
+- **AC6:** Partial. SubmitterName behavior was not changed.
 
-EXISTING PATTERN:
-Quote IsInRole(HcoApplicationRole.Msp); how other endpoints return 403; SubmitPafStrategy role dispatch before coding.
+**Validation**
+The new standalone API test project passed **9/9 tests**, including non-MSP add/update/submit denial, persisted-task mismatch denial, MSP add/submit pass-through, facility-picker denial, and CPC review preservation. `git diff --check` passed, and editor diagnostics found no errors.
 
-SCOPE (may change):
-- PafController.cs (and/or shared auth helper)
-- SubmitPafStrategy.cs (recruiter dispatch + NPP MSP initial submit)
-- TaskController.cs if facility list for Npp needs MSP
-- CreateAddTaskStrategy / AddTask path only if gate belongs there
-- New or existing API tests if a test project exists; if none, document Remaining gap and add minimal unit tests where feasible
+The normal API build task could not copy referenced DLLs because the running PAF API process held them open. The API and test project built successfully and tests ran using a temporary output directory; I did not stop the running process.
 
-DO NOT CHANGE:
-- CACTUS processor / 132600 paths
-- Non-Npp PAF types’ submit behavior except recruiter-must-be-Recruitment-task fix
-- Invent new roles
-
-IMPLEMENTATION:
-1. BEFORE coding: quote AddTaskToPafAsync / UpdateTaskAndSavePafAsync / SubmitPaf dispatch for Recruiter and Msp.
-2. When task == Npp (or FormData.TaskSelected == Npp): require MSP for AddTask and UpdateTask; reject non-MSP with auth error.
-3. Submit: MSP NPP path unchanged for MSP; block Recruiter success path unless TaskSelected == Recruitment; non-MSP initial NPP submit → auth failure (CPC review path remains for CPC role as today — quote and preserve).
-4. Facility list for TaskType.Npp: MSP required if that endpoint supplies NPP facility picker.
-5. Fail closed if principal/role cannot be resolved.
-6. Smallest diff. Prefer one shared “EnsureMspForNpp” helper if pattern fits.
-
-TESTS:
-- Non-MSP AddTask Npp → denied
-- Non-MSP UpdateTask Npp → denied
-- Recruiter submit with TaskSelected Npp → not recruiter-success path
-- MSP Add/Submit still allowed (as harness allows)
-- Build + tests + git diff --check
-
-RETURN:
-1. Files changed
-2. Gate quotes
-3. AC1–AC6 Yes/Partial/No after change
-4. Tests + results
-5. Remaining gaps (AC6 SubmitterName; env AC5; missing Api.Tests project)
-6. Confirmation: UI MSP hide/redirect untouched; CPC review not broken
+**Remaining Gaps**
+- AC6 SubmitterName authority remains unchanged.
+- AC5 was not verified against a live environment’s role claims.
+- No API test project previously existed. I added a focused one, but left it out of the already-dirty solution file; run it directly with `dotnet test Hca.Credentialing/Hca.Credentialing.Paf.Api.Tests/Hca.Credentialing.Paf.Api.Tests.csproj`.
+- Confirmed: UI MSP hide/redirect behavior is untouched, and the persisted CPC review path remains available.
