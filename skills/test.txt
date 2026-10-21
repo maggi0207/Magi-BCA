@@ -1,45 +1,102 @@
-You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
+**A. Auto-Accept vs. CPC Call Chain**
 
-ROLE:
-Senior engineer. One session. Map existing NPP submit/auto-accept/CVI/Completed/PDF/audit behavior vs 132591 BR-001–BR-008. Do not implement. Do not invent RTKs or “HCA Corporate” if missing — quote or STOP.
+In `SubmitPafStrategy.cs`, MSP NPP submissions choose between auto-accept and the standard MSP submit path:
 
-PRODUCT:
-- BR-001/002: Auto-accept ADD NPP unless exception → CPC/CVI.
-- BR-003: Completed Queue only after successful Cactus processing.
-- BR-004: PAF History user = "HCP System User".
-- BR-005: Cactus Audit User = "HCP System User – MSP Submitter Name".
-- BR-006: Cactus Audit Entity = "HCA Corporate".
-- BR-007: PAF PDF on Provider when no CVI.
-- BR-008: PAF PDF on CVI when exception CVI exists.
-- Children titles: 132592–132599 (accept, Completed route, history, cactus audit, PDF provider/CVI, PDF type, PDF history user).
+```csharp
+if (TaskSelected == TaskType.Npp)
+{
+    if (NppTask?.IsActiveDutyMilitaryOrPracticingAtVa == true &&
+        NppTask.IsPhysicianAssistant == true)
+        await ProcessSubmitForNppAutoAcceptAsync(result);
+    else
+        await ProcessSubmitForMspAsync(result);
+}
+```
 
-QUOTE:
-1. SubmitPafStrategy NPP path — ProcessSubmitForNppAutoAcceptAsync (or real name): when auto-accept vs CPC/CVI. Quote exception criteria (VA/PA etc.).
-2. Status transitions to AcceptedByCpc / Completed / SubmittedByMsp — quote.
-3. When PAF moves to Completed relative to CactusUpdater / queue processing — before or after Cactus success? Quote.
-4. PAF history / SetAcceptedByCpcUserInfo — what User Name is written today for NPP auto-accept vs BR-004.
-5. Cactus audit log user/entity strings on provider write — quote vs BR-005/006.
-6. PAF PDF generation + attach: UploadPafImageToProviderAsync / CVI attach — when for Npp; Provider vs CVI parent. Quote vs BR-007/008.
-7. Generated PDF PAF type label for Npp — quote vs 132598.
-8. Gaps per BR (Yes/Partial/No). Tests (names only). Files for implement / must-not.
+On success, `ProcessSubmitForNppAutoAcceptAsync` calls `CompleteMspAutoAcceptedSubmitAsync`. That method sets `SubmittedByMsp`, records submit information, sets the accepted-by identity, and queues PAF processing. The other NPP submissions go through `ProcessSubmitForMspAsync` for CPC review. This shows the coded VA/practicing-at-VA Physician Assistant criterion; it does not establish whether this is the complete product definition of “unless exception.”
 
-STOP AND REPORT:
-- If Completed is set before Cactus success — gap BR-003.
-- If “HCA Corporate” / “HCP System User” absent — STOP inventing; list where identity is set today.
+**B. Exception Criteria**
 
-DO NOT:
-- Edit code
-- Invent audit identity strings
-- Implement Reports 132688 in this inspect
+The exact condition is:
 
-RETURN (A–J):
-A. Auto-accept vs exception call chain — quote
-B. Exception criteria — quote
-C. Completed Queue timing vs Cactus — quote
-D. PAF History user — quote vs BR-004
-E. Cactus audit user/entity — quote vs BR-005/006
-F. PDF attach Provider vs CVI — quote vs BR-007/008
-G. PDF type / history user — quote
-H. Gap matrix BR-001–008
-I. Smallest implement order (story IDs) or STOP
-J. Confirmation: no files changed
+```csharp
+pafProcessingResult.PafFormData.NppTask?.IsActiveDutyMilitaryOrPracticingAtVa == true &&
+pafProcessingResult.PafFormData.NppTask.IsPhysicianAssistant == true
+```
+
+The condition enables NPP auto-accept. Other NPP submissions follow the non-auto-accepted path. I found no broader exception decision in this dispatch branch.
+
+**C. Completed Queue Timing vs. Cactus**
+
+The auto-accept submit method sets `SubmittedByMsp` and queues processing before Cactus runs; it does **not** set `AcceptedByCpc`. The Completed queue mapping includes `AcceptedByCpc` and `ProcessedManually`, not `SubmittedByMsp`.
+
+The PAF processor’s `CactusUpdater.cs` commits Cactus and audit changes before setting `result.Success = true`. Its PafDataContext.UpdatePaf sets `AcceptedByCpc` only for SSP Brief Enrollment, not NPP.
+
+**BR-003 gap:** No NPP Completed transition after successful Cactus processing was found. I found no NPP path setting Completed before Cactus success either; the current gap is that the NPP completion transition is absent.
+
+**D. PAF History User**
+
+The regular history helper in `PafExtensions.cs` writes:
+
+```csharp
+UpdatedByName = formData.LastUpdatedBy
+```
+
+NPP auto-accept separately sets `AcceptedByCpcUserId = "HCPSU"` and `AcceptedByCpcUserName = "HCP System User"` in `ModelExtensions.cs`. That is the accepted-by identity, not the identity used by the regular status-history helper. `CactusUpdater` also writes a Cactus-completion history row using `AcceptedByCpcUserName`.
+
+**BR-004: Partial.** “HCP System User” exists as the auto-accept accepted-by name and is used on a later Cactus history row, but the status-change history uses `LastUpdatedBy`.
+
+**E. Cactus Audit User and Entity**
+
+`CactusUpdater.cs` resolves `AcceptedByCpcUserId` to a Cactus `USER_K` using `USERS.SYSTEMINITIALS`, then passes that key to `CactusAuditContext`. For the NPP auto-accept identity, the supplied application ID/name are `HCPSU` and `HCP System User`. The requested `"HCP System User – MSP Submitter Name"` composition was not found.
+
+The audit context sets the application name to `"HCO 2.0"`. Its `BeginSessionAsync` accepts an optional `entityKOverride`, but the inspected PAF operations call it without that override. No `"HCA Corporate"` string or explicit corporate-entity override was found. The audit library may apply other defaults; the inspected repository code does not establish them.
+
+**BR-005: No** for the requested composed audit user string.  
+**BR-006: STOP.** No explicit HCA Corporate entity identity was found; do not invent one.
+
+**F. PDF Attachment: Provider vs. CVI**
+
+For NPP, `CactusUpdater.cs` calls `CreateStandardCviRecordsAsync` when the NPP task is complete. That helper calls `AttachPafPdfToCredentialingAsync`, which creates the PAF image with `ParentFileK = ImageParentFileKValues.Credentialing` and the credentialing key as parent. This is the existing CVI-parent mechanism.
+
+The provider-parent path uses `UploadPafImageToProviderAsync`, which sets `ParentFileK = ImageParentFileKValues.Provider`. In the existing-practitioner flow, it is controlled by `shouldAttachPafImageToProvider`; that flag is set for Manage Personal Info, not NPP. A separate manual-processing branch attaches to the provider for an existing practitioner.
+
+**BR-007: No demonstrated NPP provider-PDF fallback when no CVI is created.**  
+**BR-008: Partial.** NPP’s created CVI receives the PAF PDF, but the code does not condition this on the product’s “exception CVI” distinction; NPP CVI creation/attachment is the observed behavior.
+
+**G. PDF Type and History User**
+
+The print page displays:
+
+```razor
+@_pafData.TaskSelected.GetDescription();
+```
+
+The `TaskType.Npp` description is `"NPP PAF"`. No separate NPP-specific PDF type label was found.
+
+For history identity, the regular PAF history row uses `LastUpdatedBy`; “HCP System User” is only set in the accepted-by fields for the coded auto-accept case.
+
+**H. Gap Matrix**
+
+| BR | Result | Evidence |
+|---|---|---|
+| BR-001 | Partial | Auto-accept exists for the coded VA/practicing-at-VA Physician Assistant condition; completeness of exception criteria needs product confirmation. |
+| BR-002 | Partial | Other NPP submissions use the MSP/CPC path, but the full exception-routing definition is not established by this branch alone. |
+| BR-003 | No | NPP is not set to `AcceptedByCpc` after successful Cactus processing; Completed queue uses that status. |
+| BR-004 | Partial | Regular status history uses `LastUpdatedBy`; system name is present only in accepted-by fields and a Cactus-completion history row. |
+| BR-005 | No | The requested system-user-plus-MSP-submitter audit name was not found. |
+| BR-006 | Stop | No explicit HCA Corporate audit entity override was found; library default behavior is not established here. |
+| BR-007 | No demonstrated NPP path | NPP code attaches its PAF PDF to the generated Credentialing/CVI parent; no NPP provider fallback was found. |
+| BR-008 | Partial | PAF PDF attaches to NPP’s generated CVI, but there is no specific “exception CVI” gate in the observed attachment call. |
+
+**I. Smallest Implementation Order or Stop**
+
+**STOP before implementation** on the identity/entity and completion decisions. Product/architecture must confirm the exact audit identity composition, the Cactus entity value or supported resolution for HCA Corporate, and what defines the Completed transition after successful Cactus processing. Confirm whether the VA/PA condition is the full auto-accept rule and when NPP must use a Provider PDF parent instead of a CVI parent.
+
+Once resolved, the implementation areas are the child topics supplied for 132592–132599: auto-accept, Completed routing, PAF history, Cactus audit, PDF parent (Provider/CVI), PDF type, and PDF history user. I’m not assigning individual IDs to those topics beyond the supplied range because their exact ID/title pairings were not established by this code inspection.
+
+Relevant existing processor tests include `NppTaskValidationTests`, `NppSanctionLicenseIsCreatedOnceAndSanctionsAttachmentIsQueued`, `NppMissingStateLicenseIsCreatedAndPsvIsQueued`, and `CactusUpdaterIntegrationTests`. I found no named tests covering the NPP submit auto-accept decision, Completed transition, system audit identity, or PAF PDF parent selection.
+
+**J. No Files Changed**
+
+No files were changed during this inspection. The status check showed an existing modification to `Hca.Credentialing.Paf.Processor.Tests.csproj`; it was not edited.
