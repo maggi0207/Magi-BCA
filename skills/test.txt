@@ -1,76 +1,45 @@
-132591: NPP: Auto-Acceptance and Automated Processing
-ADD NPP PAF Auto-Acceptance and Automated Processing
-Epic Title: Automate ADD NPP PAF Acceptance, Audit Tracking, and Document Attachment Management
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
 
-Business Objective:
-Eliminate CPC review requirements for standard ADD NPP PAF submissions by leveraging auto-acceptance capabilities while maintaining proper audit tracking, processing visibility, and document management for both standard and exception workflows.
+ROLE:
+Senior engineer. One session. Map existing NPP submit/auto-accept/CVI/Completed/PDF/audit behavior vs 132591 BR-001–BR-008. Do not implement. Do not invent RTKs or “HCA Corporate” if missing — quote or STOP.
 
-Business Value:
+PRODUCT:
+- BR-001/002: Auto-accept ADD NPP unless exception → CPC/CVI.
+- BR-003: Completed Queue only after successful Cactus processing.
+- BR-004: PAF History user = "HCP System User".
+- BR-005: Cactus Audit User = "HCP System User – MSP Submitter Name".
+- BR-006: Cactus Audit Entity = "HCA Corporate".
+- BR-007: PAF PDF on Provider when no CVI.
+- BR-008: PAF PDF on CVI when exception CVI exists.
+- Children titles: 132592–132599 (accept, Completed route, history, cactus audit, PDF provider/CVI, PDF type, PDF history user).
 
-Reduces CPC workload and processing time.
-Accelerates provider onboarding and updates.
-Standardizes audit and history records for auto-accepted PAFs.
-Ensures proper document storage based on processing path.
-Supports exception-based CPC workflows through CVI integration.
-Description:
-The system shall automatically accept all ADD NPP PAF submissions without CPC review unless the submission meets criteria that trigger an exception workflow requiring CPC processing and CVI creation. Following successful Cactus processing, the PAF shall be routed to the Completed Queue, audit records shall be updated appropriately, and the PAF PDF shall be attached to either the Provider Record or the associated CVI based on workflow outcome.
+QUOTE:
+1. SubmitPafStrategy NPP path — ProcessSubmitForNppAutoAcceptAsync (or real name): when auto-accept vs CPC/CVI. Quote exception criteria (VA/PA etc.).
+2. Status transitions to AcceptedByCpc / Completed / SubmittedByMsp — quote.
+3. When PAF moves to Completed relative to CactusUpdater / queue processing — before or after Cactus success? Quote.
+4. PAF history / SetAcceptedByCpcUserInfo — what User Name is written today for NPP auto-accept vs BR-004.
+5. Cactus audit log user/entity strings on provider write — quote vs BR-005/006.
+6. PAF PDF generation + attach: UploadPafImageToProviderAsync / CVI attach — when for Npp; Provider vs CVI parent. Quote vs BR-007/008.
+7. Generated PDF PAF type label for Npp — quote vs 132598.
+8. Gaps per BR (Yes/Partial/No). Tests (names only). Files for implement / must-not.
 
+STOP AND REPORT:
+- If Completed is set before Cactus success — gap BR-003.
+- If “HCA Corporate” / “HCP System User” absent — STOP inventing; list where identity is set today.
 
+DO NOT:
+- Edit code
+- Invent audit identity strings
+- Implement Reports 132688 in this inspect
 
-Rule ID
-
-Rule Description
-
-BR-001
-
-All ADD NPP PAFs shall be auto-accepted.
-
-BR-002
-
-CPC review is not required for auto-accepted ADD NPP PAFs unless exception workflow criteria are met.
-
-BR-003
-
-Auto-accepted PAFs shall route to the Completed Queue only after successful Cactus processing.
-
-BR-004
-
-Auto-Accepted PAF History shall record "HCP System User" as the User Name.
-
-BR-005
-
-Cactus Audit Log User value shall be "HCP System User – MSP Submitter Name".
-
-BR-006
-
-Cactus Audit Log Entity value shall be "HCA Corporate".
-
-BR-007
-
-PAF PDFs shall be attached to the Provider Record when no CVI exists.
-
-BR-008
-
-PAF PDFs shall be attached to the CVI when a CVI is created through an exception workflow.
-
-
-Child stories========================================================
-
-132597 NPP: Auto-Acceptance and Automated Processing Attach PAF PDF to CVI for Exception Workflows
-
-132596 : NPP: Auto-Acceptance and Automated Processing Attach PAF PDF to Provider Record for Standard Processing
-
-132592 : NPP: Auto-Acceptance and Automated Processing Automatically Accept ADD NPP PAFs
-
-132595 : NPP: Auto-Acceptance and Automated Processing Create Cactus Audit Log Entries for Auto-Accepted PAFs
-
-132598 NPP: Auto-Acceptance and Automated Processing Display Correct PAF Type on Generated PDF
-
-132599 NPP: Auto-Acceptance and Automated Processing Record Auto-Acceptance User in PDF History
-
-132594 NPP: Auto-Acceptance and Automated Processing Record Auto-Accepted PAF History
-
-132593 NPP: Auto-Acceptance and Automated Processing Route Auto-Accepted PAFs to Completed Queue
-
-
-
+RETURN (A–J):
+A. Auto-accept vs exception call chain — quote
+B. Exception criteria — quote
+C. Completed Queue timing vs Cactus — quote
+D. PAF History user — quote vs BR-004
+E. Cactus audit user/entity — quote vs BR-005/006
+F. PDF attach Provider vs CVI — quote vs BR-007/008
+G. PDF type / history user — quote
+H. Gap matrix BR-001–008
+I. Smallest implement order (story IDs) or STOP
+J. Confirmation: no files changed
