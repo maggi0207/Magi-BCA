@@ -1,191 +1,40 @@
-132687 : NPP Reports
-
-Title: Generate and Distribute Monthly Add NPP Activity Report
-
-Objective
-Provide an automated monthly report that summarizes Add NPP request activity for the prior month and distributes it to the required reporting groups on the 1st of each month.
-
-Business Value
-This feature gives the business consistent oversight of Add NPP request volume and CPC routing activity, reduces manual reporting effort, and improves operational tracking.
-
-Scope
-The report shall:
-
-Run automatically on the 1st of each month.
-Use the previous calendar month as the reporting period.
-Include:
-Total number of Add NPP requests received.
-Total number of Add NPP requests routed to CPC.
-Percentage of received Add NPP requests routed to CPC.
-Distribute the report to:
-PARA.DL American SSC CPC FO MGMT
-PARA Credential Reporting
-Business Rules
-The report is generated monthly.
-The reporting period is the prior calendar month.
-If no requests were received, the report still generates and shows zero values.
-Percentage routed to CPC must not fail on divide-by-zero; display 0% when no requests were received.
-Report distribution is automated.
-
-
-
-Child stories
-
-132688 : NPP: Reports Monthly Add NPP Request Activity Report
-User Story: Monthly Add NPP Request Activity Report
-Title
-Generate and Distribute Monthly Add NPP Request Activity Report
-
-User Story
-As a Credentialing Operations Leader
-
-I want a monthly report generated and automatically distributed
-
-So that leadership and reporting teams can monitor Add NPP request volume, CPC routing activity, and operational performance.
-
-Business Requirement
-The system shall generate a monthly Add NPP Activity Report summarizing activity for the previous calendar month.
-
-The report shall be automatically generated and distributed on the 1st day of each month.
-
-The report is intended to provide oversight and operational tracking of Add NPP request processing and routing activities.
-
-Report Schedule
-Requirement	Value
-Frequency	Monthly
-Run Date	1st day of each month
-Reporting Period	Previous calendar month
-Distribution Method	Automated Email Distribution
-Example
-Run Date: August 1
-
-Reporting Period: July 1 – July 31
-
-Report Metrics
-The report shall include the following metrics for the reporting period:
-
-Metric 1
-Total Number of Add NPP Requests Received
-
-Definition:
-
-Count of all Add NPP requests received during the reporting period.
-
-Metric 2
-Total Number of Add NPP Requests Routed to CPC
-
-Definition:
-
-Count of all Add NPP requests routed to CPC during the reporting period.
-
-Metric 3
-Percentage Routed to CPC
-
-Calculation:
-
-Percentage Routed to CPC =
-(Total Routed to CPC ÷ Total Requests Received) × 100
-
-Display as percentage rounded to two decimal places.
-
-Example:
-
-Received = 100
-
-Routed to CPC = 35
-
-Percentage = 35.00%
-
-Distribution Requirements
-The completed report shall be automatically distributed to the following distribution groups:
-
-Distribution List 1
-PARA.DL American SSC CPC FO MGMT
-
-Distribution List 2
-PARA Credential Reporting
-
-Acceptance Criteria
-Scenario 1 – Monthly Report Generation
-Given Add NPP request activity exists during the reporting period
-
-When the scheduled report executes on the 1st of the month
-
-Then a report is generated containing all required metrics.
-
-Scenario 2 – Previous Month Reporting
-Given the report runs on the 1st day of a month
-
-When the report is generated
-
-Then only activity from the previous calendar month is included.
-
-Scenario 3 – CPC Routing Count
-Given requests were routed to CPC during the reporting period
-
-When the report is generated
-
-Then the total routed count is displayed.
-
-Scenario 4 – CPC Routing Percentage Calculation
-Given requests were received and routed
-
-When the report is generated
-
-Then the percentage routed to CPC is correctly calculated.
-
-Scenario 5 – Automated Distribution
-Given the report is generated successfully
-
-When report processing completes
-
-Then the report is emailed to:
-
-PARA.DL American SSC CPC FO MGMT
-
-PARA Credential Reporting
-
-Scenario 6 – No Activity During Reporting Period
-Given no Add NPP requests were received during the reporting period
-
-When the report is generated
-
-Then the report displays:
-
-Total Requests Received = 0
-
-Total Routed to CPC = 0
-
-Percentage Routed to CPC = 0%
-
-And the report is still distributed.
-
-Exception Handling
-Report Generation Failure
-Failure details shall be logged.
-
-Notification shall be sent to the support team or reporting administrator.
-
-Email Distribution Failure
-Distribution errors shall be logged.
-
-Failed recipient groups shall be identified in the log.
-
-Data Extraction Failure
-Report generation shall terminate gracefully.
-
-Error details shall be captured for support review.
-
-Divide-by-Zero Handling
-If Total Requests Received = 0
-
-Percentage Routed to CPC shall display as 0%
-
-No calculation errors shall occur.
-
-Reporting Layout (Recommended)
-Metric	Value
-Reporting Period	MM/DD/YYYY – MM/DD/YYYY
-Total Add NPP Requests Received	###
-Total Add NPP Requests Routed to CPC	###
-Percentage Routed to CPC	##.##%
+You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
+
+ROLE:
+Senior engineer. One session. Map how to implement monthly Add NPP activity report + email by reusing existing Background report patterns. Do not invent DL emails, cron, or PAF status meanings. Do not implement.
+
+PRODUCT (132688):
+- Timer: 1st of each month; period = previous calendar month.
+- Metrics: Total Add NPP received; Total routed to CPC; % = routed/received*100 (2 decimals); 0% if received=0.
+- Email to DLs: “PARA.DL American SSC CPC FO MGMT” and “PARA Credential Reporting” — find how other reports resolve DL names to addresses; do not hardcode invented emails.
+- Still send report when all zeros.
+
+QUOTE:
+1. RecruitmentReportGeneration.cs (or real monthly report function) — schedule trigger, period calculation, email send. Quote timer/CRON/NCRONTAB.
+2. How report recipients / distribution lists are configured today (appsettings, Key Vault, Graph, SendGrid, Exchange DL lookup). Quote keys — do not invent PARA.* addresses.
+3. How PAF “Add NPP” / TaskType.Npp is stored for counting “received” (status, TaskSelected, CreatedDate field names). Quote query or index.
+4. How “routed to CPC” is represented (status, CVI, queue flag). Quote existing statuses used for NPP CPC path — if unclear, list candidates and STOP for product.
+5. Existing email body/attachment pattern (HTML table vs CSV vs Excel).
+6. Tests covering Recruitment (or any) monthly report (names only).
+7. Files that would change for 132688 (names only). Files that must not.
+8. Gaps vs ticket; smallest implement shot or STOP (need product: definition of routed-to-CPC).
+
+STOP AND REPORT:
+- If no email infrastructure for DL groups — quote what exists; do not invent SMTP.
+- If “routed to CPC” has no single field — STOP list options from code; do not pick.
+
+DO NOT:
+- Edit code
+- Invent distribution email addresses
+- Invent new PAF statuses
+
+RETURN (A–I):
+A. Existing report timer pattern — quote
+B. Email / DL configuration — quote
+C. How to count Add NPP received — quote
+D. How to count routed to CPC — quote or STOP options
+E. Body format pattern — quote
+F. Tests
+G. Gaps vs 132688
+H. Smallest implement shot or STOP
+I. Confirmation: no files changed
