@@ -1,40 +1,97 @@
-You are inspecting the HCA HCP Credentialing repository. READ-ONLY. Do not edit files.
+**A. Existing Report Timer Pattern**
 
-ROLE:
-Senior engineer. One session. Map how to implement monthly Add NPP activity report + email by reusing existing Background report patterns. Do not invent DL emails, cron, or PAF status meanings. Do not implement.
+`RecruitmentReportGeneration.cs` schedules the monthly report with a six-field Azure Functions NCRONTAB expression:
 
-PRODUCT (132688):
-- Timer: 1st of each month; period = previous calendar month.
-- Metrics: Total Add NPP received; Total routed to CPC; % = routed/received*100 (2 decimals); 0% if received=0.
-- Email to DLs: “PARA.DL American SSC CPC FO MGMT” and “PARA Credential Reporting” — find how other reports resolve DL names to addresses; do not hardcode invented emails.
-- Still send report when all zeros.
+```csharp
+[TimerTrigger("0 0 8 1 * *", UseMonitor = false)]
+```
 
-QUOTE:
-1. RecruitmentReportGeneration.cs (or real monthly report function) — schedule trigger, period calculation, email send. Quote timer/CRON/NCRONTAB.
-2. How report recipients / distribution lists are configured today (appsettings, Key Vault, Graph, SendGrid, Exchange DL lookup). Quote keys — do not invent PARA.* addresses.
-3. How PAF “Add NPP” / TaskType.Npp is stored for counting “received” (status, TaskSelected, CreatedDate field names). Quote query or index.
-4. How “routed to CPC” is represented (status, CVI, queue flag). Quote existing statuses used for NPP CPC path — if unclear, list candidates and STOP for product.
-5. Existing email body/attachment pattern (HTML table vs CSV vs Excel).
-6. Tests covering Recruitment (or any) monthly report (names only).
-7. Files that would change for 132688 (names only). Files that must not.
-8. Gaps vs ticket; smallest implement shot or STOP (need product: definition of routed-to-CPC).
+That is 08:00 on the first day of each month. The ticket specifies the first of the month but not a run time or time zone, so those should be confirmed rather than assumed.
 
-STOP AND REPORT:
-- If no email infrastructure for DL groups — quote what exists; do not invent SMTP.
-- If “routed to CPC” has no single field — STOP list options from code; do not pick.
+The existing monthly query calculates its date range in SQL:
 
-DO NOT:
-- Edit code
-- Invent distribution email addresses
-- Invent new PAF statuses
+```sql
+AND CONVERT(DATE, IndexedSubmittedDate) >= DATEADD(MONTH, DATEDIFF(MONTH, 0, GETDATE()) - 1, 0)
+AND CONVERT(DATE, IndexedSubmittedDate) < EOMONTH(GETDATE(), -1)
+```
 
-RETURN (A–I):
-A. Existing report timer pattern — quote
-B. Email / DL configuration — quote
-C. How to count Add NPP received — quote
-D. How to count routed to CPC — quote or STOP options
-E. Body format pattern — quote
-F. Tests
-G. Gaps vs 132688
-H. Smallest implement shot or STOP
-I. Confirmation: no files changed
+With `CONVERT(DATE, ...)`, that exclusive upper bound excludes the final calendar date of the previous month. It is not a correct template for the requested full-month period.
+
+**B. Email / DL Configuration**
+
+The Recruitment report currently hardcodes its recipient:
+
+```csharp
+var fromEmail = "credentialing@parallon.com";
+var toEmail = "PSGDLPhysicianRecruitmentVPs@HCAHealthcare.com";
+```
+
+Other report functions use `BatchRrfcGenerationSettings.ReportToEmail`, bound from the `BatchRrfcReportToEmail` configuration key. The notification settings also expose `FromEmail` and `ToEmailOverride`; `Notifications.ResolveToEmailValue` uses the override when configured.
+
+Email delivery in this report follows the existing Service Bus notification path: the report queues a `SendEmailRequest`, and `Notifications` sends it through `NotificationService`/Raven. `GraphMailService` exists, but it takes an email-address string for recipients; no directory-group lookup or PARA DL-name resolution was found. The strings “PARA.DL American SSC CPC FO MGMT” and “PARA Credential Reporting” were not found in the repository. **There is email infrastructure, but no demonstrated DL-name-to-address mechanism.** I have not supplied or inferred addresses.
+
+**C. How to Count Add NPP Received**
+
+The PAF model has `IndexedTaskSelected`, `IndexedPafStatus`, `IndexedCreatedOn`, and `IndexedSubmittedDate`. `SetIndexedProperties` maps `IndexedCreatedOn = _formData.CreatedOn` and `IndexedTaskSelected = _formData.TaskSelected`.
+
+The existing Recruitment monthly query counts by status/task and `IndexedSubmittedDate`, not creation date:
+
+```sql
+COUNT(Id) AS PafCount
+...
+WHERE IndexedPafStatus = 15
+    AND IndexedTaskSelected = 13
+    AND CONVERT(DATE, IndexedSubmittedDate) >= ...
+    AND CONVERT(DATE, IndexedSubmittedDate) < ...
+```
+
+In the current enums, task value `13` is `TaskType.Npp`, and status value `15` is `PafStatus.SubmittedByRecruiter`. That numeric query is therefore not a safe semantic template for an “Add NPP received” metric, despite the Recruitment report’s name. The ticket needs to confirm whether “received” means created (`IndexedCreatedOn`) or submitted (`IndexedSubmittedDate`).
+
+**D. How to Count Routed to CPC**
+
+For the regular MSP submit path, `SubmitPafStrategy.ProcessSubmitForMspAsync` does:
+
+```csharp
+FormData.SetStatus(FormData.Status == PafStatus.SavedByMsp ? PafStatus.SubmittedByMsp : PafStatus.ResubmittedByMsp, null);
+CurrentPaf.IndexedSubmittedToCpcCount += 1;
+```
+
+The NPP auto-accept path also sets `SubmittedByMsp`, increments `IndexedSubmittedToCpcCount`, and queues processing:
+
+```csharp
+FormData.SetStatus(PafStatus.SubmittedByMsp, null);
+CurrentPaf.IndexedSubmittedToCpcCount += 1;
+_shouldQueuePafForProcessing = true;
+FormData.SetAcceptedByCpcUserInfo(StrategyContext);
+```
+
+The status enum comments describe `SubmittedByMsp` and `ResubmittedByMsp` as synonyms for pending CPC review. However, the NPP auto-accept path uses the same status and counter. **STOP:** the repository does not establish a single field that distinguishes “routed to CPC” from auto-accepted NPP. Candidate interpretations are the submit counter, submitted/review statuses, or CPC queue state; each needs product confirmation, particularly because the status/counter are shared with auto-accept.
+
+**E. Email Body Pattern**
+
+The Recruitment report builds an inline HTML body with tables using `TemplatedNotificationRequestBuilder`; it does not attach a CSV or Excel file. For very large bodies it can move the body to Blob Storage and queue a blob reference.
+
+It calls report generation after querying regardless of whether results are empty. That supports sending an all-zero report, though the NPP implementation must explicitly render zero-valued metrics rather than rely on empty grouped query rows.
+
+**F. Tests**
+
+No tests referencing `RecruitmentReportGeneration`, `GenerateRecruitmentReportEmail`, or its activity methods were found.
+
+Nearby Background test classes include `BatchRrfcGenerationIntegrationTests` and `NotificationsTests`; neither is monthly Recruitment report coverage.
+
+**G. Gaps vs. 132688**
+
+- No repository implementation resolves the two requested DL names to email addresses.
+- “Received” does not identify whether to count by created or submitted date.
+- The existing monthly query excludes the previous month’s last day.
+- “Routed to CPC” has no distinct NPP marker in the inspected submit paths; auto-accept shares status and counter updates.
+- The report’s time zone and execution time are not specified beyond “1st of each month.”
+- Percentage precision and zero-denominator behavior are specified by the ticket, but no NPP report implementation or tests exist.
+
+**H. Smallest Implement Shot or STOP**
+
+**STOP before implementation.** First obtain the approved method/configuration for resolving the two DL names, a product definition of “routed to CPC” that excludes or includes NPP auto-accept explicitly, and confirmation of the “received” timestamp. The existing timer, inline HTML, Service Bus email pipeline, and PAF indexed fields are reusable patterns once those decisions are made. Do not reuse the Recruitment query’s numeric filters or date bounds.
+
+**I. No Files Changed**
+
+No files were changed during this read-only inspection. The status check showed an existing modification to `Hca.Credentialing.Background.Tests.csproj`; it was left untouched.
