@@ -1,26 +1,40 @@
-You are committing the HCA HCP Credentialing repository. One session. Do not push unless asked.
+TASK 1-132688 — implement monthly Add NPP report
 
-ROLE:
-Commit ONLY 132591 NPP auto-accept Completed-after-Cactus + PDF parent changes. Do not start a second chat.
+One Copilot turn. Implement only. Reuse RecruitmentReportGeneration pattern. Do not invent joins/RTKs.
 
-STAGE (if in diff):
-- CactusUpdater.cs
-- PafDataContext.cs
-- NppAutoAcceptProcessingRules.cs
-- NppAutoAcceptProcessingTests.cs
-- Related Processor test project files only if required for the new tests
-DO NOT stage unrelated dirty Background / .sln / UI files.
+PRODUCT ANSWERS (locked):
+1) Email To:
+   PARADLAmericanSSCCPCFOMGMT@Parallon.com
+   PARA.CredentialReporting@Parallon.com
+2) Total received = count by SubmittedDate (not CreatedOn)
+3) Routed to CPC = ADD NPP PAFs where a CVI was created
+   (MSP submit + auto-accept that creates CVI counts as routed;
+    do NOT use “any SubmittedByMsp” alone)
+4) Timer: same as other 1st-of-month reports → [TimerTrigger("0 0 8 1 * *")]
 
-COMMIT MESSAGE (use exactly):
+Goal:
+Add a monthly Azure Function that emails Add NPP activity for the previous calendar month to both DLs above.
 
-Complete NPP auto-accept after Cactus success and attach PAF PDF to provider or CVI.
+Locked rules:
+- Period: prior month, inclusive first–last day — do NOT copy Recruitment exclusive upper bound that drops the last day.
+- Filter: ADD NPP / TaskType.Npp only — reuse the indexed type/field TASK 0 found; quote it.
+- Total received = count by SubmittedDate in period.
+- Routed to CPC = count of those PAFs where a CVI was created (reuse existing PAF↔CVI relationship from submit/CVI code; quote the join).
+- % routed = (routed ÷ received) × 100, two decimals; 0% if received = 0.
+- Email To: both addresses (prefer existing config/override pattern if present; else hardcode like Recruitment).
+- Zero activity → still send 0 / 0 / 0%.
+- Body: simple HTML table (Reporting Period, Total received, Total routed to CPC, % routed) via existing TemplatedNotificationRequestBuilder / Service Bus notification path.
 
-Moves auto-accepted NPP to Completed only after processing and keeps the VA/PA submit rule unchanged.
+STOP AND REPORT (do not invent):
+- If there is no existing way to detect “CVI was created for this PAF” — STOP and quote closest tables/fields; do not invent a CVI flag.
+- If NPP cannot be filtered with an existing indexed field — STOP and quote what exists.
+- Do not change Recruitment report behavior.
 
-DO NOT: push, amend, --no-verify
-
-RETURN:
-1. Commit hash + subject
-2. Files committed
-3. Leftover dirty
-4. Not pushed confirmation
+Return when done:
+1. Files added/changed (paths)
+2. How period + inclusive dates are calculated (quote)
+3. How NPP filter works (quote)
+4. How “CVI created” is detected (quote)
+5. Email recipients + send path (quote)
+6. STOP hits? (yes/no + which)
+7. Build/tests run (pass/fail)
