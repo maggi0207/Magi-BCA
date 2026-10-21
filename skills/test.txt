@@ -1,97 +1,76 @@
-**A. Existing Report Timer Pattern**
+132591: NPP: Auto-Acceptance and Automated Processing
+ADD NPP PAF Auto-Acceptance and Automated Processing
+Epic Title: Automate ADD NPP PAF Acceptance, Audit Tracking, and Document Attachment Management
 
-`RecruitmentReportGeneration.cs` schedules the monthly report with a six-field Azure Functions NCRONTAB expression:
+Business Objective:
+Eliminate CPC review requirements for standard ADD NPP PAF submissions by leveraging auto-acceptance capabilities while maintaining proper audit tracking, processing visibility, and document management for both standard and exception workflows.
 
-```csharp
-[TimerTrigger("0 0 8 1 * *", UseMonitor = false)]
-```
+Business Value:
 
-That is 08:00 on the first day of each month. The ticket specifies the first of the month but not a run time or time zone, so those should be confirmed rather than assumed.
+Reduces CPC workload and processing time.
+Accelerates provider onboarding and updates.
+Standardizes audit and history records for auto-accepted PAFs.
+Ensures proper document storage based on processing path.
+Supports exception-based CPC workflows through CVI integration.
+Description:
+The system shall automatically accept all ADD NPP PAF submissions without CPC review unless the submission meets criteria that trigger an exception workflow requiring CPC processing and CVI creation. Following successful Cactus processing, the PAF shall be routed to the Completed Queue, audit records shall be updated appropriately, and the PAF PDF shall be attached to either the Provider Record or the associated CVI based on workflow outcome.
 
-The existing monthly query calculates its date range in SQL:
 
-```sql
-AND CONVERT(DATE, IndexedSubmittedDate) >= DATEADD(MONTH, DATEDIFF(MONTH, 0, GETDATE()) - 1, 0)
-AND CONVERT(DATE, IndexedSubmittedDate) < EOMONTH(GETDATE(), -1)
-```
 
-With `CONVERT(DATE, ...)`, that exclusive upper bound excludes the final calendar date of the previous month. It is not a correct template for the requested full-month period.
+Rule ID
 
-**B. Email / DL Configuration**
+Rule Description
 
-The Recruitment report currently hardcodes its recipient:
+BR-001
 
-```csharp
-var fromEmail = "credentialing@parallon.com";
-var toEmail = "PSGDLPhysicianRecruitmentVPs@HCAHealthcare.com";
-```
+All ADD NPP PAFs shall be auto-accepted.
 
-Other report functions use `BatchRrfcGenerationSettings.ReportToEmail`, bound from the `BatchRrfcReportToEmail` configuration key. The notification settings also expose `FromEmail` and `ToEmailOverride`; `Notifications.ResolveToEmailValue` uses the override when configured.
+BR-002
 
-Email delivery in this report follows the existing Service Bus notification path: the report queues a `SendEmailRequest`, and `Notifications` sends it through `NotificationService`/Raven. `GraphMailService` exists, but it takes an email-address string for recipients; no directory-group lookup or PARA DL-name resolution was found. The strings “PARA.DL American SSC CPC FO MGMT” and “PARA Credential Reporting” were not found in the repository. **There is email infrastructure, but no demonstrated DL-name-to-address mechanism.** I have not supplied or inferred addresses.
+CPC review is not required for auto-accepted ADD NPP PAFs unless exception workflow criteria are met.
 
-**C. How to Count Add NPP Received**
+BR-003
 
-The PAF model has `IndexedTaskSelected`, `IndexedPafStatus`, `IndexedCreatedOn`, and `IndexedSubmittedDate`. `SetIndexedProperties` maps `IndexedCreatedOn = _formData.CreatedOn` and `IndexedTaskSelected = _formData.TaskSelected`.
+Auto-accepted PAFs shall route to the Completed Queue only after successful Cactus processing.
 
-The existing Recruitment monthly query counts by status/task and `IndexedSubmittedDate`, not creation date:
+BR-004
 
-```sql
-COUNT(Id) AS PafCount
-...
-WHERE IndexedPafStatus = 15
-    AND IndexedTaskSelected = 13
-    AND CONVERT(DATE, IndexedSubmittedDate) >= ...
-    AND CONVERT(DATE, IndexedSubmittedDate) < ...
-```
+Auto-Accepted PAF History shall record "HCP System User" as the User Name.
 
-In the current enums, task value `13` is `TaskType.Npp`, and status value `15` is `PafStatus.SubmittedByRecruiter`. That numeric query is therefore not a safe semantic template for an “Add NPP received” metric, despite the Recruitment report’s name. The ticket needs to confirm whether “received” means created (`IndexedCreatedOn`) or submitted (`IndexedSubmittedDate`).
+BR-005
 
-**D. How to Count Routed to CPC**
+Cactus Audit Log User value shall be "HCP System User – MSP Submitter Name".
 
-For the regular MSP submit path, `SubmitPafStrategy.ProcessSubmitForMspAsync` does:
+BR-006
 
-```csharp
-FormData.SetStatus(FormData.Status == PafStatus.SavedByMsp ? PafStatus.SubmittedByMsp : PafStatus.ResubmittedByMsp, null);
-CurrentPaf.IndexedSubmittedToCpcCount += 1;
-```
+Cactus Audit Log Entity value shall be "HCA Corporate".
 
-The NPP auto-accept path also sets `SubmittedByMsp`, increments `IndexedSubmittedToCpcCount`, and queues processing:
+BR-007
 
-```csharp
-FormData.SetStatus(PafStatus.SubmittedByMsp, null);
-CurrentPaf.IndexedSubmittedToCpcCount += 1;
-_shouldQueuePafForProcessing = true;
-FormData.SetAcceptedByCpcUserInfo(StrategyContext);
-```
+PAF PDFs shall be attached to the Provider Record when no CVI exists.
 
-The status enum comments describe `SubmittedByMsp` and `ResubmittedByMsp` as synonyms for pending CPC review. However, the NPP auto-accept path uses the same status and counter. **STOP:** the repository does not establish a single field that distinguishes “routed to CPC” from auto-accepted NPP. Candidate interpretations are the submit counter, submitted/review statuses, or CPC queue state; each needs product confirmation, particularly because the status/counter are shared with auto-accept.
+BR-008
 
-**E. Email Body Pattern**
+PAF PDFs shall be attached to the CVI when a CVI is created through an exception workflow.
 
-The Recruitment report builds an inline HTML body with tables using `TemplatedNotificationRequestBuilder`; it does not attach a CSV or Excel file. For very large bodies it can move the body to Blob Storage and queue a blob reference.
 
-It calls report generation after querying regardless of whether results are empty. That supports sending an all-zero report, though the NPP implementation must explicitly render zero-valued metrics rather than rely on empty grouped query rows.
+Child stories========================================================
 
-**F. Tests**
+132597 NPP: Auto-Acceptance and Automated Processing Attach PAF PDF to CVI for Exception Workflows
 
-No tests referencing `RecruitmentReportGeneration`, `GenerateRecruitmentReportEmail`, or its activity methods were found.
+132596 : NPP: Auto-Acceptance and Automated Processing Attach PAF PDF to Provider Record for Standard Processing
 
-Nearby Background test classes include `BatchRrfcGenerationIntegrationTests` and `NotificationsTests`; neither is monthly Recruitment report coverage.
+132592 : NPP: Auto-Acceptance and Automated Processing Automatically Accept ADD NPP PAFs
 
-**G. Gaps vs. 132688**
+132595 : NPP: Auto-Acceptance and Automated Processing Create Cactus Audit Log Entries for Auto-Accepted PAFs
 
-- No repository implementation resolves the two requested DL names to email addresses.
-- “Received” does not identify whether to count by created or submitted date.
-- The existing monthly query excludes the previous month’s last day.
-- “Routed to CPC” has no distinct NPP marker in the inspected submit paths; auto-accept shares status and counter updates.
-- The report’s time zone and execution time are not specified beyond “1st of each month.”
-- Percentage precision and zero-denominator behavior are specified by the ticket, but no NPP report implementation or tests exist.
+132598 NPP: Auto-Acceptance and Automated Processing Display Correct PAF Type on Generated PDF
 
-**H. Smallest Implement Shot or STOP**
+132599 NPP: Auto-Acceptance and Automated Processing Record Auto-Acceptance User in PDF History
 
-**STOP before implementation.** First obtain the approved method/configuration for resolving the two DL names, a product definition of “routed to CPC” that excludes or includes NPP auto-accept explicitly, and confirmation of the “received” timestamp. The existing timer, inline HTML, Service Bus email pipeline, and PAF indexed fields are reusable patterns once those decisions are made. Do not reuse the Recruitment query’s numeric filters or date bounds.
+132594 NPP: Auto-Acceptance and Automated Processing Record Auto-Accepted PAF History
 
-**I. No Files Changed**
+132593 NPP: Auto-Acceptance and Automated Processing Route Auto-Accepted PAFs to Completed Queue
 
-No files were changed during this read-only inspection. The status check showed an existing modification to `Hca.Credentialing.Background.Tests.csproj`; it was left untouched.
+
+
