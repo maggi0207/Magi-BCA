@@ -1,40 +1,54 @@
-TASK 1-132688 — implement monthly Add NPP report
+1. **Files added**
+   - `NppActivityReportGeneration.cs`
+   - `NppActivityReportTests.cs`
 
-One Copilot turn. Implement only. Reuse RecruitmentReportGeneration pattern. Do not invent joins/RTKs.
+   Recruitment report code was not changed. The Background.Tests project file has a pre-existing dirty change; I left it untouched.
 
-PRODUCT ANSWERS (locked):
-1) Email To:
-   PARADLAmericanSSCCPCFOMGMT@Parallon.com
-   PARA.CredentialReporting@Parallon.com
-2) Total received = count by SubmittedDate (not CreatedOn)
-3) Routed to CPC = ADD NPP PAFs where a CVI was created
-   (MSP submit + auto-accept that creates CVI counts as routed;
-    do NOT use “any SubmittedByMsp” alone)
-4) Timer: same as other 1st-of-month reports → [TimerTrigger("0 0 8 1 * *")]
+2. **Period and inclusive dates**
 
-Goal:
-Add a monthly Azure Function that emails Add NPP activity for the previous calendar month to both DLs above.
+   The function uses the requested timer expression:
 
-Locked rules:
-- Period: prior month, inclusive first–last day — do NOT copy Recruitment exclusive upper bound that drops the last day.
-- Filter: ADD NPP / TaskType.Npp only — reuse the indexed type/field TASK 0 found; quote it.
-- Total received = count by SubmittedDate in period.
-- Routed to CPC = count of those PAFs where a CVI was created (reuse existing PAF↔CVI relationship from submit/CVI code; quote the join).
-- % routed = (routed ÷ received) × 100, two decimals; 0% if received = 0.
-- Email To: both addresses (prefer existing config/override pattern if present; else hardcode like Recruitment).
-- Zero activity → still send 0 / 0 / 0%.
-- Body: simple HTML table (Reporting Period, Total received, Total routed to CPC, % routed) via existing TemplatedNotificationRequestBuilder / Service Bus notification path.
+   ```csharp
+   [TimerTrigger("0 0 8 1 * *", UseMonitor = false)]
+   ```
 
-STOP AND REPORT (do not invent):
-- If there is no existing way to detect “CVI was created for this PAF” — STOP and quote closest tables/fields; do not invent a CVI flag.
-- If NPP cannot be filtered with an existing indexed field — STOP and quote what exists.
-- Do not change Recruitment report behavior.
+   It calculates the prior month’s first day and the current month’s first day as an exclusive bound:
 
-Return when done:
-1. Files added/changed (paths)
-2. How period + inclusive dates are calculated (quote)
-3. How NPP filter works (quote)
-4. How “CVI created” is detected (quote)
-5. Email recipients + send path (quote)
-6. STOP hits? (yes/no + which)
-7. Build/tests run (pass/fail)
+   ```csharp
+   var currentMonthStart = new DateTime(date.Year, date.Month, 1, 0, 0, 0, date.Kind);
+   return (currentMonthStart.AddMonths(-1), currentMonthStart);
+   ```
+
+   The query uses `IndexedSubmittedDate >= @PeriodStart` and `< @PeriodEndExclusive`, which includes the entire prior month, including its last day. The displayed period ends on `EndExclusive.AddDays(-1)`.
+
+3. **NPP filter**
+
+   The query filters by the existing indexed task field:
+
+   ```sql
+   WHERE paf.IndexedTaskSelected = @NppTaskType
+   ```
+
+   `@NppTaskType` is `(int)TaskType.Npp`; submission date uses `IndexedSubmittedDate`, which the model indexes from `SubmittedDate`.
+
+4. **CVI-created detection**
+
+   The report counts each matching PAF once when its stored `FormData` JSON contains at least one `CreatedOrUpdatedCvis` item:
+
+   ```sql
+   FROM OPENJSON(paf.FormData, '$.CreatedOrUpdatedCvis')
+   ```
+
+   This reuses the existing persisted collection: CactusUpdater loads the affected `CREDENTIALING_K` records into `CviSummaryResult` values, and `PafDataContext.UpdatePaf` stores them in `CreatedOrUpdatedCvis`. The NPP Cactus path inserts the NPP `CREDENTIALING` record. The query does not invent a new flag or join.
+
+5. **Recipients and email path**
+
+   Recipients are exactly `PARADLAmericanSSCCPCFOMGMT@Parallon.com` and `PARA.CredentialReporting@Parallon.com`. The function builds the HTML table using `TemplatedNotificationRequestBuilder`, then calls `QueueEmailAsync` through the existing Service Bus notification path. The aggregate query still returns zero-valued counts for an empty period, so the report is sent when activity is zero.
+
+6. **STOP hits**
+
+   **No.** The existing indexed NPP field and persisted PAF-to-CVI collection provide the required signals. The percentage is formatted to two decimals and returns `0.00%` when received count is zero.
+
+7. **Build/tests**
+
+   The Background and Background.Tests projects built; the focused report tests passed **3/3**. The build emitted the existing ImageSharp license warning. Editor diagnostics reported no errors; the new test file’s no-index whitespace check produced no whitespace findings.
