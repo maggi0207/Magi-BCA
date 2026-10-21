@@ -1,38 +1,49 @@
-You are committing the HCA HCP Credentialing repository. One session. Do not push unless asked.
+You are implementing a change in the HCA HCP Credentialing repository.
 
 ROLE:
-Senior engineer. Commit ONLY the uncommitted 132600 NPP CACTUS sync batch (Provider → License + NPI + pre-commit review fixes). Do not start a second chat.
+Senior engineer. One session. When NPP SpecialtyTask has Professional Practice Interest (PPI), create APP-Other specialty with Not Certified status. Do not start a second chat.
 
-BEFORE COMMIT:
-1. git status / git diff — list every modified/untracked file.
-2. Stage ONLY CACTUS/NPP processor files from this batch, typically:
-   - CactusUpdater.cs
-   - CrudPractitionerOperation.cs
-   - CrudPractitionerLicensesOperation.cs
-   - CrudPractitionerAddressOperation.cs
-   - CrudPractitionerSpecialtiesOperation.cs
-   - CrudEntityAssignmentOperation.cs
-   - CommonCactusRtks.cs
-   - CactusOperationIntegrationTests.cs
-   (Include any other file clearly part of this NPP CACTUS batch; if unsure, DO NOT stage — list under Leftover.)
-3. DO NOT stage unrelated dirty UI/config.
+PRODUCT / AC (132635):
+- Given a PPI selection exists, When processing occurs, Then Specialty_RTK = APP-Other.
+- PROVIDERSPECIALTIES SpecialtyStatus_RTK = Not Certified = DS9Q12M4UO (ADO 132635).
+- Do not invent other RTKs. If APP-Other is stored as a specialty key/RTK constant in repo, quote and reuse; otherwise use the ticket literal and note how specialty keys are resolved today.
 
-COMMIT MESSAGE (use exactly):
+OFFICE EVIDENCE:
+- SpecialtyTask.ProfessionalPracticeInterest exists; specialty op does not reference it.
+- Primary path uses PRSPTYPRIM; existing NPP create-if-missing-primary already added — keep it.
+- Full Add-Practitioner reconciliation inactivates omitted rows — do NOT use that for NPP PPI.
 
-Wire NPP PAF accept into CACTUS provider, licenses, address, specialty, entity, and NPI image attach.
+EXISTING PATTERN:
+Quote SpecialtyTask.ProfessionalPracticeInterest; SavePractitionerSpecialtyAsync / insert fields (SpecialtyStatusRtk); NPP specialty call sites (new + existing missing-primary).
 
-Preserve existing provider/address/license data, attach sanction/license/NPI PSV images, and keep Add-Practitioner paths unchanged.
+SCOPE (may change):
+- CrudPractitionerSpecialtiesOperation.cs
+- CactusUpdater.cs only if NPP paths must invoke PPI handling
+- CommonCactusRtks.cs only if adding named constants next to existing specialty RTKs
+- Focused test(s)
 
-DO NOT:
-- Push
-- Amend
-- --no-verify
+DO NOT CHANGE:
+- Non-Npp reconciliation / inactivate behavior
+- Provider preserve, licenses, address, entity, NPI
+- Invent RTKs beyond APP-Other / DS9Q12M4UO from ticket
 
-AFTER:
-- git status + git log -1 --oneline
+IMPLEMENTATION:
+1. BEFORE coding: quote how Primary specialty key is saved; quote ProfessionalPracticeInterest type/shape; how “PPI selection exists” is detected (non-empty / specific values).
+2. For TaskType.Npp when Specialty processing runs (net-new save and/or existing NPP specialty path): if PPI selection exists, ensure an APP-Other specialty row exists with SpecialtyStatusRtk = DS9Q12M4UO. Prefer create-if-missing; do not wipe other specialties.
+3. If PPI absent → do nothing for APP-Other.
+4. Specialty type for APP-Other: quote existing pattern (primary vs alternate); if ticket is silent, match how non-primary specialties are typed today or leave type as existing helper default — document choice.
+5. Smallest diff.
+
+TESTS:
+- Npp + PPI set → APP-Other + status DS9Q12M4UO created or asserted.
+- Npp without PPI → no APP-Other forced.
+- Build + focused tests + git diff --check.
+- GenB36Key skip OK with note.
 
 RETURN:
-1. Commit hash + subject
-2. Files committed
-3. Leftover dirty files
-4. Confirmation: not pushed
+1. Files changed
+2. Gate quotes (how PPI detected; APP-Other key resolution)
+3. AC 132635 Yes/Partial/No
+4. Tests + results
+5. Remaining gaps
+6. Confirmation: non-Npp reconciliation untouched; missing-primary path still works
