@@ -1,50 +1,26 @@
-**Files Changed**
-- `CactusUpdater.cs`
-- `PafDataContext.cs`
-- `NppAutoAcceptProcessingRules.cs`
-- `NppAutoAcceptProcessingTests.cs`
+You are committing the HCA HCP Credentialing repository. One session. Do not push unless asked.
 
-The processor test project file already had an unrelated dirty change; I left it untouched.
+ROLE:
+Commit ONLY 132591 NPP auto-accept Completed-after-Cactus + PDF parent changes. Do not start a second chat.
 
-**Gate Evidence and Changes**
-The submit decision remains as requested:
+STAGE (if in diff):
+- CactusUpdater.cs
+- PafDataContext.cs
+- NppAutoAcceptProcessingRules.cs
+- NppAutoAcceptProcessingTests.cs
+- Related Processor test project files only if required for the new tests
+DO NOT stage unrelated dirty Background / .sln / UI files.
 
-```csharp
-if (NppTask?.IsActiveDutyMilitaryOrPracticingAtVa == true &&
-    NppTask.IsPhysicianAssistant == true)
-    await ProcessSubmitForNppAutoAcceptAsync(result);
-else
-    await ProcessSubmitForMspAsync(result);
-```
+COMMIT MESSAGE (use exactly):
 
-Cactus success is gated by transaction and audit commits:
+Complete NPP auto-accept after Cactus success and attach PAF PDF to provider or CVI.
 
-```csharp
-await cactusTransaction.CommitAsync();
-await cactusAuditContext.CommitAuditsAsync();
-// PAF update and completion history follow
-result.Success = true;
-```
+Moves auto-accepted NPP to Completed only after processing and keeps the VA/PA submit rule unchanged.
 
-For auto-accepted NPP, the post-commit PAF update now runs even when no CVI was generated and sets `AcceptedByCpc`. The existing completion history uses `AcceptedByCpcUserName`, which remains `"HCP System User"` for auto-accept.
+DO NOT: push, amend, --no-verify
 
-The existing CVI PDF path uses `ParentFileK = Credentialing`. Auto-accepted NPP now uses the existing Provider attachment path only when there are no affected CVI keys; a generated practitioner key is supplied for new providers.
-
-**BR Status**
-| BR | Result |
-|---|---|
-| BR-001 | Yes. VA+PA auto-accept condition is unchanged. |
-| BR-002 | Yes. Other NPP submissions still use the existing MSP/CPC path. |
-| BR-003 | Yes. Auto-accepted NPP becomes `AcceptedByCpc` only during PAF persistence after Cactus and audit commits. |
-| BR-004 | Yes for the post-Cactus completion history; it uses `"HCP System User"`. |
-| BR-005 | Partial. HCPSU key resolution is retained, but the requested `"HCP System User – {MSP SubmitterName}"` display composition is not supported by the inspected audit interface, which takes a resolved `USER_K`. |
-| BR-006 | No. No HCA Corporate lookup/key was found, so the existing audit entity behavior remains unchanged. |
-| BR-007 | Yes for auto-accepted NPP without a CVI: PAF PDF falls back to Provider. |
-| BR-008 | Yes. When a CVI is created, the existing Credentialing/CVI PDF attachment path remains in use. |
-
-The PDF type remains `TaskType.Npp.GetDescription()` (`"NPP PAF"`).
-
-**Validation and Remaining**
-The processor and focused test project built, and **4/4 focused tests passed**. The scoped `git diff --check` passed, and editor diagnostics reported no errors. Repository-wide `git diff --check` reported trailing whitespace in an unrelated, already-dirty Background project file; I left it unchanged.
-
-Remaining gaps: BR-005 needs an audit-layer mechanism for per-event display composition; BR-006 needs an approved HCA Corporate entity resolution. No entity or user key was invented. The VA+PA dispatch rule is unchanged.
+RETURN:
+1. Commit hash + subject
+2. Files committed
+3. Leftover dirty
+4. Not pushed confirmation
