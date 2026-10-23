@@ -1,15 +1,39 @@
-1. **File changed:** `PractitionerSearchForm.razor`
+TASK 1D-131785 — hotfix: /Practitioner/Search/Npp NPI Search broken
 
-   - Reason: before, `<InputHca ... Value="Practitioner does not have NPI" Disabled="true" />`; after, `<p><strong>Reason:</strong> Practitioner does not have NPI</p>` outside `FormItem`.
-   - First Name: before and after, `@bind-Value="@_model.PractitionerFirstName"`.
-   - Last Name: before and after, `@bind-Value="@_model.PractitionerLastName"`.
-   - State: before and after, `@bind-Value="@_model.State"`.
-   - License Number: before and after, `@bind-Value="@_model.LicenseNumber"`.
+One Copilot turn. Fix regression only. Do not do Exception UI polish in this shot.
 
-2. **Reason:** rendered as plain text outside `FormItem`; it remains read-only and no longer triggers AntDesign’s binding requirement.
+REPRO:
+On /Practitioner/Search/Npp (NPI mode, NOT exception):
+- Enter 10-digit NPI (e.g. 1861482259)
+- Click Search
+- User reports Search “not working”; UI shows No Data
+- “No NPI available?” link still visible (correct for NPI mode)
 
-3. **STOP:** None. No global `InputHca` change and no API, search, or audit changes.
+GOAL:
+Restore pre-131785 NPI Simple search on the NPP route. Exception search must stay isolated to Exception mode only.
 
-4. **Build:** Client `net10.0` build passed.
+DIAGNOSE (quote before fix):
+1. PractitionerSearchForm Search click / CanSearch for IsNppRequest + NPI mode — which SearchType is sent?
+2. PractitionerController / PractitionerRepository — does IsNppRequest or new NppException search type intercept Simple/NPI searches?
+3. Any MSP-only gate applied to ALL NPP searches (including Simple) vs exception-only?
+4. Network: expected API path/status for NPI Simple on /Npp.
 
-Recruitment, PSG, and Begin PAF markup was untouched.
+FIX RULES:
+- When IsNppRequest && NPI mode (not ExceptionSearch): use existing Simple/NPI search path exactly as before 131785.
+- NppException search type + State/License params ONLY when ExceptionSearch mode.
+- Do not require State/License for NPI search.
+- Do not change Recruitment/PSG/Begin PAF.
+- Do not remove No-NPI link from NPI mode.
+
+VALIDATE:
+- Build Client + Cactus API (or affected projects).
+- Mentally: NPI mode Search sends Simple/NPI; Exception mode sends NppException type.
+- Add/adjust a focused test if easy: NPP NPI mode does not use NppException search type.
+
+RETURN:
+1. Root cause (quote)
+2. Files changed
+3. Before/after SearchType / handler quotes
+4. Tests + build
+5. Confirm Exception path still wired
+6. STOP hits?
