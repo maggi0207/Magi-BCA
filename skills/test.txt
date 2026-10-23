@@ -1,68 +1,30 @@
-TASK 1-131785 — implement NPP No-NPI Exception Search
+Implemented TASK 1-131785.
 
-You are implementing a change in the HCA HCP Credentialing repository.
+1. **Files changed:** `PractitionerSearchForm.razor`, `PractitionerSearchForm.razor.cs`, `PractitionerSearchPage.razor`, `PractitionerSearchParameters.cs`, `PractitionerController.cs`, `PractitionerRepository.cs`, `NppExceptionSearchPagedQueryBuilder.cs`, `AuditLog.cs`, `CredentialingAuditLogger.cs`, `NppExceptionSearchTests.cs`, and the Cactus test fixture/project files.
 
-ROLE:
-Senior engineer. One focused session. Reuse patterns from TASK 0. Do not invent RTKs or AffVerify reuse.
+2. **Reverse lookup:** Names are prefix-matched against `PROVIDERS`; when state and license are supplied, a correlated `EXISTS` requires a matching license for that same provider:
+   ```sql
+   AND EXISTS (
+       SELECT 1
+       FROM VISUALCACTUS.PROVIDERLICENSES PL WITH (NOLOCK)
+       WHERE PL.PROVIDER_K = P.PROVIDER_K
+         AND PL.STATE = @State
+         AND PL.LICENSENUMBER = @LicenseNumber
+         AND PL.LICENSE_RTK = 'NPDBSTATEx'
+   )
+   ```
+   Last-name-only searches omit the license predicate. Results use the existing pager and filtered-count pattern. No results flow through the existing empty state.
 
-PRODUCT + DEFAULTS (locked — proceed):
-- NPP-only (/Practitioner/Search/Npp). Do NOT change Begin PAF, Recruitment, or PSG exception behavior.
-- When user opens “No NPI available?” on NPP: show Exception form with:
-  - Reason: hardcoded “Practitioner does not have NPI” (display)
-  - Last Name*: required, min 2 alpha
-  - First Name: optional; if present min 1 alpha
-  - State + License Number: if either entered, both required; License min 2 chars when entered
-- Search:
-  - Last only (no State/License): Providers by Last (+ First if set). Use existing page size/cap if any.
-  - State+License set: same provider must match name filter AND a PROVIDERLICENSES row with STATE + LICENSENUMBER + LICENSE_RTK = "NPDBSTATEx" (reuse predicate from GetExistingStateLicense — do NOT call that Processor method; it requires providerKey).
-  - No match → existing “No Results Found” empty state (do not invent new copy).
-- Audit: new AuditAction for NPP Exception Search; build criteria from entered fields; QueueAuditLogEntry → audit-log Service Bus (copy AffVerify pipeline, NEW action name). Retention: leave default 180-day purge (do not change AffVerify 5yr).
-- Cancel on NPP: clear exception fields and SwitchToNpiSearch — NOT history.back().
-- Pass IsNppRequest into PractitionerSearchForm. Do NOT set IsFlexiblePafUser for NPP.
+3. **NPP form isolation:** The page passes `IsNppRequest` only for the NPP route. That form branch displays the fixed reason and only the NPP name/state/license criteria. The NPP request uses its own search type; it does not set Recruitment/PSG flags. The API also restricts that new search type to MSP.
 
-OFFICE EVIDENCE (TASK 0):
-- GetExistingStateLicense in CrudLicensesAndCertificationsOperation = provider-scoped duplicate check only.
-- Reverse lookup belongs on Cactus API PractitionerRepository / PractitionerController (has _cactusDb).
-- Providers join pattern: AffiliationVerificationSearchPagedQueryBuilder.
-- AffVerify audit: CredentialingAuditLogger + QueueAuditLogEntry.
-- PractitionerSearchParameters currently has no State/LicenseNumber.
+4. **Audit:** Added `AuditAction.NppExceptionPractitionerSearchCriteria` at the end of the enum. The repository builds criteria from entered fields and calls `QueueAuditLogEntry`; the existing service sends the serialized entry to `ConfigConstants.AuditLog`. No retention policy was changed, so the default 180-day purge remains in effect.
 
-SCOPE (add only what needed):
-- PractitionerSearchForm.razor / .razor.cs
-- PractitionerSearchPage.razor / .razor.cs
-- PractitionerSearchTable if needed for IsNppRequest
-- PractitionerSearchParameters.cs
-- PractitionerController.cs + PractitionerRepository.cs + focused query builder
-- AuditAction enum + CredentialingAuditLogger (+ call site on search)
-- Focused unit/integration tests
+5. **Cancel:** On NPP, Cancel resets the exception criteria and validation state, invokes the existing reset callback, and switches to NPI mode. It does not call `history.back()`.
 
-DO NOT:
-- Call Packet.Processor GetExistingStateLicense from UI/API
-- Reuse AffVerifyPractitionerSearchCriteria action for NPP
-- Enable IsFlexiblePafUser for NPP
-- Change Recruitment/PSG/Begin PAF validators
-- Invent LICENSE_RTK other than NPDBSTATEx (matches existing helper)
-- Broad refactors
+6. **Validation:** Six focused tests pass, including state/license pair validation, last-name-only search, combined name-and-license filtering, unchanged Recruitment validation, and NPP reset/no-flexible behavior. The Client Release build and PAF API Release build also pass.
 
-IMPLEMENTATION:
-1. Quote GetExistingStateLicense predicate + AffVerify audit send + form SwitchToExceptionSearch before coding.
-2. Add Cactus API reverse/name search path for NPP exception (new search type or dedicated method — prefer smallest extension of SearchExistingPractitionersAsync).
-3. NPP exception UI + validation per rules above.
-4. Wire audit on successful search attempt (criteria + outcome if pattern supports; at least criteria like AffVerify).
-5. NPP Cancel → clear + NPI mode.
-6. Tests for: pair validation; last-only; state+license AND; no flexible leak; Cancel.
+7. **STOP hits:** None. The API can query `PROVIDERLICENSES`; the audit enum is append-only, preserving existing enum values.
 
-STOP AND REPORT (do not invent):
-- If Cactus API cannot query PROVIDERLICENSES from PractitionerRepository — quote why and STOP.
-- If AuditAction enum cannot be extended without breaking serialization — quote and STOP.
-- If last-name-only cannot be done without changing shared Recruitment contract globally — implement NPP-only branch only; do not weaken Recruitment.
+8. **Regression scope:** Recruitment, PSG, and Begin PAF behavior were left unchanged. `IsFlexiblePafUser` remains Recruitment/PSG only.
 
-RETURN:
-1. Files changed
-2. How reverse lookup SQL/query works (quote)
-3. How NPP form isolation works (quote)
-4. New AuditAction name + SB path (quote)
-5. Cancel behavior (quote)
-6. Tests run (pass/fail)
-7. STOP hits
-8. Confirm: Recruitment / PSG / Begin PAF unchanged
+The task-scoped `git diff --check` is clean. The full-worktree check still reports trailing whitespace in unrelated Background project lines. A Debug PAF build was blocked by the running PAF API locking output files; the Release build passed.
