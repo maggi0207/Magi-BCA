@@ -1,30 +1,12 @@
-Implemented TASK 1-131785.
+TASK 2-131785 — UAT No-NPI Exception (no code changes)
 
-1. **Files changed:** `PractitionerSearchForm.razor`, `PractitionerSearchForm.razor.cs`, `PractitionerSearchPage.razor`, `PractitionerSearchParameters.cs`, `PractitionerController.cs`, `PractitionerRepository.cs`, `NppExceptionSearchPagedQueryBuilder.cs`, `AuditLog.cs`, `CredentialingAuditLogger.cs`, `NppExceptionSearchTests.cs`, and the Cactus test fixture/project files.
+1) /Practitioner/Search/Npp → “No NPI available?” → Reason + Last (+ optional First/State/License).
+2) Last only → results or empty “No Results Found”.
+3) State without License (and reverse) → blocked.
+4) Valid State+License match → provider; bad pair → not found.
+5) Cancel → NPI mode on same page (not browser back).
+6) Confirm Begin PAF / Recruitment exception unchanged.
+7) Optional: audit-log queue / entry for NppExceptionPractitionerSearchCriteria.
 
-2. **Reverse lookup:** Names are prefix-matched against `PROVIDERS`; when state and license are supplied, a correlated `EXISTS` requires a matching license for that same provider:
-   ```sql
-   AND EXISTS (
-       SELECT 1
-       FROM VISUALCACTUS.PROVIDERLICENSES PL WITH (NOLOCK)
-       WHERE PL.PROVIDER_K = P.PROVIDER_K
-         AND PL.STATE = @State
-         AND PL.LICENSENUMBER = @LicenseNumber
-         AND PL.LICENSE_RTK = 'NPDBSTATEx'
-   )
-   ```
-   Last-name-only searches omit the license predicate. Results use the existing pager and filtered-count pattern. No results flow through the existing empty state.
-
-3. **NPP form isolation:** The page passes `IsNppRequest` only for the NPP route. That form branch displays the fixed reason and only the NPP name/state/license criteria. The NPP request uses its own search type; it does not set Recruitment/PSG flags. The API also restricts that new search type to MSP.
-
-4. **Audit:** Added `AuditAction.NppExceptionPractitionerSearchCriteria` at the end of the enum. The repository builds criteria from entered fields and calls `QueueAuditLogEntry`; the existing service sends the serialized entry to `ConfigConstants.AuditLog`. No retention policy was changed, so the default 180-day purge remains in effect.
-
-5. **Cancel:** On NPP, Cancel resets the exception criteria and validation state, invokes the existing reset callback, and switches to NPI mode. It does not call `history.back()`.
-
-6. **Validation:** Six focused tests pass, including state/license pair validation, last-name-only search, combined name-and-license filtering, unchanged Recruitment validation, and NPP reset/no-flexible behavior. The Client Release build and PAF API Release build also pass.
-
-7. **STOP hits:** None. The API can query `PROVIDERLICENSES`; the audit enum is append-only, preserving existing enum values.
-
-8. **Regression scope:** Recruitment, PSG, and Begin PAF behavior were left unchanged. `IsFlexiblePafUser` remains Recruitment/PSG only.
-
-The task-scoped `git diff --check` is clean. The full-worktree check still reports trailing whitespace in unrelated Background project lines. A Debug PAF build was blocked by the running PAF API locking output files; the Release build passed.
+Return: PASS / FAIL / PARTIAL per step + screenshots if any.
+Do not commit (final batch later).
