@@ -1,143 +1,68 @@
-**A–N**
+TASK 1-131785 — implement NPP No-NPI Exception Search
 
-**A. `GetExistingStateLicense`**
+You are implementing a change in the HCA HCP Credentialing repository.
 
-Found in `CrudLicensesAndCertificationsOperation.cs`, class `CrudLicensesAndCertificationsOperation`:
+ROLE:
+Senior engineer. One focused session. Reuse patterns from TASK 0. Do not invent RTKs or AffVerify reuse.
 
-```csharp
-private async Task<Providerlicenses> GetExistingStateLicense(
-    string state, string licenseNumber, string providerKey)
-```
+PRODUCT + DEFAULTS (locked — proceed):
+- NPP-only (/Practitioner/Search/Npp). Do NOT change Begin PAF, Recruitment, or PSG exception behavior.
+- When user opens “No NPI available?” on NPP: show Exception form with:
+  - Reason: hardcoded “Practitioner does not have NPI” (display)
+  - Last Name*: required, min 2 alpha
+  - First Name: optional; if present min 1 alpha
+  - State + License Number: if either entered, both required; License min 2 chars when entered
+- Search:
+  - Last only (no State/License): Providers by Last (+ First if set). Use existing page size/cap if any.
+  - State+License set: same provider must match name filter AND a PROVIDERLICENSES row with STATE + LICENSENUMBER + LICENSE_RTK = "NPDBSTATEx" (reuse predicate from GetExistingStateLicense — do NOT call that Processor method; it requires providerKey).
+  - No match → existing “No Results Found” empty state (do not invent new copy).
+- Audit: new AuditAction for NPP Exception Search; build criteria from entered fields; QueueAuditLogEntry → audit-log Service Bus (copy AffVerify pipeline, NEW action name). Retention: leave default 180-day purge (do not change AffVerify 5yr).
+- Cancel on NPP: clear exception fields and SwitchToNpiSearch — NOT history.back().
+- Pass IsNppRequest into PractitionerSearchForm. Do NOT set IsFlexiblePafUser for NPP.
 
-It queries `VISUALCACTUS.PROVIDERLICENSES`, matching `PROVIDER_K`, `LICENSENUMBER`, `STATE`, and `LICENSE_RTK = "NPDBSTATEx"`. This is a **provider-scoped duplicate check**, not a reverse search: the provider key is required.
+OFFICE EVIDENCE (TASK 0):
+- GetExistingStateLicense in CrudLicensesAndCertificationsOperation = provider-scoped duplicate check only.
+- Reverse lookup belongs on Cactus API PractitionerRepository / PractitionerController (has _cactusDb).
+- Providers join pattern: AffiliationVerificationSearchPagedQueryBuilder.
+- AffVerify audit: CredentialingAuditLogger + QueueAuditLogEntry.
+- PractitionerSearchParameters currently has no State/LicenseNumber.
 
-**B. Existing caller**
+SCOPE (add only what needed):
+- PractitionerSearchForm.razor / .razor.cs
+- PractitionerSearchPage.razor / .razor.cs
+- PractitionerSearchTable if needed for IsNppRequest
+- PractitionerSearchParameters.cs
+- PractitionerController.cs + PractitionerRepository.cs + focused query builder
+- AuditAction enum + CredentialingAuditLogger (+ call site on search)
+- Focused unit/integration tests
 
-It is called by the Packet Processor’s license operation when processing new state-license records:
+DO NOT:
+- Call Packet.Processor GetExistingStateLicense from UI/API
+- Reuse AffVerifyPractitionerSearchCriteria action for NPP
+- Enable IsFlexiblePafUser for NPP
+- Change Recruitment/PSG/Begin PAF validators
+- Invent LICENSE_RTK other than NPDBSTATEx (matches existing helper)
+- Broad refactors
 
-```csharp
-var existing = await GetExistingStateLicense(
-    stateLicense.State, stateLicense.Number ?? "", packet.Practitioner.Key);
-```
+IMPLEMENTATION:
+1. Quote GetExistingStateLicense predicate + AffVerify audit send + form SwitchToExceptionSearch before coding.
+2. Add Cactus API reverse/name search path for NPP exception (new search type or dedicated method — prefer smallest extension of SearchExistingPractitionersAsync).
+3. NPP exception UI + validation per rules above.
+4. Wire audit on successful search attempt (criteria + outcome if pattern supports; at least criteria like AffVerify).
+5. NPP Cancel → clear + NPI mode.
+6. Tests for: pair validation; last-only; state+license AND; no flexible leak; Cancel.
 
-The operation is invoked from `PacketProcessor`’s `CactusUpdater`, which supplies the `CactusDbContext`. This path is for packet license writes, not practitioner search.
+STOP AND REPORT (do not invent):
+- If Cactus API cannot query PROVIDERLICENSES from PractitionerRepository — quote why and STOP.
+- If AuditAction enum cannot be extended without breaking serialization — quote and STOP.
+- If last-name-only cannot be done without changing shared Recruitment contract globally — implement NPP-only branch only; do not weaken Recruitment.
 
-**C. Provider key and name join**
-
-The returned `Providerlicenses` record contains `ProviderK`; the query selects `pl.*`. The helper does not join `PROVIDERS` or filter names.
-
-A closest API-side name lookup pattern is `AffiliationVerificationSearchPagedQueryBuilder.cs`:
-
-```sql
-LEFT JOIN VisualCACTUS.PROVIDERS P WITH (NOLOCK)
-    ON P.PROVIDER_K = ea.PROVIDER_K
-```
-
-It selects `P.LASTNAME` and `P.FIRSTNAME`. That demonstrates an existing Providers join pattern, but not a ready-made license-driven lookup.
-
-**D. Existing practitioner search API**
-
-No PractitionerController/repository API was found that searches practitioners by state plus license number. `SearchExistingPractitionersAsync` dispatches existing search types; `PractitionerSearchParameters` contains no State or license-number fields.
-
-**E. Exception form and NPP isolation**
-
-`IsFlexiblePafUser()` is Recruitment or PSG only:
-
-```csharp
-private bool IsFlexiblePafUser() => _isRecruitmentUser || _isPsgUser;
-```
-
-Thus NPP MSP users use the non-flexible exception form: NPI, SSN, First Name, Last Name; no Reason, State, or License fields. Recruitment/PSG get Reason, Last Name, SSN, First Name, DOB, and Email.
-
-On `/Npp`, the page passes `ForceNpiSearchMode` to the form, which prevents initial auto-switching:
-
-```csharp
-if (!_isRecruitmentUser && !_isPsgUser && !ForceNpiSearchMode)
-    SwitchToExceptionSearch();
-```
-
-But the shared “No NPI available?” link is still rendered, and `SwitchToExceptionSearch` has no NPP-specific restriction. The page passes `IsNppRequest` to the table, not to `PractitionerSearchForm`. So the route begins in NPI mode but does not currently isolate or specialize exception search.
-
-**F. Search parameter fields**
-
-`PractitionerSearchParameters.cs` has FirstName, LastName, SSN, NPI, EmailAddress, DOB, and other existing search fields. **No State or LicenseNumber properties.**
-
-**G. Recruitment Last-name validation**
-
-Recruitment exception search requires at least one additional criterion with Last Name:
-
-```csharp
-if (!hasAdditionalCriterion)
-{
-    throw new ArgumentException(
-        "At least one additional search criteria is required along with Last Name");
-}
-```
-
-The UI also enables flexible-user exception search only when Last Name, Reason, and at least one additional criterion are present. Recruitment’s exception search is therefore not reusable for the requested NPP “Last Name only” case.
-
-**H. Audit pattern**
-
-CredentialingAuditLogger.GetAffVerifyPractitionerSearchAuditLog constructs an `AuditLog` containing action, current user, and entered criteria. Cactus API’s `PractitionerRepository.SearchPractitionersAsync` then calls:
-
-```csharp
-await _serviceBusService.QueueAuditLogEntry(
-    _auditLogger.GetAffVerifyPractitionerSearchAuditLog(...));
-```
-
-`ServiceBusService.QueueAuditLogEntry` serializes to the `audit-log` queue; Background’s `AuditLogFunctions.CreateAuditLogEntry` consumes and persists it. AffVerify is the existing example, but the product explicitly says not to reuse its action.
-
-**I. New audit action**
-
-The pipeline can carry a new action: `AuditAction` is an enum stored in the `AuditLog` payload and the audit consumer persists it generically. However, audit retention is action-specific: `CredentialingAuditLogRepository.PurgeAuditLogsAsync` keeps only AffVerify actions for five years and deletes other actions after 180 days. A new NPP action can reuse the transport/persistence pipeline, but its retention duration needs an explicit decision. Do not send it under an AffVerify action.
-
-**J. Cancel on `/Npp`**
-
-For non-flexible users, Cancel does this:
-
-```csharp
-await JsRuntime.InvokeVoidAsync("history.back");
-```
-
-It does not clear the exception criteria and return the same form to NPI mode. Recruitment/PSG instead clear exception fields and switch modes.
-
-**K. License API reverse lookup**
-
-No existing reverse lookup by State + license number was found. `PractitionerLicenseController`’s state-license endpoint is keyed by practitioner key; its other license search methods accept practitioner/item criteria, not state plus license number. The existing `GetExistingStateLicense` also requires provider key.
-
-**L. STOP risks / host boundary**
-
-`CrudLicensesAndCertificationsOperation` belongs to Packet.Processor and receives its `CactusDbContext` from the processor’s `CactusUpdater`. It is not a service callable from the UI.
-
-The UI calls Cactus API’s `PractitionerController.SearchExistingPractitionersAsync`. Cactus API has a `PractitionerRepository` configured with `_cactusDb`; a new reverse lookup belongs in that API repository/endpoint, not by calling a Processor operation from the UI. PAF API’s `Startup` configures PAF, User, and Packet DB settings, but not `CactusDb`.
-
-**M. Minimal implementation surface**
-
-- `PractitionerSearchForm.razor` and `.razor.cs`
-- `PractitionerSearchPage.razor` and `.razor.cs`
-- `PractitionerSearchTable.razor.cs`
-- `PractitionerSearchParameters.cs`
-- `PractitionerController.cs`
-- `PractitionerRepository.cs` and a focused search-query builder
-- `AuditLog.cs`
-- `CredentialingAuditLogger.cs`
-- Cactus API call site and, if five-year retention is required, `CredentialingAuditLogRepository.cs`
-- Focused Cactus API/search and audit tests
-
-**N. Ready to implement?**
-
-**Partial.** The existing query’s exact state/number predicate and the Providers join pattern are reusable references, but `GetExistingStateLicense` cannot directly implement a reverse search because it requires a provider key. The Cactus API host can access Cactus DB and is the correct API boundary. Still to resolve: exact matching/name behavior, audit retention for a new action, and NPP-specific entry/cancel/form isolation. Do not set `IsFlexiblePafUser` for NPP.
-
-**Reuse verdict**
-- License predicate: **Partial reuse**; exact state + number comparison exists, but only as a provider-scoped duplicate check.
-- Providers join: **Yes, pattern exists** in Cactus API query code; no license-driven name-filter endpoint exists.
-- Audit Service Bus pipeline: **Yes, with a new action**; retention requires a decision.
-- NPP form isolation: **Not complete today**; do not enable flexible-user behavior for NPP.
-
-**STOP hits**
-- No current reverse lookup endpoint.
-- Processor helper cannot be called directly from the search/API path.
-- NPP route leaves the shared no-NPI link active and Cancel uses `history.back`.
-- New audit action would inherit 180-day cleanup unless retention is addressed.
-
-No files were changed.
+RETURN:
+1. Files changed
+2. How reverse lookup SQL/query works (quote)
+3. How NPP form isolation works (quote)
+4. New AuditAction name + SB path (quote)
+5. Cancel behavior (quote)
+6. Tests run (pass/fail)
+7. STOP hits
+8. Confirm: Recruitment / PSG / Begin PAF unchanged
