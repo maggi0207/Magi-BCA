@@ -1,57 +1,41 @@
-TASK — Commit NPP work, backup branch, merge Sprint10branch, resolve conflicts
+TASK 1E-131785 — fix NPP NPI Search: click does not fire any network request
 
-You are working in the HCA HCP Credentialing repository (office). Do this in order. Do not push unless I explicitly ask.
+One Copilot turn. Diagnose then fix. NPP NPI mode only. Do not polish Exception UI.
 
-STEP 1 — Status
-1. Print: current branch, git status -sb, git diff --stat
-2. List dirty files. Identify which are NPP-related vs unrelated.
-3. Do NOT include secrets (.env, credentials, local.settings with keys) in the commit.
+REPRO (confirmed UAT):
+- /Practitioner/Search/Npp — NPI mode (not Exception)
+- Enter NPI 1861482259 — Search button looks enabled
+- Click Search → Chrome Network stays EMPTY (no SearchExistingPractitioners)
+- Results stay “No Data”
+- Prior fix (mask RawValue → _model.PractitionerNpi) already in branch — still no HTTP
 
-STEP 2 — Commit NPP changes
-1. Stage only NPP-related changes (typical: PractitionerSearchForm*, PractitionerSearchPage*, PractitionerSearchParameters*, PractitionerController/Repository NPP paths, NppExceptionSearch*, AuditAction/CredentialingAuditLogger NPP, NppActivityReport*, CACTUS NPP/auto-accept files, related tests). Leave unrelated dirty files unstaged unless I said otherwise.
-2. Commit with message:
+MEANING:
+Handler never reaches the API call (Disabled / no OnClick / early return / Blazor exception).
 
-Add NPP close-out: No-NPI exception search, NPI mask fallback, CACTUS/auto-accept/report.
+DIAGNOSE (quote before coding):
+1. PractitionerSearchForm Search button markup for NPP NPI mode: OnClick, Disabled, HtmlType, loading.
+2. CanSearch / IsSearchEnabled / equivalent — exact conditions for IsNppRequest + NPI mode. Does 10-digit NPI enable it?
+3. Search click method: every early return path; does it call the HTTP search client?
+4. Diff vs Begin PAF / non-NPP NPI Search button that DOES work — what’s different for IsNppRequest?
+5. After Sprint10 merge: any broken event wiring on PractitionerSearchForm?
+6. If you can run UI: note Console errors on click (user saw 2 console errors).
 
-Includes 131785 exception path + FormItem/NPI fixes; keep Recruitment/PSG/Begin PAF unchanged.
+FIX:
+- Ensure NPP NPI Search button is enabled when NPI has 10 digits (same rule as pre-NPP Enforce NPI).
+- Ensure OnClick invokes the same search path as working NPI search, with NPI from mask RawValue OR _model.PractitionerNpi.
+- Do not early-return silently; if validation fails, show existing validation UI.
+- Do not route NPI mode to NppException search type.
+- Do not change Recruitment/PSG/Begin PAF behavior.
 
-3. If hook fails: fix and create a NEW commit (do not amend).
-4. Print commit hash + git status -sb.
+VALIDATE:
+- Client build.
+- Mentally: click → method runs → HTTP client called with Simple + NPI.
+- Add a small unit/UI-logic test if easy: CanSearch true for IsNppRequest + 10-digit NPI.
 
-STEP 3 — Backup (before Sprint10)
-1. Create branch: backup/<currentBranch>-before-Sprint10-yyyyMMdd-HHmm
-2. Print the backup branch name. Do not delete any branches.
-3. Do not push backup unless I ask.
-
-STEP 4 — Fetch + merge Sprint10
-1. git fetch origin
-2. Find exact remote branch name matching Sprint10 (Sprint10branch / Sprint10 / etc.) — quote it.
-3. Merge that remote branch into the CURRENT branch (merge, not rebase).
-4. If conflicts:
-   - List conflicted files
-   - Resolve carefully:
-     * PractitionerSearch* / NppException* / NppActivityReport* / NPP audit → keep OUR NPP behavior; integrate Sprint10 only if clearly unrelated and required
-     * AuditAction enum → keep append of NppExceptionPractitionerSearchCriteria; do not reorder existing values
-     * Unrelated Sprint10 files → prefer theirs unless it breaks build
-   - After each resolve: git add <file>
-   - git merge --continue
-5. If merge is clean, say so.
-
-STEP 5 — Build + WASM note
-1. dotnet build affected projects (Client, Cactus API, Background if report/auto-accept touched).
-2. If Client wasm 404 was an issue: note that user must restart host + hard refresh after clean build.
-3. Do not invent fixes for unrelated Sprint10 failures — report them.
-
-RETURN (required):
-1. Commit hash(es)
-2. Backup branch name
-3. Exact Sprint10 remote ref merged
-4. Conflicts? (none / file list + how resolved)
-5. Build pass/fail
-6. Final git status -sb
-7. Anything still unstaged (unrelated)
-
-STOP AND REPORT if:
-- Cannot identify Sprint10 branch name
-- Merge would require discarding NPP work
-- Secrets would be committed
+RETURN:
+1. Root cause (why no network) — quote
+2. Files changed
+3. Before/after button + CanSearch + click handler quotes
+4. Build/tests
+5. Confirm Exception path untouched
+6. STOP hits?
