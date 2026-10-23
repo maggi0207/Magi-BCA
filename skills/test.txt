@@ -1,39 +1,16 @@
-TASK 1D-131785 — hotfix: /Practitioner/Search/Npp NPI Search broken
+1. **Root cause:** NPP NPI mode already selected Simple, but submitted the NPI only from the input mask’s raw value:
+   ```csharp
+   searchParams.SearchType = PractitionerSearchType.Simple;
+   searchParams.Npi = _npiInputMask?.RawValue ?? _npiInputMaskNonRecruitment?.RawValue;
+   ```
+   The form also keeps the NPI in the two-way-bound `_model.PractitionerNpi`. If the mask value is empty, the request reaches Simple without an NPI, which fails the Simple search criteria check and can appear as no results. The exact runtime request wasn’t captured, so the missing mask value is the identified failure path, not a network-confirmed observation.
 
-One Copilot turn. Fix regression only. Do not do Exception UI polish in this shot.
+2. **File changed:** `PractitionerSearchForm.razor.cs`. For NPP NPI mode only, when mask `RawValue` is blank, the request now falls back to `_model.PractitionerNpi`.
 
-REPRO:
-On /Practitioner/Search/Npp (NPI mode, NOT exception):
-- Enter 10-digit NPI (e.g. 1861482259)
-- Click Search
-- User reports Search “not working”; UI shows No Data
-- “No NPI available?” link still visible (correct for NPI mode)
+3. **Before/after handler:** The search type remains `PractitionerSearchType.Simple`; only the NPP NPI value source gains the bound-model fallback. `NppException` remains selected only in the Exception mode/no-NPI branch. The controller gate checks only `SearchType == NppException`; Simple is dispatched by the existing Simple repository branch. Expected request: `POST api/Practitioner/SearchExistingPractitioners`; a matching NPI returns the normal successful search response.
 
-GOAL:
-Restore pre-131785 NPI Simple search on the NPP route. Exception search must stay isolated to Exception mode only.
+4. **Validation:** Client `net10.0` build passed; Cactus API `net10.0` build passed. Scoped diff check passed. No new focused test was added.
 
-DIAGNOSE (quote before fix):
-1. PractitionerSearchForm Search click / CanSearch for IsNppRequest + NPI mode — which SearchType is sent?
-2. PractitionerController / PractitionerRepository — does IsNppRequest or new NppException search type intercept Simple/NPI searches?
-3. Any MSP-only gate applied to ALL NPP searches (including Simple) vs exception-only?
-4. Network: expected API path/status for NPI Simple on /Npp.
+5. **Exception path:** Still uses `NppException` and carries State/LicenseNumber only from Exception mode.
 
-FIX RULES:
-- When IsNppRequest && NPI mode (not ExceptionSearch): use existing Simple/NPI search path exactly as before 131785.
-- NppException search type + State/License params ONLY when ExceptionSearch mode.
-- Do not require State/License for NPI search.
-- Do not change Recruitment/PSG/Begin PAF.
-- Do not remove No-NPI link from NPI mode.
-
-VALIDATE:
-- Build Client + Cactus API (or affected projects).
-- Mentally: NPI mode Search sends Simple/NPI; Exception mode sends NppException type.
-- Add/adjust a focused test if easy: NPP NPI mode does not use NppException search type.
-
-RETURN:
-1. Root cause (quote)
-2. Files changed
-3. Before/after SearchType / handler quotes
-4. Tests + build
-5. Confirm Exception path still wired
-6. STOP hits?
+6. **STOP hits:** None. No API, audit, Recruitment, PSG, or Begin PAF changes were made.
