@@ -1,11 +1,32 @@
-UAT is **PARTIAL**: the local app responded, but `/Practitioner/Search/Npp` redirected to the login page. I couldn’t run the authenticated MSP flows without a signed-in session, and I did not enter credentials or change code. The browser also reported 404s loading client WASM assets.
+TASK 1B-131785 — hotfix NPP Exception FormItem bind crash
 
-1. **PARTIAL**: Reached the login page, not the NPP form. The welcome dialog was visible in the captured screenshot.
-2. **PARTIAL**: Could not submit a last-name-only search.
-3. **PARTIAL**: Could not interactively verify either incomplete state/license pair.
-4. **PARTIAL**: Could not run a matching or non-matching license search.
-5. **PARTIAL**: Could not exercise Cancel in the browser.
-6. **PASS, code review only**: The NPP branch is isolated by `IsNppRequest`; Recruitment/PSG remain governed by `IsFlexiblePafUser()`, and Begin PAF still uses its existing NPI-search mode. Not runtime-verified.
-7. **PARTIAL**: The code queues `NppExceptionPractitionerSearchCriteria` through the existing audit-log Service Bus path; I could not observe a runtime queue entry.
+One Copilot turn. Fix only. Do not change search/API/audit.
 
-No commit was created. To complete browser UAT, the local app needs a signed-in MSP session; the WASM 404s may also need resolving before the page can be exercised.
+REPRO:
+/Practitioner/Search/Npp → click “No NPI available? Search without NPI”
+→ Unexpected Error:
+System.InvalidOperationException: Please use `@bind-Value` (or `@bind-Values`)
+in the control with generic type System.String.
+at AntDesign.FormItem.AddControl → InputHca.OnInitialized (line 38)
+
+CAUSE:
+NPP exception branch InputHca (and similar) under FormItem without @bind-Value.
+
+FIX:
+1. Open PractitionerSearchForm.razor — NPP exception (IsNppRequest) markup only.
+2. Quote every InputHca / Select / input under FormItem in that branch.
+3. Mirror binding used by existing working fields on the SAME form (NPI mode or flexible exception): use @bind-Value="_prop" (two-way). Do not use Value= alone inside FormItem.
+4. Reason may be read-only display — if it must stay in FormItem, bind to a string field (hardcoded ok) with @bind-Value, OR render Reason outside FormItem as plain text (prefer match existing Reason pattern on flexible form).
+5. Do not change InputHca.cs globally unless the only safe fix is documented and Recruitment/PSG still work.
+6. Do not change NppExceptionSearchPagedQueryBuilder / audit / API.
+
+VALIDATE:
+- Build Client.
+- Mentally confirm: click No NPI → form renders (no ErrorBoundary).
+- Recruitment/PSG/Begin PAF markup untouched.
+
+RETURN:
+1. Files changed + before/after bind quotes for each NPP field
+2. Reason handled how?
+3. STOP if none?
+4. Build result
