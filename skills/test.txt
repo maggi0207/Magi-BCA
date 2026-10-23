@@ -1,33 +1,44 @@
-TASK 2-132688 — UAT / smoke Monthly Add NPP Report
+TASK 0-131785 — No-NPI Exception Search inspect (read-only)
 
-Do not commit. Do not change Recruitment. Report only.
+One Copilot turn. Read-only. Do NOT implement. Do NOT invent APIs.
 
-Goal: Verify NppActivityReportGeneration matches Laura definitions and emails both DLs (or captures the outbound notification in Dev).
+PRODUCT (Ashley 2026-10-22/23):
+- NPP-only: when No NPI available → license search options (not other PAF types)
+- Last Name required; if State OR License entered → both required
+- State + License Number must BOTH match; else not found
+- Guideline query: GetExistingStateLicense in CrudLicense operation; join Providers for name
+- Audit: add to audit logs (HCP examples); track fields entered; ship via Service Bus (background)
+- Do NOT reuse AffVerify audit
+- Do NOT set IsFlexiblePafUser for NPP
 
-Steps:
-1) Force-run NppActivityReportGeneration locally (same entry pattern as Recruitment monthly report — quote how you triggered it).
-2) Confirm period = previous calendar month, inclusive first–last day (quote the computed PeriodStart / EndExclusive / displayed range).
-3) With known ADD NPP PAFs in that period (or seed/fixture if Dev has none):
-   a) Total received = count of TaskType.Npp with IndexedSubmittedDate in period
-   b) Routed to CPC = subset where FormData.CreatedOrUpdatedCvis has ≥1 item
-   c) % = (routed ÷ received) × 100, two decimals; 0.00% if received = 0
-   Manually spot-check SQL or known PAF IDs vs email HTML numbers.
-4) Confirm QueueEmailAsync / notification payload To includes BOTH:
-   PARADLAmericanSSCCPCFOMGMT@Parallon.com
-   PARA.CredentialReporting@Parallon.com
-5) Zero-activity case: empty period (or mock) still sends 0 / 0 / 0.00%.
-6) Confirm RecruitmentReportGeneration still unchanged / still builds.
+GOAL:
+Prove whether we can reuse GetExistingStateLicense / CrudLicense (+ Providers join) and an existing audit+Service Bus pattern for NPP Exception Search.
 
-STOP AND REPORT if:
-- Function cannot be force-run locally — quote how Recruitment is run and what blocked NPP.
-- CreatedOrUpdatedCvis is empty for PAFs that should have CVIs — quote FormData sample; do not invent a fix in this task.
-- Email path fails — quote exception / notification sink.
+ANSWER A–N with file/class/method quotes:
 
-Return:
-1. How you force-ran (quote)
-2. Period used (start / end exclusive / display)
-3. Received / routed / % from email (or payload) vs your manual count
-4. Recipients on outbound message (quote)
-5. Zero-activity result (pass/fail)
-6. PASS / FAIL / PARTIAL + blockers
-7. Commit? NO (defer to final)
+A. Find GetExistingStateLicense — full path, class, signature, what it queries (tables/columns for state + license number).
+B. Find CrudLicense (or Crud*License*) operation that hosts it — how called today (from where)?
+C. Does it return provider key / link to Providers? Can it join or be followed by Providers name filter (Last/First)? Quote closest pattern.
+D. Is there already any “search practitioners by state + license” API on PractitionerController / repository? Quote or “none”.
+E. PractitionerSearchForm exception mode on /Npp today — fields shown for non-flexible vs flexible; SwitchToExceptionSearch; IsNppRequest plumbing.
+F. PractitionerSearchParameters — any State/License fields today?
+G. Last-name-only: does current Recruitment exception search allow Last only, or require extra criterion? Quote validation.
+H. Audit: find 1–2 examples of search/criteria audit that queue Service Bus (CredentialingAuditLogger or similar). Quote action name + how payload is built + SB send.
+I. Can NPP Exception Search follow that audit pattern with a NEW action name copying the same pipeline? Or must reuse an existing action? Quote.
+J. Cancel on /Npp exception — history.back vs clear+NPI? Quote.
+K. PractitionerLicenseRepository or other license APIs — reverse lookup by state+number (not by provider key)? Quote or none.
+L. STOP risks: GenB36Key / VISUALCACTUS access from PAF.Api vs Processor-only — where can GetExistingStateLicense run from UI/API request path?
+M. Minimal implement surface list (files only) if reuse is Yes.
+N. Ready for implement? Yes / No / Partial — and what’s still missing.
+
+STOP AND REPORT (do not invent):
+- If GetExistingStateLicense does not exist — say so; do not invent a sibling.
+- If license query cannot run from the search API host — quote why.
+- If no Service Bus audit pattern exists — quote what exists instead.
+- Do not implement UI or API in this task.
+
+RETURN:
+1. A–N answers (short + quotes)
+2. Reuse verdict: license query / Providers join / audit SB / NPP form isolation
+3. STOP hits
+4. Recommended TASK 1 scope (names only)
