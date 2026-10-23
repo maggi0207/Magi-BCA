@@ -1,32 +1,15 @@
-TASK 1B-131785 — hotfix NPP Exception FormItem bind crash
+1. **File changed:** `PractitionerSearchForm.razor`
 
-One Copilot turn. Fix only. Do not change search/API/audit.
+   - Reason: before, `<InputHca ... Value="Practitioner does not have NPI" Disabled="true" />`; after, `<p><strong>Reason:</strong> Practitioner does not have NPI</p>` outside `FormItem`.
+   - First Name: before and after, `@bind-Value="@_model.PractitionerFirstName"`.
+   - Last Name: before and after, `@bind-Value="@_model.PractitionerLastName"`.
+   - State: before and after, `@bind-Value="@_model.State"`.
+   - License Number: before and after, `@bind-Value="@_model.LicenseNumber"`.
 
-REPRO:
-/Practitioner/Search/Npp → click “No NPI available? Search without NPI”
-→ Unexpected Error:
-System.InvalidOperationException: Please use `@bind-Value` (or `@bind-Values`)
-in the control with generic type System.String.
-at AntDesign.FormItem.AddControl → InputHca.OnInitialized (line 38)
+2. **Reason:** rendered as plain text outside `FormItem`; it remains read-only and no longer triggers AntDesign’s binding requirement.
 
-CAUSE:
-NPP exception branch InputHca (and similar) under FormItem without @bind-Value.
+3. **STOP:** None. No global `InputHca` change and no API, search, or audit changes.
 
-FIX:
-1. Open PractitionerSearchForm.razor — NPP exception (IsNppRequest) markup only.
-2. Quote every InputHca / Select / input under FormItem in that branch.
-3. Mirror binding used by existing working fields on the SAME form (NPI mode or flexible exception): use @bind-Value="_prop" (two-way). Do not use Value= alone inside FormItem.
-4. Reason may be read-only display — if it must stay in FormItem, bind to a string field (hardcoded ok) with @bind-Value, OR render Reason outside FormItem as plain text (prefer match existing Reason pattern on flexible form).
-5. Do not change InputHca.cs globally unless the only safe fix is documented and Recruitment/PSG still work.
-6. Do not change NppExceptionSearchPagedQueryBuilder / audit / API.
+4. **Build:** Client `net10.0` build passed.
 
-VALIDATE:
-- Build Client.
-- Mentally confirm: click No NPI → form renders (no ErrorBoundary).
-- Recruitment/PSG/Begin PAF markup untouched.
-
-RETURN:
-1. Files changed + before/after bind quotes for each NPP field
-2. Reason handled how?
-3. STOP if none?
-4. Build result
+Recruitment, PSG, and Begin PAF markup was untouched.
