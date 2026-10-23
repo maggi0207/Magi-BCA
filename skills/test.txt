@@ -1,12 +1,11 @@
-TASK 2-131785 — UAT No-NPI Exception (no code changes)
+UAT is **PARTIAL**: the local app responded, but `/Practitioner/Search/Npp` redirected to the login page. I couldn’t run the authenticated MSP flows without a signed-in session, and I did not enter credentials or change code. The browser also reported 404s loading client WASM assets.
 
-1) /Practitioner/Search/Npp → “No NPI available?” → Reason + Last (+ optional First/State/License).
-2) Last only → results or empty “No Results Found”.
-3) State without License (and reverse) → blocked.
-4) Valid State+License match → provider; bad pair → not found.
-5) Cancel → NPI mode on same page (not browser back).
-6) Confirm Begin PAF / Recruitment exception unchanged.
-7) Optional: audit-log queue / entry for NppExceptionPractitionerSearchCriteria.
+1. **PARTIAL**: Reached the login page, not the NPP form. The welcome dialog was visible in the captured screenshot.
+2. **PARTIAL**: Could not submit a last-name-only search.
+3. **PARTIAL**: Could not interactively verify either incomplete state/license pair.
+4. **PARTIAL**: Could not run a matching or non-matching license search.
+5. **PARTIAL**: Could not exercise Cancel in the browser.
+6. **PASS, code review only**: The NPP branch is isolated by `IsNppRequest`; Recruitment/PSG remain governed by `IsFlexiblePafUser()`, and Begin PAF still uses its existing NPI-search mode. Not runtime-verified.
+7. **PARTIAL**: The code queues `NppExceptionPractitionerSearchCriteria` through the existing audit-log Service Bus path; I could not observe a runtime queue entry.
 
-Return: PASS / FAIL / PARTIAL per step + screenshots if any.
-Do not commit (final batch later).
+No commit was created. To complete browser UAT, the local app needs a signed-in MSP session; the WASM 404s may also need resolving before the page can be exercised.
