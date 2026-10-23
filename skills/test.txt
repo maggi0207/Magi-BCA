@@ -1,16 +1,57 @@
-1. **Root cause:** NPP NPI mode already selected Simple, but submitted the NPI only from the input mask’s raw value:
-   ```csharp
-   searchParams.SearchType = PractitionerSearchType.Simple;
-   searchParams.Npi = _npiInputMask?.RawValue ?? _npiInputMaskNonRecruitment?.RawValue;
-   ```
-   The form also keeps the NPI in the two-way-bound `_model.PractitionerNpi`. If the mask value is empty, the request reaches Simple without an NPI, which fails the Simple search criteria check and can appear as no results. The exact runtime request wasn’t captured, so the missing mask value is the identified failure path, not a network-confirmed observation.
+TASK — Commit NPP work, backup branch, merge Sprint10branch, resolve conflicts
 
-2. **File changed:** `PractitionerSearchForm.razor.cs`. For NPP NPI mode only, when mask `RawValue` is blank, the request now falls back to `_model.PractitionerNpi`.
+You are working in the HCA HCP Credentialing repository (office). Do this in order. Do not push unless I explicitly ask.
 
-3. **Before/after handler:** The search type remains `PractitionerSearchType.Simple`; only the NPP NPI value source gains the bound-model fallback. `NppException` remains selected only in the Exception mode/no-NPI branch. The controller gate checks only `SearchType == NppException`; Simple is dispatched by the existing Simple repository branch. Expected request: `POST api/Practitioner/SearchExistingPractitioners`; a matching NPI returns the normal successful search response.
+STEP 1 — Status
+1. Print: current branch, git status -sb, git diff --stat
+2. List dirty files. Identify which are NPP-related vs unrelated.
+3. Do NOT include secrets (.env, credentials, local.settings with keys) in the commit.
 
-4. **Validation:** Client `net10.0` build passed; Cactus API `net10.0` build passed. Scoped diff check passed. No new focused test was added.
+STEP 2 — Commit NPP changes
+1. Stage only NPP-related changes (typical: PractitionerSearchForm*, PractitionerSearchPage*, PractitionerSearchParameters*, PractitionerController/Repository NPP paths, NppExceptionSearch*, AuditAction/CredentialingAuditLogger NPP, NppActivityReport*, CACTUS NPP/auto-accept files, related tests). Leave unrelated dirty files unstaged unless I said otherwise.
+2. Commit with message:
 
-5. **Exception path:** Still uses `NppException` and carries State/LicenseNumber only from Exception mode.
+Add NPP close-out: No-NPI exception search, NPI mask fallback, CACTUS/auto-accept/report.
 
-6. **STOP hits:** None. No API, audit, Recruitment, PSG, or Begin PAF changes were made.
+Includes 131785 exception path + FormItem/NPI fixes; keep Recruitment/PSG/Begin PAF unchanged.
+
+3. If hook fails: fix and create a NEW commit (do not amend).
+4. Print commit hash + git status -sb.
+
+STEP 3 — Backup (before Sprint10)
+1. Create branch: backup/<currentBranch>-before-Sprint10-yyyyMMdd-HHmm
+2. Print the backup branch name. Do not delete any branches.
+3. Do not push backup unless I ask.
+
+STEP 4 — Fetch + merge Sprint10
+1. git fetch origin
+2. Find exact remote branch name matching Sprint10 (Sprint10branch / Sprint10 / etc.) — quote it.
+3. Merge that remote branch into the CURRENT branch (merge, not rebase).
+4. If conflicts:
+   - List conflicted files
+   - Resolve carefully:
+     * PractitionerSearch* / NppException* / NppActivityReport* / NPP audit → keep OUR NPP behavior; integrate Sprint10 only if clearly unrelated and required
+     * AuditAction enum → keep append of NppExceptionPractitionerSearchCriteria; do not reorder existing values
+     * Unrelated Sprint10 files → prefer theirs unless it breaks build
+   - After each resolve: git add <file>
+   - git merge --continue
+5. If merge is clean, say so.
+
+STEP 5 — Build + WASM note
+1. dotnet build affected projects (Client, Cactus API, Background if report/auto-accept touched).
+2. If Client wasm 404 was an issue: note that user must restart host + hard refresh after clean build.
+3. Do not invent fixes for unrelated Sprint10 failures — report them.
+
+RETURN (required):
+1. Commit hash(es)
+2. Backup branch name
+3. Exact Sprint10 remote ref merged
+4. Conflicts? (none / file list + how resolved)
+5. Build pass/fail
+6. Final git status -sb
+7. Anything still unstaged (unrelated)
+
+STOP AND REPORT if:
+- Cannot identify Sprint10 branch name
+- Merge would require discarding NPP work
+- Secrets would be committed
