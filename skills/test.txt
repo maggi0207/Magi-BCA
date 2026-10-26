@@ -1,41 +1,24 @@
-TASK 1E-131785 — fix NPP NPI Search: click does not fire any network request
+TASK-5946 — Diagnose NPP PAF 5946 “credentialing system update processing” Failed
 
-One Copilot turn. Diagnose then fix. NPP NPI mode only. Do not polish Exception UI.
+One Copilot turn. Read-only diagnose first. Do NOT invent RTKs. Fix only if root cause is clear and local.
 
-REPRO (confirmed UAT):
-- /Practitioner/Search/Npp — NPI mode (not Exception)
-- Enter NPI 1861482259 — Search button looks enabled
-- Click Search → Chrome Network stays EMPTY (no SearchExistingPractitioners)
-- Results stay “No Data”
-- Prior fix (mask RawValue → _model.PractitionerNpi) already in branch — still no HTTP
+INCIDENT:
+- PAFID = 5946 (NPP)
+- UI: Failed + Submitted
+- History (HCP System User): “An error occurred during credentialing system update processing. there may be a delay while the error is resolved.”
 
-MEANING:
-Handler never reaches the API call (Disabled / no OnClick / early return / Blazor exception).
+GOAL:
+Find the REAL exception for PAF 5946, then smallest safe fix if clear.
 
-DIAGNOSE (quote before coding):
-1. PractitionerSearchForm Search button markup for NPP NPI mode: OnClick, Disabled, HtmlType, loading.
-2. CanSearch / IsSearchEnabled / equivalent — exact conditions for IsNppRequest + NPI mode. Does 10-digit NPI enable it?
-3. Search click method: every early return path; does it call the HTTP search client?
-4. Diff vs Begin PAF / non-NPP NPI Search button that DOES work — what’s different for IsNppRequest?
-5. After Sprint10 merge: any broken event wiring on PractitionerSearchForm?
-6. If you can run UI: note Console errors on click (user saw 2 console errors).
+DIAGNOSE (quote):
+A. Where is that user message set? (file/method)
+B. PAF 5946 — TaskType/Npp, status history, FormData, last error fields
+C. Processor / CactusUpdater logs for 5946 — full exception + stack
+D. Which NPP op failed (Provider / Entity / Address / Specialty / License / Sanction / NPI image / PDF / AcceptedByCpc)?
+E. Dev IsDevMode skip vs real queue?
+F. Related to GenB36Key / enrollment / Entity N/A? yes/no + quote
 
-FIX:
-- Ensure NPP NPI Search button is enabled when NPI has 10 digits (same rule as pre-NPP Enforce NPI).
-- Ensure OnClick invokes the same search path as working NPI search, with NPI from mask RawValue OR _model.PractitionerNpi.
-- Do not early-return silently; if validation fails, show existing validation UI.
-- Do not route NPI mode to NppException search type.
-- Do not change Recruitment/PSG/Begin PAF behavior.
+IF clear + safe: minimal fix only.
+IF unclear: STOP with log quote + what to pull next.
 
-VALIDATE:
-- Client build.
-- Mentally: click → method runs → HTTP client called with Simple + NPI.
-- Add a small unit/UI-logic test if easy: CanSearch true for IsNppRequest + 10-digit NPI.
-
-RETURN:
-1. Root cause (why no network) — quote
-2. Files changed
-3. Before/after button + CanSearch + click handler quotes
-4. Build/tests
-5. Confirm Exception path untouched
-6. STOP hits?
+RETURN: A–F, root cause, fix or STOP, retest steps, build/tests
