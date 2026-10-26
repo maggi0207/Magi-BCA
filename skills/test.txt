@@ -1,24 +1,39 @@
-TASK-5946 — Diagnose NPP PAF 5946 “credentialing system update processing” Failed
+TASK-ANCHOR-CVI — Fix NPP Path B fail: “No qualifying Anchor CVI found”
 
-One Copilot turn. Read-only diagnose first. Do NOT invent RTKs. Fix only if root cause is clear and local.
+One Copilot turn. Diagnose then minimal fix if clear. Do NOT invent RTKs.
 
-INCIDENT:
-- PAFID = 5946 (NPP)
-- UI: Failed + Submitted
-- History (HCP System User): “An error occurred during credentialing system update processing. there may be a delay while the error is resolved.”
+INCIDENT (repro QA + LOCAL — same practitioner):
+- Path B: VA=Yes, PA=Yes → Submit → toast Success → Submitted
+- History Detail: **No qualifying Anchor CVI found**
+- Also may wrap as: “An error occurred during credentialing system update processing…”
+- Local: Gupta, Karan (MD) / TC000BKK0M / msp.test@test.com — Saved → Submitted → No qualifying Anchor CVI found (~5:44 PM)
+- QA: same practitioner / Alpine — Failed + same Anchor CVI message + HCP System User rows
+- Earlier: PAF 5946 same pattern
 
 GOAL:
-Find the REAL exception for PAF 5946, then smallest safe fix if clear.
+Find where “No qualifying Anchor CVI found” is thrown; why NPP Path B has no qualifying anchor CVI; fix so Path B completes (CVI + processing) without Failed / that history line.
 
 DIAGNOSE (quote):
-A. Where is that user message set? (file/method)
-B. PAF 5946 — TaskType/Npp, status history, FormData, last error fields
-C. Processor / CactusUpdater logs for 5946 — full exception + stack
-D. Which NPP op failed (Provider / Entity / Address / Specialty / License / Sanction / NPI image / PDF / AcceptedByCpc)?
-E. Dev IsDevMode skip vs real queue?
-F. Related to GenB36Key / enrollment / Entity N/A? yes/no + quote
+A. Exact file/method that sets status detail “No qualifying Anchor CVI found”
+B. What makes a CVI “qualifying” / “anchor” (filters, RTKs, status, type)?
+C. NPP Path B flow: where CVI is created (CreateStandardCviRecordsAsync / Npp) vs where anchor is looked up
+D. Does NPP CVI (HCA0095563 / UDP0000001 / Facility Undefined Practitioner) fail the anchor filter? Quote mismatch
+E. Is this PDF attach (BR-008), AcceptedByCpc, or another step?
+F. Code filter vs env-only? (LOCAL repro proves code path)
 
-IF clear + safe: minimal fix only.
-IF unclear: STOP with log quote + what to pull next.
+FIX (if clear):
+- Smallest change so NPP auto-accept Path B either creates a CVI that qualifies as anchor, OR uses the correct NPP CVI as anchor, OR skips anchor requirement only where product allows for NPP.
+- Do not break non-NPP Anchor CVI behavior.
+- Do not invent new RTKs — reuse Laura NPP CVI keys already in code.
 
-RETURN: A–F, root cause, fix or STOP, retest steps, build/tests
+VALIDATE:
+- Build affected projects.
+- Mentally: Path B VA+PA Yes → no “No qualifying Anchor CVI found”; prefer Completed after processing.
+
+RETURN:
+1. A–F with quotes
+2. Root cause one paragraph
+3. Fix files + before/after (or STOP)
+4. STOP hits?
+5. Build/tests
+6. Retest steps for Gupta Path B local
