@@ -1,60 +1,19 @@
+TASK-TEST-UPDATER — Run/adapt TestCactusUpdater_NewNew for NPP Path B
 
+Ashley: TestCactusUpdater_NewNew goes through the whole CactusUpdater; change data as needed; comment out portalClient refs to run locally.
 
-**Result**
-Applied a minimal NPP-only fix for the misleading history line. **“No qualifying Anchor CVI found” is not a thrown exception or a processing gate in this PAF path.** The separate Failed/generic-error incident is not yet fixed.
+GOAL:
+1. Find TestCactusUpdater_NewNew (or exact name) — quote file/class.
+2. Quote what data/PAF/TaskType it uses today.
+3. Adapt minimally for NPP Path B (TaskType.Npp, VA+PA Yes / auto-accept shape if required) — reuse existing NPP fixtures if any.
+4. Comment out portalClient references that block local run (quote before/after).
+5. Run the test. Capture pass/fail + any exception (especially Anchor CVI / processing fail).
+6. Do NOT invent RTKs. Do not change production SubmitPafStrategy unless test proves a real CactusUpdater bug.
 
-**A–F Evidence**
-**A. Exact source:** SubmitPafStrategy.OnAfterExecuteAsync writes:
-```csharp
-if (FormData.CalculatedAnchorCvi == null)
-    await CreatePafHistory("No qualifying Anchor CVI found");
-```
-It then calls `QueuePafForProcessingAsync` regardless. This inserts history; it does not set Failed or throw. The same text also occurs in `PacketBuilder.cs:1462`, as packet history.
-
-**B. Qualifying anchor:** `CredentialingRepository.cs:126` requires practitioner/CPC association, excludes any KY facility, and allows group types:
-> `D2850Y27PK`, `D2CD0MGH9B`, `D2R60KTS58`, `DS680QA1VZ`, or `D2FH0NY1SH` without Immediate Patient Need.
-
-It also requires an allowlisted credentialing status and source, `c.USERDEF_N3 != 0`, and received/sent-date windows. This query does **not** explicitly filter `ACTIVE` or `COMPLETED`. `SubmitPafStrategy.cs:488` selects anchors for DOP/full-packet actions.
-
-**C. Path B order:** `SubmitPafStrategy.cs:337` validates NPP and calls `CompleteMspAutoAcceptedSubmitAsync`, which sets:
-> `FormData.SetStatus(PafStatus.SubmittedByMsp, null)` and `_shouldQueuePafForProcessing = true`.
-
-It does not calculate an anchor. The history entry happens **before** processing creates the NPP CVI through `CactusUpdater.cs:1065`.
-
-**D. NPP mismatch:** Creation explicitly uses:
-> `NppCredentialingTypeRtk = "HCA0095563"`  
-> `UdpFacilityRequestCviStatusRtk = "UDP0000001"`
-
-Neither value is in the anchor query’s respective type/status allowlist. That excludes an NPP CVI from packet-anchor eligibility, but **does not block NPP CVI creation**. The reported “Facility Undefined Practitioner” label is not an anchor predicate in this query.
-
-**E. PDF/status:** This history line is neither BR-008 PDF attachment nor an `AcceptedByCpc` failure. `PafDataContext.cs:73` sets successful auto-accepted NPP processing to `AcceptedByCpc`, displayed as **Completed**. The `CactusUpdater.cs:221` separately writes the generic error and logs the actual exception.
-
-**F. Code/environment:** The misleading line is a code issue. Separately, `PafProcessingService.cs:34` says:
-> `"in dev mode skipping processing queue"`
-
-Thus local Submitted plus this history line does not prove processor execution or an anchor-caused failure.
-
-**Root Cause**
-NPP auto-accept was included in shared packet-anchor history logging even though that submit path does not calculate a packet anchor. A null anchor therefore produced an alarming but non-blocking history entry before the NPP CVI existed. Broadening anchor filters or changing Laura’s RTKs would address the wrong behavior. The actual QA processor failure remains unknown.
-
-**Fix**
-Changed only `SubmitPafStrategy.cs:106`:
-- Before: exclude SSP Brief Enrollment and Recruitment from anchor logging.
-- After: also exclude NPP.
-- Queueing, CVI creation, RTKs, and non-NPP anchor behavior remain unchanged. Existing history is not removed.
-
-**STOP Hits**
-Stopped on fixing **Failed/generic processing errors**: no incident-specific processor exception/stack establishes their cause. This patch cannot honestly guarantee Path B completion. Obtain the `PAF Cactus Update Processing ... failed with error` exception, including inner exception and stack, correlated to the affected PAF.
-
-**Build/Tests**
-- PAF API Release and PAF Processor Release: **passed**.
-- Debug API build: blocked by running API PID `29484` locking DLLs; left running.
-- Filtered NPP tests: blocked by existing ambiguous `[Ignore]` attributes in `CactusOperationIntegrationTests.cs:31` and `CactusUpdaterIntegrationTests.cs:26`.
-- Editor diagnostics and `git diff --check`: passed.
-
-**Gupta Retest**
-1. Restart the local PAF API with the updated build; the running instance still has the old code.
-2. Use an approved test PAF for Gupta, Karan / `TC000BKK0M`; set VA=Yes and PA=Yes, then submit.
-3. Confirm no **new PAF history** entry says “No qualifying Anchor CVI found.”
-4. For completion testing, use an approved queue-enabled test environment and running processor. Development mode skips queueing.
-5. Verify CVI creation, “Credentialing system updates complete,” and **Completed**. If the generic error returns, capture its full processor exception before replaying or changing code.
+RETURN:
+1. Test file + method quote
+2. Data changes made
+3. portalClient comments (quote)
+4. Run result + stack if fail
+5. Does this exercise the same path as QA Failed? yes/no
+6. STOP hits?
