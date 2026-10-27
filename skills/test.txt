@@ -1,19 +1,53 @@
-TASK-GENB36 — Who needs EXECUTE on VISUALCACTUS.dbo.GenB36Key?
+**1. Identity**
+For this local integration-test run, the Windows identity is **`HCA\FXI2523`**. Both the source and copied test-output settings use:
 
-Read-only. Do not change grants or production code.
+```text
+Data Source=xrdcwqdbsecs03.hcaqa.corpadqa.net;
+Initial Catalog=VISUALCACTUS;
+Integrated Security=True;
+```
 
-Context: TestCactusUpdater_NewNew on PAF 150030 failed with:
-SqlException — EXECUTE permission denied on object 'GenB36Key', database 'VISUALCACTUS', schema 'dbo'
-Stack: GenerateKeyCactusOperation.InternalExecuteAsync → CrudPractitionerLicensesOperation.InsertLicenseAsync → CactusUpdater.UpdateFromExistingAsync
+SQL authentication therefore uses the test process’s Windows identity, **not a SQL `User ID`**. The DBA should review access for `HCA\FXI2523` through its mapped database user or approved Windows-group/database role. The exact database principal mapping was not queried.
 
-From the integration test / CactusUpdater config used by that test:
-1. Quote connection string name(s) for VISUALCACTUS / Cactus DB (mask passwords/secrets).
-2. Quote how SQL auth is chosen (Integrated Security vs User Id=…).
-3. Quote GenerateKeyCactusOperation call to GenB36Key (proc / function / TVF?).
-4. List appsettings / user secrets keys for that connection (keys only, no secret values).
+`HCPSU` is the PAF acceptance/audit identity, not this SQL connection’s login.
 
-RETURN:
-1. Exact login/identity to grant EXECUTE on dbo.GenB36Key
-2. Where that connection is configured
-3. One-line GRANT example for DBA (optional) — do NOT run GRANT yourself
-4. STOP — wait for DBA / user approval before re-running the test
+**2. Configuration**
+`CactusUpdaterIntegrationTests.cs:42` loads:
+
+```csharp
+new ConfigurationBuilder().AddJsonFile("appsettings.Development.json").Build();
+_cactusConnectionString = config.GetConnectionString("CactusDb");
+_pafConnectionString = config.GetConnectionString("PafDb");
+```
+
+The file is `appsettings.Development.json`, copied to the test output directory.
+
+Relevant keys, with no secret values:
+- `ConnectionStrings:CactusDb` — VISUALCACTUS connection.
+- `ConnectionStrings:PafDb` — separate PAF database connection.
+- `CactusUpdaterSettings.CactusDb` — assigned directly from `_cactusConnectionString`.
+
+This test’s configuration builder does **not** load user secrets or environment-variable overrides.
+
+**3. Procedure Call**
+`GenerateKeyCactusOperation.cs:17` explicitly invokes a **stored procedure**, not a function or TVF:
+
+```csharp
+var cactusGenKeySp = "dbo.GenB36Key";
+await DbTransaction.ExecuteAsync(
+    cactusGenKeySp, dParams,
+    commandType: CommandType.StoredProcedure);
+```
+
+It passes input `prefix` and input/output `result`.
+
+**4. DBA Example**
+Only if `[HCA\FXI2523]` is the approved, mapped **database principal**, the DBA could run this in `VISUALCACTUS`:
+
+```sql
+GRANT EXECUTE ON OBJECT::dbo.GenB36Key TO [HCA\FXI2523];
+```
+
+The DBA may instead grant through the approved role/group after checking mappings and any explicit DENY.
+
+**STOP:** No grants, configuration, or production code changed. The test was not rerun. Waiting for DBA/user approval.
