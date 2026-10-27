@@ -1,8 +1,6 @@
 USE VISUALCACTUS;
-SELECT SUSER_SNAME() AS WinLogin, USER_NAME() AS DbUser, SCHEMA_NAME() AS DefaultSchema;
+ALTER USER [HCA\FXI2523] WITH DEFAULT_SCHEMA = [VisualCACTUS];
+
+
+SELECT USER_NAME() AS DbUser, SCHEMA_NAME() AS DefaultSchema;
 SELECT OBJECT_ID(N'HCA_KEY_TABLE_TD') AS Unqualified;
-SELECT OBJECT_ID(N'dbo.HCA_KEY_TABLE_TD') AS DboQualified;
-SELECT s.name AS [schema], o.name
-FROM sys.objects o
-JOIN sys.schemas s ON s.schema_id = o.schema_id
-WHERE o.name = N'HCA_KEY_TABLE_TD';
