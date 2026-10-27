@@ -1,15 +1,43 @@
-TASK-TEST-UPDATER-2 — Rerun TestCactusUpdater_NewNew with local NPP PAF
+**Run Result**
+Used **PAF `150030`**. It exists in the configured local PafDb and passed the `TaskType.Npp` assertion.
 
-Prior STOP: PAF 5946 not in local test PafDb; Initialize Assert.IsNotNull failed; updater never ran.
-Portal mock + NPP Path B shape (VA/PA Yes, SubmittedByMsp, HCPSU) already adapted — keep that.
+Ran only `CactusUpdaterIntegrationTests.TestCactusUpdater_NewNew`:
+- Debug build: **passed**
+- Test: **failed**, with one captured updater error
+- Preserved VA/PA=Yes, SubmittedByMsp, `HCPSU`, strict portal mock, and `CommitChanges=false`
 
-DO:
-1. Point the test at a PAF that EXISTS in the configured local PafDb.
-   Prefer PafId **150030** if present; else find an NPP Submitted PAF (Gupta / TC000BKK0M) and use that id.
-2. Assert TaskType.Npp (or skip if row already NPP).
-3. Keep Path B shape + portal Mock + CommitChanges=false unless you must commit to see CVI.
-4. Run only TestCactusUpdater_NewNew.
-5. RETURN: which PafId used, pass/fail, full exception if fail, whether CreateStandardCvi / Anchor / generic processing error appeared in logs.
-6. Do not invent RTKs. Do not change production SubmitPafStrategy.
+**Actual Exception**
+```text
+Microsoft.Data.SqlClient.SqlException (0x80131904):
+The EXECUTE permission was denied on the object 'GenB36Key',
+database 'VISUALCACTUS', schema 'dbo'.
 
-If 150030 also missing: STOP and list how to query local PafDb for latest Npp Submitted PafIds (SQL or API) — do not invent rows.
+Error Number: 229, State: 5, Class: 14
+```
+
+The full exception and stack are saved in `NppPathB-150030-failure.txt`.
+
+The application stack identifies:
+```text
+GenerateKeyCactusOperation.InternalExecuteAsync()             line 24
+CrudPractitionerLicensesOperation.InsertLicenseAsync(...)    line 913
+CrudPractitionerLicensesOperation.SavePractitionerLicensesAsync()
+CactusUpdater.UpdateFromExistingAsync(...)                   line 675
+CactusUpdater.InternalUpdateCactusFromPafAsync(...)           line 275
+CactusUpdater.UpdateCactusFromPafAsync(...)
+```
+
+**Processing Evidence**
+| Step/message | Observed |
+|---|---|
+| NPP existing-practitioner processing | Reached |
+| NPP license insertion | Reached; key generation failed |
+| `CreateStandardCviRecordsAsync` | Not reached |
+| “No qualifying Anchor CVI found” | Not present in captured output |
+| Processor failure log | Captured with the SQL exception |
+| Generic processing-error history | Catch path reached; mocked history was not persisted or printed |
+
+**STOP**
+The blocker is now a **confirmed database permission failure for this local test identity**, not a missing PAF or demonstrated anchor bug. An authorized DBA needs to review EXECUTE access to `VISUALCACTUS.dbo.GenB36Key` before the test can reach CVI creation.
+
+This does **not yet prove QA uses the same identity or has the same failure**. No permissions, RTKs, or production code were changed; the earlier `SubmitPafStrategy` change was untouched.
