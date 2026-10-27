@@ -1,25 +1,7 @@
-TASK-KEY-TABLE — Why Invalid object name HCA_KEY_TABLE_TD if table exists?
+TASK-TEST-UPDATER-4 — Re-run TestCactusUpdater_NewNew after HCA_KEY_TABLE_TD security tweak
 
-Read-only. No GRANT, no CREATE TABLE, no production logic changes.
-
-Context: After GenB36Key EXECUTE grant, TestCactusUpdater_NewNew PAF 150030 fails:
-SqlException 208 Invalid object name 'HCA_KEY_TABLE_TD'
-at GenerateKeyCactusOperation → dbo.GenB36Key SP.
-Ashley: table is in the DB; she hasn’t seen this before.
-
-DO:
-1. Quote CactusDb connection (mask secrets): server + Initial Catalog from test appsettings.Development.json.
-2. Quote GenerateKeyCactusOperation call (prefix/result params).
-3. Search repo for HCA_KEY_TABLE_TD / GenB36Key — any scripts, synonyms, schema notes.
-4. If you can run a quick read-only SQL against that connection (only if already how tests connect), check:
-   - SELECT OBJECT_ID('HCA_KEY_TABLE_TD'), OBJECT_ID('dbo.HCA_KEY_TABLE_TD');
-   - SELECT SCHEMA_NAME(), USER_NAME(), SUSER_SNAME();
-   - Or STOP with exact SSMS queries for user — do not invent objects.
-5. Suspect: wrong DB, non-dbo schema, missing SELECT for FXI2523, synonym broken, or SP uses unqualified name + wrong default schema.
-
-RETURN:
-1. Connection server/db
-2. Any repo refs to HCA_KEY_TABLE_TD
-3. Query results OR exact SSMS checklist
-4. Best next ask for Ashley (1–2 lines)
-5. STOP — no code/DB changes
+Ashley adjusted security on VISUALCACTUS for HCA\FXI2523.
+Same setup: PAF 150030, NPP Path B shape, portal mock, CommitChanges=false.
+Run only TestCactusUpdater_NewNew.
+RETURN: pass/fail; did GenB36Key / license insert succeed; CreateStandardCviRecordsAsync reached?; full stack if fail.
+No production code changes unless a clear NPP bug appears.
