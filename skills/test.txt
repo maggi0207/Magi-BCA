@@ -1,6 +1,4 @@
-USE VISUALCACTUS;
-ALTER USER [HCA\FXI2523] WITH DEFAULT_SCHEMA = [VisualCACTUS];
-
-
-SELECT USER_NAME() AS DbUser, SCHEMA_NAME() AS DefaultSchema;
-SELECT OBJECT_ID(N'HCA_KEY_TABLE_TD') AS Unqualified;
+My SSMS shows DefaultSchema null (not dbo), and OBJECT_ID('HCA_KEY_TABLE_TD') is null.
+The table only shows under schema VisualCACTUS.
+So if default is dbo, GenB36Key still won’t resolve it.
+What permissions setup do you use that works — can you match mine to that, or set default schema to VisualCACTUS?
