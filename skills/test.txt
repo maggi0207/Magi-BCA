@@ -1,15 +1,3 @@
-USE VISUALCACTUS;
-SELECT USER_NAME(), SCHEMA_NAME() AS DefaultSchema;
-SELECT OBJECT_ID(N'HCA_KEY_TABLE_TD') AS Unqualified;
-SELECT OBJECT_ID(N'dbo.HCA_KEY_TABLE_TD') AS Dbo;
-SELECT OBJECT_ID(N'VisualCACTUS.HCA_KEY_TABLE_TD') AS Visual;
-
-In SSMS / Azure Data Studio
-Click Connect (or File → Connect).
-Server name: XRDCWQDBSECS03
-(or full: xrdcwqdbsecs03.hcaqa.corpadqa.net)
-Authentication: Windows Authentication
-Database: VISUALCACTUS (or pick it after connect)
-Connect.
-Do not use XRPSWDDBSCRD01 or (localdb).
-
+Reconnect done — default is dbo now.
+But OBJECT_ID('HCA_KEY_TABLE_TD') and dbo.HCA_KEY_TABLE_TD are still null; only VisualCACTUS.HCA_KEY_TABLE_TD resolves.
+Can you set my default schema to VisualCACTUS (not dbo), or add a dbo synonym to that table?
