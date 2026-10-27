@@ -1,7 +1,47 @@
-TASK-TEST-UPDATER-4 — Re-run TestCactusUpdater_NewNew after HCA_KEY_TABLE_TD security tweak
+**Failed: 1 test run, 1 failed.** The Debug build succeeded. The test used PAF `150030` with NPP Path B data, a strict portal mock, and `CommitChanges=false`. No production code changed.
 
-Ashley adjusted security on VISUALCACTUS for HCA\FXI2523.
-Same setup: PAF 150030, NPP Path B shape, portal mock, CommitChanges=false.
-Run only TestCactusUpdater_NewNew.
-RETURN: pass/fail; did GenB36Key / license insert succeed; CreateStandardCviRecordsAsync reached?; full stack if fail.
-No production code changes unless a clear NPP bug appears.
+**GenB36Key and CVI progress**
+The previous EXECUTE-denied error is gone, but `GenB36Key` failed internally with `Invalid object name 'HCA_KEY_TABLE_TD'`. Key generation and the license insert did not complete. `CreateStandardCviRecordsAsync` was **not reached**; no Anchor CVI error appeared.
+
+**Full exception stack**
+```text
+Microsoft.Data.SqlClient.SqlException (0x80131904): Invalid object name 'HCA_KEY_TABLE_TD'.
+   at Microsoft.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at Microsoft.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)
+   at Microsoft.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, Boolean callerHasConnectionLock, Boolean asyncClose)
+   at Microsoft.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)
+   at Microsoft.Data.SqlClient.SqlCommand.FinishExecuteReader(SqlDataReader ds, RunBehavior runBehavior, String resetOptionsString, Boolean isInternal, Boolean forDescribeParameterEncryption, Boolean shouldCacheForAlwaysEncrypted)
+   at Microsoft.Data.SqlClient.SqlCommand.CompleteAsyncExecuteReader(Boolean isInternal, Boolean forDescribeParameterEncryption)
+   at Microsoft.Data.SqlClient.SqlCommand.InternalEndExecuteNonQuery(IAsyncResult asyncResult, Boolean isInternal, String endMethod)
+   at Microsoft.Data.SqlClient.SqlCommand.EndExecuteNonQueryInternal(IAsyncResult asyncResult)
+   at Microsoft.Data.SqlClient.SqlCommand.EndExecuteNonQueryAsync(IAsyncResult asyncResult)
+   at Microsoft.Data.SqlClient.SqlCommand.<>c.<InternalExecuteNonQueryAsync>b__210_1(IAsyncResult result)
+   at System.Threading.Tasks.TaskFactory`1.FromAsyncCoreLogic(IAsyncResult iar, Func`2 endFunction, Action`1 endAction, Task`1 promise, Boolean requiresSynchronization)
+--- End of stack trace from previous location ---
+   at Dapper.SqlMapper.ExecuteImplAsync(IDbConnection cnn, CommandDefinition command, Object param) in /_/Dapper/SqlMapper.Async.cs:line 646
+   at Hca.Credentialing.Paf.Processor.Cactus.Operations.GenerateKeyCactusOperation.InternalExecuteAsync() in Hca.Credentialing/Hca.Credentialing.Paf.Processor/Cactus/Operations/GenerateKeyCactusOperation.cs:line 24
+   at Hca.Credentialing.Paf.Processor.Cactus.Operations.BaseCactusOperation`1.ExecuteAsync() in Hca.Credentialing/Hca.Credentialing.Paf.Processor/Cactus/Operations/BaseCactusOperation.cs:line 26
+   at Hca.Credentialing.Paf.Processor.Cactus.Operations.CrudPractitionerLicensesOperation.InsertLicenseAsync(String licenseRtk, String institutionK, String state, String note, String licenseNumber, Boolean isDefaultLicense) in Hca.Credentialing/Hca.Credentialing.Paf.Processor/Cactus/Operations/CrudPractitionerLicensesOperation.cs:line 913
+   at Hca.Credentialing.Paf.Processor.Cactus.Operations.CrudPractitionerLicensesOperation.SavePractitionerLicensesAsync() in Hca.Credentialing/Hca.Credentialing.Paf.Processor/Cactus/Operations/CrudPractitionerLicensesOperation.cs:line 86
+   at Hca.Credentialing.Paf.Processor.Cactus.Operations.CrudPractitionerLicensesOperation.InternalExecuteAsync() in Hca.Credentialing/Hca.Credentialing.Paf.Processor/Cactus/Operations/CrudPractitionerLicensesOperation.cs:line 34
+   at Hca.Credentialing.Paf.Processor.Cactus.Operations.BaseCactusOperation`1.ExecuteAsync() in Hca.Credentialing/Hca.Credentialing.Paf.Processor/Cactus/Operations/BaseCactusOperation.cs:line 26
+   at Hca.Credentialing.Paf.Processor.Cactus.CactusUpdater.UpdateFromExistingAsync(...) in Hca.Credentialing/Hca.Credentialing.Paf.Processor/Cactus/CactusUpdater.cs:line 675
+   at Hca.Credentialing.Paf.Processor.Cactus.CactusUpdater.InternalUpdateCactusFromPafAsync(...) in Hca.Credentialing/Hca.Credentialing.Paf.Processor/Cactus/CactusUpdater.cs:line 275
+   at Hca.Credentialing.Paf.Processor.Cactus.CactusUpdater.<>c__DisplayClass12_0.<<UpdateCactusFromPafAsync>b__0>d.MoveNext() in Hca.Credentialing/Hca.Credentialing.Paf.Processor/Cactus/CactusUpdater.cs:line 105
+--- End of stack trace from previous location ---
+   at Hca.Credentialing.Paf.Processor.Cactus.CactusUpdater.<>c__DisplayClass12_0.<<UpdateCactusFromPafAsync>b__0>d.MoveNext() in Hca.Credentialing/Hca.Credentialing.Paf.Processor/Cactus/CactusUpdater.cs:line 221
+--- End of stack trace from previous location ---
+   at Hca.Credentialing.Paf.Processor.Cactus.CactusUpdater.<>c__DisplayClass12_0.<<UpdateCactusFromPafAsync>b__0>d.MoveNext() in Hca.Credentialing/Hca.Credentialing.Paf.Processor/Cactus/CactusUpdater.cs:line 221
+--- End of stack trace from previous location ---
+   at Polly.AsyncPolicy.<>c__DisplayClass40_0.<<ImplementationAsync>b__0>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](...)
+   at Polly.AsyncPolicy.ExecuteAsync(...)
+   at Hca.Credentialing.Paf.Processor.Cactus.CactusUpdater.UpdateCactusFromPafAsync(...) in Hca.Credentialing/Hca.Credentialing.Paf.Processor/Cactus/CactusUpdater.cs:line 79
+ClientConnectionId: 47fb7657-ac48-4426-a29c-82e28255b283
+Error Number: 208, State: 1, Class: 16
+```
+
+The test assertion then failed because the updater logged this error instead of returning a successful result.
+
+**Next blocker:** DBA review is needed to determine why the procedure cannot resolve `HCA_KEY_TABLE_TD` in this database/context.
