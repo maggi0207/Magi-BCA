@@ -1,19 +1,67 @@
-TASK-TEST-UPDATER — Run/adapt TestCactusUpdater_NewNew for NPP Path B
+**1. Test Located**
+`CactusUpdaterIntegrationTests.cs`, class `CactusUpdaterIntegrationTests`:
 
-Ashley: TestCactusUpdater_NewNew goes through the whole CactusUpdater; change data as needed; comment out portalClient refs to run locally.
+```csharp
+public async Task TestCactusUpdater_NewNew()
+```
 
-GOAL:
-1. Find TestCactusUpdater_NewNew (or exact name) — quote file/class.
-2. Quote what data/PAF/TaskType it uses today.
-3. Adapt minimally for NPP Path B (TaskType.Npp, VA+PA Yes / auto-accept shape if required) — reuse existing NPP fixtures if any.
-4. Comment out portalClient references that block local run (quote before/after).
-5. Run the test. Capture pass/fail + any exception (especially Anchor CVI / processing fail).
-6. Do NOT invent RTKs. Do not change production SubmitPafStrategy unless test proves a real CactusUpdater bug.
+Originally it loaded persisted PAF `572` and called the updater using the real PAF repository and portal client. **TaskType was supplied by that database row, not declared in the test.** Its value was not verified.
 
-RETURN:
-1. Test file + method quote
-2. Data changes made
-3. portalClient comments (quote)
-4. Run result + stack if fail
-5. Does this exercise the same path as QA Failed? yes/no
-6. STOP hits?
+**2. Data Changes**
+Adapted the test to load incident PAF `5946`, assert it is already NPP, and apply the auto-accept shape from `NppAutoAcceptProcessingTests.cs`:
+
+```csharp
+NppTask.IsActiveDutyMilitaryOrPracticingAtVa = true;
+NppTask.IsPhysicianAssistant = true;
+NppTask.Status = TaskStatus.Complete;
+Status = PafStatus.SubmittedByMsp;
+AcceptedByCpcUserId = "HCPSU";
+AcceptedByCpcUserName = "HCP System User";
+```
+
+The existing PAF supplies practitioner, facilities, licenses, and other data. No RTKs were added or changed.
+
+For the diagnostic run, PAF writes/history use mocks and the updater uses `CommitChanges = false`. Assertions check logged errors and whether CVI creation was reached. This does **not** validate committed completion.
+
+**3. Portal References**
+Commented out the real authentication/client setup.
+
+Before:
+```csharp
+var handler = new AccessTokenHandler(authUrl, clientId, clientSecret, "api-portal");
+...
+_portalClient = new PortalClient(client, ...);
+```
+
+After:
+```csharp
+//var handler = new AccessTokenHandler(...);
+...
+//_portalClient = new PortalClient(...);
+_portalClient = new Mock<IPortalClient>(MockBehavior.Strict).Object;
+```
+
+Unexpected portal calls will fail visibly rather than silently succeed.
+
+**4. Run Result**
+Debug compilation **passed**, including the processor and test project. Executed only `TestCactusUpdater_NewNew`.
+
+**Result: 1 failed, 0 passed**, during initialization:
+
+```text
+Assert.IsNotNull failed.
+Incident PAF 5946 must exist in the configured test PAF database.
+
+at CactusUpdaterIntegrationTests.Initialize()
+   in CactusUpdaterIntegrationTests.cs:line 63
+at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(...)
+at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(...)
+```
+
+The configured database returned no PAF `5946`. **CactusUpdater was never invoked**, so no Anchor CVI or processing exception was captured. Editor diagnostics and `git diff --check` passed.
+
+**5. Same QA Path?**
+**No, not in this run.** The adapted test targets the updater’s NPP branch, but stopped before reaching it. Its rollback mode and mocked portal also exclude post-commit behavior.
+
+**6. STOP Hits**
+Missing incident data. The next prerequisite is the correct local NPP Path B PAF ID, or an approved copy of PAF `5946` in the configured test database. I did not substitute PAF `572`, invent data/RTKs, or change production code. The earlier `SubmitPafStrategy` edit remains untouched.
