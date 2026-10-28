@@ -1,41 +1,11 @@
-**Committed**
-`d8bd4943b6dff8b7bd6798586c11180bfda4d041`
+TASK-PUSH — Push GetTypeName NPP fix only
 
-```text
-fix(npp): map TaskType.Npp in credentialing group GetTypeName
-```
+Push current branch to origin (commit d8bd4943 already local).
+Do NOT force-push. Do NOT amend. Do NOT add extra commits.
 
-Exactly two files were staged and committed:
-- `CrudEntityCredentialingGroupOperation.cs`
-- `CrudEntityCredentialingGroupOperationTests.cs`
+1. git status; git log -1 --oneline; git rev-parse --abbrev-ref HEAD
+2. Confirm HEAD is d8bd4943 (or contains that commit)
+3. git push -u origin HEAD
+4. RETURN: branch, remote URL, push result, commit on remote
 
-**Fix Verified**
-The case was already present and saved:
-```csharp
-case TaskType.Npp:
-    result = "NPP";
-    break;
-```
-Unknown-task throw behavior and existing RTKs remain unchanged.
-
-**Validation**
-Processor and test-project Debug builds passed. All **10 focused unit tests passed**, including NPP naming, unknown-task rejection, existing names, and Change Info precedence. Staged whitespace check passed.
-
-**Cleanup**
-Unstaged all six previously staged files: VS Code settings/tasks, Background project, Unity load balancer, solution, and Client launch settings. No working-tree edits were discarded.
-
-These files remain dirty and excluded:
-- `settings.json`
-- `tasks.json`
-- Background test project
-- Background project
-- `UnityApiLoadBalancer.cs`
-- `SubmitPafStrategy.cs`, with its Anchor history fix preserved
-- PAF API launch settings
-- `CactusUpdaterIntegrationTests.cs`
-- Solution
-- Client launch settings
-- Untracked `skills`
-- `start-all.ps1`
-
-**STOP:** Staging area is empty. No push, amend, or hook bypass. Ready for push/deploy when requested.
+STOP after push — user handles QA Processor deploy + Path B retest.
