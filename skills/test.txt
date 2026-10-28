@@ -1,41 +1,41 @@
-TASK-CLEANUP-AND-GETTYPENAME — Unstage junk, re-apply NPP GetTypeName fix, commit only that
+**Committed**
+`d8bd4943b6dff8b7bd6798586c11180bfda4d041`
 
-One Copilot turn. Be careful with git. Do NOT push. Do NOT amend. Do NOT --no-verify.
+```text
+fix(npp): map TaskType.Npp in credentialing group GetTypeName
+```
 
-PART A — CLEANUP (git only)
-1. git status, git diff --stat, git diff --cached --stat
-2. Unstage EVERYTHING currently staged (e.g. git restore --staged .). Do not discard working-tree edits yet.
-3. Do NOT commit launchSettings, UnityApiLoadBalancer, Background.csproj, .sln, start-all.ps1, or local TestCactusUpdater_NewNew diagnostic hacks in this task.
-4. Leave unrelated dirty files unstaged. Do not revert SubmitPafStrategy NPP Anchor history fix if present — leave it unstaged for a separate commit later unless already committed.
+Exactly two files were staged and committed:
+- `CrudEntityCredentialingGroupOperation.cs`
+- `CrudEntityCredentialingGroupOperationTests.cs`
 
-PART B — VERIFY / REDO FIX
-1. Open CrudEntityCredentialingGroupOperation.cs → GetTypeName switch.
-2. If case TaskType.Npp → result = "NPP" is MISSING: add it next to the other TaskType cases (same style). Do not invent RTKs. Do not change default throw behavior for unknown tasks.
-3. If case already present: quote it; ensure file is saved.
-4. Ensure/add CrudEntityCredentialingGroupOperationTests covering:
-   - NPP returns "NPP"
-   - unknown task still throws
-   - existing task names / Change Info precedence if tests already exist — keep them green
-5. Build Processor + test project (Debug). Run only those GetTypeName / credentialing-group unit tests. All must pass.
+**Fix Verified**
+The case was already present and saved:
+```csharp
+case TaskType.Npp:
+    result = "NPP";
+    break;
+```
+Unknown-task throw behavior and existing RTKs remain unchanged.
 
-PART C — COMMIT (only the fix)
-1. Stage ONLY:
-   - CrudEntityCredentialingGroupOperation.cs
-   - CrudEntityCredentialingGroupOperationTests.cs (or whatever the new test file is named)
-2. Show staged file list (must be exactly those).
-3. Commit message:
+**Validation**
+Processor and test-project Debug builds passed. All **10 focused unit tests passed**, including NPP naming, unknown-task rejection, existing names, and Change Info precedence. Staged whitespace check passed.
 
-   fix(npp): map TaskType.Npp in credentialing group GetTypeName
+**Cleanup**
+Unstaged all six previously staged files: VS Code settings/tasks, Background project, Unity load balancer, solution, and Client launch settings. No working-tree edits were discarded.
 
-   QA Path B Failed with ArgumentOutOfRangeException when creating
-   standard CVI / entity credentialing group description for NPP.
+These files remain dirty and excluded:
+- `settings.json`
+- `tasks.json`
+- Background test project
+- Background project
+- `UnityApiLoadBalancer.cs`
+- `SubmitPafStrategy.cs`, with its Anchor history fix preserved
+- PAF API launch settings
+- `CactusUpdaterIntegrationTests.cs`
+- Solution
+- Client launch settings
+- Untracked `skills`
+- `start-all.ps1`
 
-4. git status after commit.
-
-RETURN:
-1. What was unstaged
-2. Quote of Npp case (before was missing / already there)
-3. Test results
-4. Commit hash + staged files
-5. Files still dirty and excluded (list)
-6. STOP — ready for push/deploy when user asks
+**STOP:** Staging area is empty. No push, amend, or hook bypass. Ready for push/deploy when requested.
