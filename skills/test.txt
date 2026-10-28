@@ -1,17 +1,64 @@
-TASK-GETTYPENAME — Fix NPP Failed: CrudEntityCredentialingGroupOperation.GetTypeName
+**Root Cause**
+Confirmed a missing NPP case in CrudEntityCredentialingGroupOperation.GetTypeName:
 
-QA App Insights (PafId 5974):
-ArgumentOutOfRangeException at GetTypeName (~line 250)
-→ ResolveGroupDescriptionAsync (~205) → SaveEntityCredentialingGroupAsync (~128)
-→ CreateStandardCviRecordsAsync (~1081) → UpdateFromExistingAsync (~692)
+```csharp
+switch (PafDataContext.Paf.TaskSelected)
+{
+    // Existing task cases, but no TaskType.Npp
+    ...
+    default:
+        throw new ArgumentOutOfRangeException();
+}
+```
 
-GOAL: Find why GetTypeName throws for this NPP Path B / existing practitioner flow. Fix minimally and NPP-safe. Do not invent RTKs.
+The unsupported value is **`TaskType.Npp`**. This switch does not inspect a facility or RTK, so the reported throw is not caused by a null facility or an invalid group RTK.
 
-DO:
-1. Quote GetTypeName + ResolveGroupDescriptionAsync (what arg / switch / enum).
-2. Quote how NPP / UpdateFromExistingAsync reaches CreateStandardCviRecordsAsync and credentialing group.
-3. Identify invalid value (null? unexpected group type? facility missing?).
-4. Propose minimal fix (handle NPP case or map type correctly). Implement if clear.
-5. Note: local TestCactusUpdater may still be blocked by HCA_KEY_TABLE_TD — do not conflate.
+`CrudEntityCredentialingGroupOperation.cs:167` calls it while formatting the description:
 
-RETURN: root cause quote, fix diff, how to retest (QA 5974 or unit). STOP if need PAF 5974 facility/RTK data from user.
+```csharp
+return ($"{DateTime.Now.Date.ToDefaultFormat()} - {await this.GetEntityAbbrAsync(false)} - {GetTypeName()}").TruncateTo(50);
+```
+
+**NPP Call Path**
+The source matches the supplied QA stack:
+
+1. `CactusUpdater.cs:663` enters when:
+   ```csharp
+   paf.TaskSelected == TaskType.Npp && paf.NppTask?.Status == TaskStatus.Complete
+   ```
+2. After license and eligible specialty processing, it calls `CreateStandardCviRecordsAsync`.
+3. That method resolves the existing NPP RTK and constructs the group operation with:
+   ```csharp
+   GroupTypeRtk = credentialingTypeRtk
+   ```
+4. Group creation calls `ResolveGroupDescriptionAsync`, then the unhandled NPP switch case throws.
+
+The existing NPP type remains **`HCA0095563`**. No RTKs were added or changed.
+
+**Fix Diff**
+Added only this case to the production switch:
+
+```diff
+ case TaskType.SSPBriefEnrollment:
+     result = "SSP Brief";
+     break;
++case TaskType.Npp:
++    result = "NPP";
++    break;
+```
+
+Non-NPP mappings, the Change Info override, and rejection of unknown tasks remain unchanged. No changes were made to `SubmitPafStrategy`.
+
+**Validation**
+Added `CrudEntityCredentialingGroupOperationTests.cs`.
+
+- **10 tests passed**, including NPP with its existing RTK, NPP without an override, Change Info precedence, existing task names, and unknown-task rejection.
+- Processor and test-project Debug builds passed.
+- Editor diagnostics and `git diff --check` passed.
+
+**Retest / STOP**
+No additional PAF `5974` facility or RTK data is needed to fix this specific exception.
+
+Deploy the updated **PAF Processor** to QA, then use an approved retry of `5974` after checking for prior side effects, or submit a fresh equivalent Path B PAF. Verify group/CVI creation, absence of the `GetTypeName` exception, “Credentialing system updates complete,” and the Completed status.
+
+End-to-end QA completion is not yet verified. The local `HCA_KEY_TABLE_TD` SQL blocker is separate and was not bypassed or retested.
