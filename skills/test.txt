@@ -1,11 +1,106 @@
-TASK-PUSH — Push GetTypeName NPP fix only
+# Analyse FACTS Active IPR DELETE Authorization and Permission Bypass
 
-Push current branch to origin (commit d8bd4943 already local).
-Do NOT force-push. Do NOT amend. Do NOT add extra commits.
+## Context
 
-1. git status; git log -1 --oneline; git rev-parse --abbrev-ref HEAD
-2. Confirm HEAD is d8bd4943 (or contains that commit)
-3. git push -u origin HEAD
-4. RETURN: branch, remote URL, push result, commit on remote
+In the FACTS API, the following endpoint is available:
 
-STOP after push — user handles QA Processor deploy + Path B retest.
+`DELETE /api/ActiveReaction/{activeIprId}`
+
+I tested it through local Swagger at `https://localhost:2900/swagger` using Active IPR ID `6`. The API returned **HTTP 204 No Content**.
+
+Our intended permission configuration is:
+- `LeadChemist` is allowed to delete Active IPR records.
+- `Chemist` should not be allowed to delete.
+- A `Developer` permission bypass may exist in the local Development environment.
+
+The endpoint description says that an Active IPR can be deleted only when it is not referenced by a formulation concept.
+
+I need to understand exactly why my local request was allowed. Do not assume that my account is LeadChemist just because the DELETE request succeeded.
+
+## Investigation tasks
+
+### 1. Trace the DELETE request
+Trace the complete request flow through:
+- ActiveReactionController
+- Authorization attributes, policies, filters, and middleware
+- ActiveReactionService
+- Permission configuration CSV and generated runtime JSON
+- JWT authentication and claims
+- Any Developer or Development-environment bypass
+- Formulation API client and actual deletion implementation
+
+Identify the exact code responsible for allowing or rejecting the request.
+
+### 2. Verify role and permission evaluation
+Determine:
+- Which claim or permission is checked for DELETE.
+- Whether authorization is based on roles, permissions, groups, or another mechanism.
+- Whether the `LeadChemist` role is explicitly required.
+- Whether a Developer identity bypasses the permission check.
+- Whether Development mode changes authorization behavior.
+- Whether Swagger authentication, a cached token, or custom middleware affects the result.
+
+Show the relevant file paths, methods, configuration entries, and code snippets.
+
+### 3. Explain my HTTP 204 result
+Determine all code paths that could produce HTTP 204 for this endpoint.
+
+Check whether:
+- The DELETE permission check actually executed.
+- The request was allowed through a Developer bypass.
+- The service called the Formulation API.
+- The Formulation API actually deleted the database record.
+- The service can return 204 without verifying that deletion occurred.
+
+Do not infer my actual identity or role unless the available claims or application logs establish it.
+
+### 4. Verify the business-rule protection
+Inspect whether deletion is blocked when the Active IPR is referenced by `FormulationConceptActive.ActiveIprId`.
+
+Determine whether the code:
+- Checks the reference before deletion.
+- Returns HTTP 409 when the Active IPR is in use.
+- Deletes child records and the parent transactionally when deletion is allowed.
+- Handles nonexistent IDs correctly.
+
+Separate implemented behavior from intended behavior and missing implementation.
+
+### 5. Provide a verification matrix
+Create a table showing expected and actual behavior for:
+- LeadChemist in Development
+- Chemist in Development
+- Developer in Development
+- LeadChemist outside Development
+- Chemist outside Development
+- Unauthenticated user
+- Authorized user attempting to delete an Active IPR that is referenced
+- Authorized user attempting to delete a nonexistent Active IPR
+
+Use the existing code to determine expected behavior. Clearly label anything that cannot be confirmed without runtime testing.
+
+### 6. Recommend safe tests
+Provide practical steps to verify authorization locally:
+- Inspect JWT claims without exposing the token.
+- Identify the active user identity and effective permissions using existing logs or debugging.
+- Set breakpoints in the authorization handler and DELETE service.
+- Test with authorized and unauthorized test accounts.
+- Confirm database state before and after deletion.
+
+Use disposable DEV records only.
+
+## Constraints
+- This is an investigation-only task. Do not modify application code, permission configuration, database schema, or runtime configuration.
+- Do not generate commits or automatically fix anything.
+- Do not expose or log full JWT tokens or other credentials.
+- Do not assume that HTTP 204 proves that the caller is LeadChemist or that a database row was deleted.
+- If the repository does not contain enough evidence, explicitly list what needs to be verified at runtime.
+
+## Required output
+1. Executive summary: why the DELETE request may be allowed.
+2. Exact authorization flow with file paths and line numbers.
+3. Explanation of the HTTP 204 response.
+4. Permission configuration and Developer-bypass findings.
+5. Active IPR usage-check and database-deletion findings.
+6. Test matrix with expected HTTP status codes.
+7. Step-by-step local debugging instructions.
+8. Final conclusion distinguishing confirmed facts, likely causes, and unresolved questions.
