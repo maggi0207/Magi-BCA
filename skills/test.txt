@@ -1,18 +1,114 @@
-Investigate how Active IPR DELETE authorization behaves between local Development and Production.
+# Final Code Review Before Commit — FACTS Active IPR DELETE
 
-Our investigation confirmed that the local DELETE request was processed with the Developer claim. Both permission-matrix checks denied the request, but Development bypass handlers granted access, resulting in HTTP 204.
+Perform a thorough, read-only code review of all current changes related to Active IPR deletion across the FACTS API and Formulation API.
 
-Trace the existing code and answer:
+## Context
 
-1. Where is the ASP.NET Core environment detected? Is the Developer bypass explicitly restricted to Development?
-2. In Production, can a Developer claim bypass the LeadChemist-only DELETE permission?
-3. Where are the production user claims issued and mapped to application roles or permissions?
-4. Are the permission CSV and generated runtime JSON consistent between local and production deployments?
-5. Does the Formulation API apply the same authorization rules independently of the FACTS API?
-6. What happens if a production user has Developer but not LeadChemist?
-7. What happens if a production user has LeadChemist and the Active IPR is unused?
-8. What happens if the Active IPR is referenced by FormulationConceptActive.ActiveIprId?
+Endpoint:
+`DELETE /api/ActiveReaction/{activeIprId}`
 
-Provide exact file paths, methods, configuration keys, and relevant code lines. Clearly separate confirmed behavior from assumptions that require production configuration or log verification.
+Intended behavior:
+- LeadChemist can delete an Active IPR if it is not referenced by a formulation concept.
+- Chemist without Developer privileges must not be allowed to delete.
+- Developer bypass may be enabled in Development but must not bypass authorization in Production.
+- An Active IPR referenced by `FormulationConceptActive.ActiveIprId` must return 409 Conflict.
+- An unknown Active IPR ID must return 404 Not Found.
+- Successful deletion returns 204 No Content.
 
-Do not modify code, configuration, database data, or production resources. Do not expose credentials or tokens.
+Local Swagger test:
+- Active IPR ID 6 returned HTTP 204.
+- Investigation confirmed that the request was processed with the Developer claim and authorized by the Development bypass in both APIs.
+- Logs showed the usage query, DELETE SQL statements, and 204 response.
+- The human identity behind the Developer claim and independent post-delete database verification remain unconfirmed.
+- Production configuration and authorization behavior have not been tested against the deployed environment.
+
+## Review checklist
+
+### 1. Review all changes
+Inspect `git status`, `git diff`, staged changes, untracked files, and generated files relevant to this feature.
+
+Identify:
+- Required changes that are missing.
+- Accidental changes unrelated to this feature.
+- Duplicate DTOs or API methods.
+- Generated files that should or should not be committed.
+- Debug code, temporary configuration, secrets, and credentials.
+
+Do not discard, reset, or overwrite any user changes.
+
+### 2. Authorization and permissions
+Trace authorization through both APIs.
+
+Verify:
+- DELETE is restricted to LeadChemist according to the existing permission matrix.
+- The Developer bypass is explicitly restricted to Development.
+- Both APIs independently enforce the intended authorization rules.
+- Production cannot grant deletion merely because the caller has a Developer claim.
+- Unauthenticated users receive 401 and unauthorized users receive 403.
+- The CSV, runtime JSON, permission keys, claims mapping, and authorization handlers are consistent.
+
+Identify any fail-open behavior, environment detection issues, or missing authorization checks.
+
+### 3. Deletion business rules
+Verify that:
+- The service checks whether the Active IPR exists.
+- The usage check uses the correct `FormulationConceptActive.ActiveIprId` relationship.
+- Referenced Active IPR records cannot be deleted.
+- A reference-check failure cannot accidentally allow deletion.
+- Child records are deleted in the correct order.
+- Parent and child deletion is transactional.
+- Exceptions cause rollback and appropriate error responses.
+- Concurrent usage or deletion cannot cause an unsafe deletion due to a check-then-delete race.
+- The service does not return 204 unless the deletion actually succeeded.
+
+Do not assume the business rule is implemented merely because the endpoint description says so.
+
+### 4. API contract and error handling
+Verify actual controller, service, client, and exception-mapping behavior for:
+- 204 — successful deletion.
+- 400 — invalid input, if applicable.
+- 401 — unauthenticated.
+- 403 — unauthorized.
+- 404 — missing Active IPR.
+- 409 — Active IPR is in use.
+- 500 — unexpected failure.
+
+Check whether the Formulation API response is correctly propagated through the FACTS API.
+
+### 5. Tests and build
+Inspect existing and new tests.
+
+Confirm coverage for:
+- LeadChemist authorization.
+- Chemist denial.
+- Development-only Developer bypass.
+- Developer denial outside Development.
+- Missing Active IPR.
+- Referenced Active IPR.
+- Successful deletion of an unused Active IPR.
+- Child deletion and transaction rollback.
+- Client delegation and error propagation.
+
+Run available focused tests and builds without changing code. Report any tests blocked by unavailable database infrastructure.
+
+Do not claim that Production behavior has been verified by unit tests alone.
+
+### 6. Final review report
+Return:
+1. Overall verdict: READY TO COMMIT, READY WITH CAVEATS, or DO NOT COMMIT.
+2. Critical issues that must be fixed.
+3. Important issues that should be fixed.
+4. Minor suggestions.
+5. Exact files and line numbers for each finding.
+6. Tests and builds actually executed, including results.
+7. Unverified assumptions and deployment checks.
+8. Exact list of files that should be committed.
+
+## Strict constraints
+- Investigation and testing only.
+- Do not modify any files.
+- Do not auto-fix issues.
+- Do not stage, commit, push, or reset anything.
+- Preserve all existing user changes.
+- Do not expose authentication tokens or secrets.
+- Base conclusions on the actual code and test results, not assumptions.
