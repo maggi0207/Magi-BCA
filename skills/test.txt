@@ -1,64 +1,41 @@
-**Root Cause**
-Confirmed a missing NPP case in CrudEntityCredentialingGroupOperation.GetTypeName:
+TASK-CLEANUP-AND-GETTYPENAME — Unstage junk, re-apply NPP GetTypeName fix, commit only that
 
-```csharp
-switch (PafDataContext.Paf.TaskSelected)
-{
-    // Existing task cases, but no TaskType.Npp
-    ...
-    default:
-        throw new ArgumentOutOfRangeException();
-}
-```
+One Copilot turn. Be careful with git. Do NOT push. Do NOT amend. Do NOT --no-verify.
 
-The unsupported value is **`TaskType.Npp`**. This switch does not inspect a facility or RTK, so the reported throw is not caused by a null facility or an invalid group RTK.
+PART A — CLEANUP (git only)
+1. git status, git diff --stat, git diff --cached --stat
+2. Unstage EVERYTHING currently staged (e.g. git restore --staged .). Do not discard working-tree edits yet.
+3. Do NOT commit launchSettings, UnityApiLoadBalancer, Background.csproj, .sln, start-all.ps1, or local TestCactusUpdater_NewNew diagnostic hacks in this task.
+4. Leave unrelated dirty files unstaged. Do not revert SubmitPafStrategy NPP Anchor history fix if present — leave it unstaged for a separate commit later unless already committed.
 
-`CrudEntityCredentialingGroupOperation.cs:167` calls it while formatting the description:
+PART B — VERIFY / REDO FIX
+1. Open CrudEntityCredentialingGroupOperation.cs → GetTypeName switch.
+2. If case TaskType.Npp → result = "NPP" is MISSING: add it next to the other TaskType cases (same style). Do not invent RTKs. Do not change default throw behavior for unknown tasks.
+3. If case already present: quote it; ensure file is saved.
+4. Ensure/add CrudEntityCredentialingGroupOperationTests covering:
+   - NPP returns "NPP"
+   - unknown task still throws
+   - existing task names / Change Info precedence if tests already exist — keep them green
+5. Build Processor + test project (Debug). Run only those GetTypeName / credentialing-group unit tests. All must pass.
 
-```csharp
-return ($"{DateTime.Now.Date.ToDefaultFormat()} - {await this.GetEntityAbbrAsync(false)} - {GetTypeName()}").TruncateTo(50);
-```
+PART C — COMMIT (only the fix)
+1. Stage ONLY:
+   - CrudEntityCredentialingGroupOperation.cs
+   - CrudEntityCredentialingGroupOperationTests.cs (or whatever the new test file is named)
+2. Show staged file list (must be exactly those).
+3. Commit message:
 
-**NPP Call Path**
-The source matches the supplied QA stack:
+   fix(npp): map TaskType.Npp in credentialing group GetTypeName
 
-1. `CactusUpdater.cs:663` enters when:
-   ```csharp
-   paf.TaskSelected == TaskType.Npp && paf.NppTask?.Status == TaskStatus.Complete
-   ```
-2. After license and eligible specialty processing, it calls `CreateStandardCviRecordsAsync`.
-3. That method resolves the existing NPP RTK and constructs the group operation with:
-   ```csharp
-   GroupTypeRtk = credentialingTypeRtk
-   ```
-4. Group creation calls `ResolveGroupDescriptionAsync`, then the unhandled NPP switch case throws.
+   QA Path B Failed with ArgumentOutOfRangeException when creating
+   standard CVI / entity credentialing group description for NPP.
 
-The existing NPP type remains **`HCA0095563`**. No RTKs were added or changed.
+4. git status after commit.
 
-**Fix Diff**
-Added only this case to the production switch:
-
-```diff
- case TaskType.SSPBriefEnrollment:
-     result = "SSP Brief";
-     break;
-+case TaskType.Npp:
-+    result = "NPP";
-+    break;
-```
-
-Non-NPP mappings, the Change Info override, and rejection of unknown tasks remain unchanged. No changes were made to `SubmitPafStrategy`.
-
-**Validation**
-Added `CrudEntityCredentialingGroupOperationTests.cs`.
-
-- **10 tests passed**, including NPP with its existing RTK, NPP without an override, Change Info precedence, existing task names, and unknown-task rejection.
-- Processor and test-project Debug builds passed.
-- Editor diagnostics and `git diff --check` passed.
-
-**Retest / STOP**
-No additional PAF `5974` facility or RTK data is needed to fix this specific exception.
-
-Deploy the updated **PAF Processor** to QA, then use an approved retry of `5974` after checking for prior side effects, or submit a fresh equivalent Path B PAF. Verify group/CVI creation, absence of the `GetTypeName` exception, “Credentialing system updates complete,” and the Completed status.
-
-End-to-end QA completion is not yet verified. The local `HCA_KEY_TABLE_TD` SQL blocker is separate and was not bypassed or retested.
+RETURN:
+1. What was unstaged
+2. Quote of Npp case (before was missing / already there)
+3. Test results
+4. Commit hash + staged files
+5. Files still dirty and excluded (list)
+6. STOP — ready for push/deploy when user asks
