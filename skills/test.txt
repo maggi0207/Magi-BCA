@@ -1,22 +1,74 @@
-TASK-148067 — Investigate duplicate ADD NPP (Begin PAF vs Begin NPP PAF)
+**1. Entry Paths**
+Both dashboard actions are handled in `PafQueueSearchCriteria.razor.cs:546`:
 
-ADO 148067. QA: ADD NPP to Facility is available from both Begin PAF and Begin NPP PAF entry paths. Should be limited to one.
+```csharp
+private void NavigateToStartPaf()
+{
+    NavigationManager.NavigateTo(PageUri.PractitionerSearchUri);
+}
 
-Evidence: /Paf/New from MSP Dashboard shows ADD NPP in Practitioner Action list (Gupta).
+private void NavigateToStartNppPaf()
+{
+    NavigationManager.NavigateTo(PageUri.PractitionerNppSearchUri);
+}
+```
 
-GOAL this turn = investigate only. Do NOT remove/hide the action until Product/user confirms which path keeps it.
+`PageUri.cs:54` defines:
+```csharp
+PractitionerSearchUri = "/Practitioner/Search";
+PractitionerNppSearchUri = "/Practitioner/Search/Npp";
+NewPafUri = "/Paf/New";
+```
 
-DO:
-1. Quote where Begin PAF launches /Paf/New and builds Practitioner Action list (incl. ADD NPP / TaskType.Npp).
-2. Quote where Begin NPP PAF launches (search / enforce NPI / different action set).
-3. Explain why ADD NPP appears on both paths (shared action catalog? missing TaskSelected/entry-point filter?).
-4. List safe options (hide on classic Begin PAF only / hide on Begin NPP only / eligibility gate) with exact code touchpoints — no invent.
-5. STOP with recommendation + one Product question: which single entry should keep ADD NPP?
-6. Do not implement hide/remove in this turn.
+The NPP route sets search intent. `PractitionerSearchPage.razor:27` passes:
+```razor
+ForceNpiSearchMode="@_isNppEntry" IsNppRequest="@_isNppEntry"
+```
+This controls NPI-first search and NPP confirmation behavior, including the controlled exception-search path.
 
-RETURN:
-1. Code quotes (both entry paths + action visibility)
-2. Why duplicated
-3. Recommended single path + alternative
-4. Exact Product confirm question
-5. STOP — wait for user/Product before fix
+Both paths ultimately call `NavigateToNewPaf(returnUri)`. `NavigationManagerExtensions.cs:16` constructs:
+```csharp
+var uri = $"{PageUri.NewPafUri}?{PageUri.ReturnUriParameter}={HttpUtility.UrlEncode(returnUri)}";
+```
+Only the return URI is carried forward, not NPP entry intent.
+
+**2. Action Visibility**
+PafTaskSelection.LoadAvailableTasks requests:
+```csharp
+Mode = isNewPractitioner ? TaskAllowedListMode.NewPractitioner
+                        : TaskAllowedListMode.ExistingPractitioner,
+PractitionerId = StateContainer.PafState.Practitioner.Id,
+IsPsgUserMode = _currentUserIsPsg,
+IsRecruitmentUserMode = _currentUserIsRecruitment
+```
+
+No entry-path field is supplied. `PafTaskSelection.razor:9` displays every returned task.
+
+For existing practitioners, `TaskDeterminationService.cs:131` adds:
+```csharp
+if (listParameters.IsMspUserMode)
+{
+    var eligibleFacilities =
+        await GetUserFacilitiesNotAddedToOrInactiveAtAsync(
+            listParameters.UserId, practitioner.Key);
+
+    if (eligibleFacilities?.Any() == true)
+        list.Add(new() { Name = "ADD NPP to Facility", Type = TaskType.Npp });
+}
+```
+The service also adds NPP for new, non-recruitment MSP practitioners.
+
+**Why Duplicated**
+Both entries use the same action catalog. NPP availability depends on MSP role and practitioner/facility eligibility, **not the button clicked**. The dedicated entry’s search flags stop before `/Paf/New` action selection. This explains the observed classic Begin PAF behavior.
+
+**3. Safe Options**
+- **Recommended: retain Begin NPP PAF only.** Preserve explicit entry intent through `PractitionerSearchTable.razor.cs:139`, `StateContainer.cs:54`, and new-PAF initialization; then exclude NPP from classic-entry results in `PafTaskSelection.LoadAvailableTasks`. This preserves the dedicated NPI-first workflow.
+- **Alternative: retain classic Begin PAF only.** Remove the dedicated entry button in `PafQueueSearchCriteria.razor:19`, with a Product-approved decision on direct `/Practitioner/Search/Npp` access. Keep the shared catalog’s NPP action.
+- **Eligibility gate:** adjust only the NPP additions in `TaskDeterminationService`. Eligibility alone cannot distinguish the two entry paths today; it would need propagated entry intent to enforce exclusivity.
+
+Simply hiding ADD NPP within the dedicated NPP path would leave that button unable to start an NPP request, so I do not recommend that approach.
+
+**4. Product Confirmation**
+**Which single entry should retain ADD NPP to Facility: the dedicated Begin NPP PAF path (recommended), or classic Begin PAF?**
+
+**STOP:** Read-only investigation completed. No visibility changes, code edits, builds, or tests performed. Waiting for user/Product confirmation.
