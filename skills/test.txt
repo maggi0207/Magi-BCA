@@ -1,21 +1,60 @@
-TASK-148060 — Investigate Completed queue PAF type “Unknown” for NPP
+The queue’s Type column renders two independent labels in `PafQueueSearch.razor:247`:
 
-ADO 148060. QA: Completed PAF shows Type “Unknown”; expected “NPP” / “NPP PAF”.
-Example: Poser, John S. — Existing Practitioner + Unknown (screenshot in ticket).
+```razor
+@GetPafTypeDisplayName(context.Result.PafType)
+...
+@GetTaskSelectedDisplayName(context.Result.TaskSelected)
+```
 
-GOAL this turn = investigate; fix only if one clear missing TaskType.Npp case (like GetTypeName).
+In `PafQueueSearch.razor.cs:793`, the first mapper returns `"Existing Practitioner"` for `ManageExistingPractitioner`. The second had no NPP branch:
 
-DO:
-1. Find where Completed (and related) queue maps TaskSelected / PAF type to display string. Quote file/class/switch.
-2. Confirm TaskType.Npp is missing or maps to Unknown / default.
-3. Compare to CPC Completed Queue type filter work (131783/131784) if same mapper.
-4. Quote expected label string already used elsewhere for NPP (e.g. “NPP”, “NPP PAF”, “ADD NPP to Facility”) — reuse existing, do not invent.
-5. If root cause is a missing switch case with an established label: implement minimal fix + any existing unit tests; build.
-6. If multiple queues/APIs or product label unclear: STOP with quotes + questions — do not invent wording.
+```csharp
+else if (taskSelected == TaskType.Recruitment)
+    return "Recruitment";
+else
+    return "Unknown";
+```
 
-RETURN:
-1. Mapper quote(s)
-2. Root cause
-3. Fix diff if applied, else STOP
-4. Build/test result
-5. QA retest steps (Completed queue NPP row)
+Therefore an existing-practitioner NPP row deterministically displayed **Existing Practitioner + Unknown**. This mapper is shared across queue modes.
+
+**Filter Comparison**
+The Completed queue filter uses a separate implementation in `PafQueueSearchCriteria.razor.cs:122`:
+
+```csharp
+Text = "Add NPP to Facility",
+Value = TaskType.Npp
+```
+
+That filter already supports NPP. It does not control the row label; no filter changes were needed.
+
+**Fix Applied**
+Reused the established label from `TaskType.cs`:
+
+```csharp
+[Description("NPP PAF")]
+Npp,
+```
+
+Added only:
+```diff
+ else if (taskSelected == TaskType.Recruitment)
+     return "Recruitment";
++else if (taskSelected == TaskType.Npp)
++    return taskSelected.GetDescription();
+ else
+     return "Unknown";
+```
+
+The row now displays **Existing Practitioner + NPP PAF**. Existing labels and the unknown-task fallback remain unchanged.
+
+**Validation**
+Client Release build passed. Editor diagnostics and `git diff --check` passed. No direct queue-display unit/UI tests were found, so rendered behavior remains for manual QA verification.
+
+**QA Retest**
+1. Deploy the updated Client assets and refresh QA to load the new version.
+2. Open the CPC Completed queue and locate the reported Poser NPP row.
+3. Verify its Type shows **Existing Practitioner / NPP PAF**, not Unknown.
+4. Apply **Add NPP to Facility** in the type filter and verify the row remains included.
+5. Check a non-NPP row to confirm its existing label is unchanged.
+
+One file changed, unstaged. No commit or push.
