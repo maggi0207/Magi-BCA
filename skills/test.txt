@@ -1,36 +1,13 @@
-**Root Cause**
-IdpClient.UserAccountExistsAsync dereferences email before making the request:
+TASK-COMMIT-148169 — Commit Start PAF email guard only
 
-```csharp
-Uri.EscapeDataString(email.Trim())
-```
+Stage only ConfirmationWizardModal (SaveNewPractitionerAsync IdP guard).
+Do NOT push. Do not mix other bug files unless asked.
 
-NPP Add New permits omitted email and maps it using `_model.Email?.Trim()`. The shared ConfirmationWizardModal.SaveNewPractitionerAsync called IdP for every non-recruitment practitioner, including those with null email.
+Commit message:
 
-Classic Begin PAF and Begin NPP PAF use this same modal.
+  fix(npp): skip IdP account check when new practitioner email blank
 
-**Fix**
-Added a single guard at the wizard call site:
+  SaveNewPractitionerAsync no longer calls UserAccountExistsAsync with
+  null/whitespace email (ADO 148169 NullReferenceException on Start PAF).
 
-```diff
--if (!practitioner.IsRecruitmentPractitioner)
-+if (!practitioner.IsRecruitmentPractitioner &&
-+    !string.IsNullOrWhiteSpace(practitioner.EmailAddress))
- {
-     accountExists = await Idp.UserAccountExistsAsync(practitioner.EmailAddress);
- }
-```
-
-Null, empty, or whitespace email skips the account lookup. Supplied email still receives the existing IdP check, including rejection when already in use. Duplicate-practitioner checks and recruitment behavior remain unchanged.
-
-**Validation**
-Client Release build **passed**, including a final rebuild after formatting correction. No editor errors were found. No direct wizard/IdP unit-test harness was located, so UI behavior remains for manual QA verification.
-
-**QA Retest**
-1. Begin NPP PAF → Add New; enter valid name, degree, and NPI, leaving email blank.
-2. Select **Verify & Start PAF**. Confirm it reaches the new PAF without the IdP null exception or stuck validation state.
-3. Repeat with a valid unused email; confirm the lookup and start succeed.
-4. Repeat with an email already in use; confirm the existing email-in-use validation still blocks completion.
-5. Check classic Begin PAF Add New with its required fields to confirm unchanged behavior.
-
-**STOP:** One wizard file modified, unstaged. No commit or push. Unrelated staged and dirty files were preserved.
+RETURN: hash, file committed.
