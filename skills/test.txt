@@ -1,19 +1,43 @@
-TASK-FIX-148062 — NPP PAF print: ReviewNppTask + exclude legacy FSQ
+**Changes**
+Updated only `PractitionerPafPrintPage.razor`.
 
-Approved direction: mirror PafReviewForm on PractitionerPafPrintPage.
-Do not invent RTKs. Do not change non-NPP Add Practitioner print behavior.
+**NPP branch:** previously absent; now:
+```razor
+@if (_pafData.TaskSelected == TaskType.Npp && _pafData.NppTask != null)
+{
+    <div class="break-page">
+        <ReviewNppTask Task="@_pafData.NppTask"
+            PractitionerKey="@_pafData.Practitioner?.Key">
+        </ReviewNppTask>
+    </div>
+}
+```
 
-DO:
-1. On PractitionerPafPrintPage (razor + code-behind as needed):
-   - If TaskSelected == Npp (or equivalent from print payload) and Npp task loaded → render ReviewNppTask Print=true (or same props as review) with NPP task + practitioner key.
-   - Exclude TaskType.Npp from the AddPractitionerToFacilitiesTask / ReviewAddPractitionerToFacilityTask branch (same intent as PafReviewForm).
-2. Quote before/after for both branches.
-3. Build Client (or project that hosts print page). Note any compile issues.
-4. If unit/UI tests exist for print/review, add or extend a minimal NPP print assertion; otherwise document manual retest steps.
-5. Do not regenerate live PAF 5983 PDF in this turn unless you already have a safe local print path — list exact QA retest steps instead.
+`ReviewNppTask` has no `Print` parameter, so this uses the same task and practitioner-key props as the review form. No code-behind changes were needed.
 
-RETURN:
-1. Diff summary / file quotes
-2. Build result
-3. Manual QA retest steps (NPP VA/PA Yes, other NPP path, non-NPP Add Practitioner PDF)
-4. STOP — ready to commit when user asks
+**Legacy FSQ branch:**
+```diff
+-@if (_pafData?.AddPractitionerToFacilitiesTask != null)
++@if (_pafData?.AddPractitionerToFacilitiesTask != null &&
++     _pafData.TaskSelected != TaskType.Npp)
+```
+
+Its existing `ReviewAddPractitionerToFacilityTask Print="true"` rendering remains unchanged for non-NPP forms. No RTKs changed.
+
+**Validation**
+- Client Release build: **passed**.
+- Editor diagnostics: no errors.
+- `git diff --check`: passed.
+- No active print/review unit or UI test harness was found. Visual PDF behavior remains for manual verification.
+
+**QA Retest**
+Deploy the updated Client assets used by the QA PAF print URL, then:
+
+1. **NPP VA=Yes / PA=Yes:** generate a fresh approved test PDF. Verify “ADD NPP to Facility,” both Yes answers, and applicable PSV filenames. Confirm legacy FSQ and its “Initial Processing” block are absent.
+2. **Other NPP path:** use VA=No or VA=Yes / PA=No. Verify answers, conditional PA/license fields, and available PSV data match the review form; legacy FSQ remains absent.
+3. **Non-NPP Add Practitioner:** generate a PDF and verify Facility Specific Questions, the selected Processing Type, and facility details still render as before.
+4. Check pagination, clipping, and absence of Edit buttons in all three PDFs.
+
+PAF `5983` was **not regenerated**. Its existing PDF will retain the old content until an approved regeneration.
+
+**STOP:** One file changed, unstaged. No commit or push; ready to commit when requested.
