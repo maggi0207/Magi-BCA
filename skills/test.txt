@@ -1,13 +1,21 @@
-TASK-COMMIT-148169 — Commit Start PAF email guard only
+TASK-148170 — Investigate/fix NPP license Save stuck after CA→TX
 
-Stage only ConfirmationWizardModal (SaveNewPractitionerAsync IdP guard).
-Do NOT push. Do not mix other bug files unless asked.
+ADO 148170. QA: ADD NPP (VA=No) — saved CA license → toast “A state license in the state of 'TX' is required for PAF submission.” User changes new license State CA→TX → Save does not respond / changes not saved.
+Evidence: Poser ADD NPP form; TX required toast; State=CA highlighted.
 
-Commit message:
+GOAL: Find why Save hangs or no-ops after correcting state. Fix minimally. Do not invent RTKs or weaken real TX facility license requirement.
 
-  fix(npp): skip IdP account check when new practitioner email blank
+DO:
+1. Quote ADD NPP Save handler + TX-required validation (where message is built).
+2. Trace what happens on second Save after State changes to TX — exception? validation still using old CA? button disabled? event not firing?
+3. Compare to successful first-time TX license Save path.
+4. If clear bug (stale validation, swallowed exception, busy flag never cleared): implement minimal fix.
+5. Build Client. Tests if harness exists.
+6. If product rule vs facility state unclear: STOP with quotes.
 
-  SaveNewPractitionerAsync no longer calls UserAccountExistsAsync with
-  null/whitespace email (ADO 148169 NullReferenceException on Start PAF).
-
-RETURN: hash, file committed.
+RETURN:
+1. Root cause
+2. Fix diff or STOP
+3. Build/test
+4. QA retest: require TX → enter CA (expect toast) → change to TX → Save succeeds → card Complete
+5. Confirm wrong-state Save still blocked
