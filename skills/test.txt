@@ -1,17 +1,22 @@
-TASK-COMMIT-148065 — Commit NPP MSO Due Date fix only
+TASK-148169 — Fix Start PAF NullReferenceException (IdpClient.UserAccountExistsAsync)
 
-Stage only:
-- CrudEntityCredentialingOperation.cs
-- CrudEntityCredentialingOperationTests.cs
+ADO 148169. QA: Add New Provider (NPP path) → enter name/degree/NPI → Verify & Start PAF → ErrorPage / “not responding”.
+Console: System.NullReferenceException at IdpClient.UserAccountExistsAsync(email)
+← ConfirmationWizardModal.SaveNewPractitionerAsync ← Save
 
-Do NOT push. Do not mix other bug files unless user asks combined commit.
+GOAL: Find null (email? client? response?) and fix minimally so new NPP practitioner can start PAF. Do not invent IdP APIs.
 
-Commit message:
+DO:
+1. Quote IdpClient.UserAccountExistsAsync and ConfirmationWizardModal.SaveNewPractitionerAsync call site.
+2. Identify what is null when email is empty/missing on Add New (NPP often optional email).
+3. Compare with classic Begin PAF Add New path — same modal?
+4. Minimal fix: skip IdP check when email null/empty, or guard NRE; preserve behavior when email present.
+5. Build Client. Add/adjust unit test if harness exists.
+6. No RTK invent. No unrelated wizard refactor.
 
-  fix(npp): MSO due date = acceptance + 3 business days
-
-  NPP no longer falls through to +14 calendar days (ADO 148065).
-  Auto-accept uses SubmittedDate; CPC accept uses StatusDate;
-  reuse Recruitment blackout / CalculateBusinessDueDate.
-
-RETURN: hash, files committed.
+RETURN:
+1. Root cause quote
+2. Fix diff
+3. Build/test result
+4. QA retest: Begin NPP PAF → Add New (no email) → Verify & Start PAF succeeds; with email still works
+5. STOP — ready to commit when asked
