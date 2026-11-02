@@ -1,9 +1,18 @@
-Stage the Active IPR DELETE feature changes in both FACTS API and Formulation API repositories.
+TASK-148062 — Investigate NPP PAF PDF Issues (read-only first)
 
-1. Check `git status` in each repository.
-2. Review the changed and untracked files.
-3. Stage all files related to the Active IPR DELETE feature, including required controllers, services, permissions, generated client files, and tests.
-4. Do not stage unrelated changes, secrets, or local-only configuration.
-5. Do not use `git add .`. Stage the relevant files explicitly.
-6. Do not commit, push, amend, or modify any files.
-7. After staging, show `git status` and summarize the staged files separately for each repository.
+ADO 148062. Evidence: PAF 5983 Path B (ADD NPP, VA/PA Yes).
+Observed PDF: Facility Specific Questions + Processing Type Initial Processing; ADD NPP to Facility title/section missing.
+
+GOAL (this turn = investigate only; fix only if root cause is clear and NPP-safe):
+1. Find where PAF PDF / packet is built for TaskType.Npp (quote file/class/method). Do not invent paths.
+2. Quote how Processing Type / FSQ vs ADD NPP title is chosen.
+3. Why NPP gets Initial Processing FSQ content.
+4. Why ADD NPP to Facility does not appear on PDF.
+5. Compare to Add Practitioner to Facility PDF pattern if reusable.
+6. STOP for product if expected PDF sections are unclear. Do not invent RTKs.
+
+RETURN:
+1. Code quotes (builders)
+2. Root cause for finding A and B
+3. Minimal fix plan (or STOP questions)
+4. Do NOT implement until user says fix — unless cause is a one-line obvious omission like GetTypeName
