@@ -1,89 +1,19 @@
-**1. PDF Builders**
-The completed **PAF PDF**, rather than credentialing packet PDF, uses PdfGeneration.GeneratePdfFromCompletedPaf:
+TASK-FIX-148062 — NPP PAF print: ReviewNppTask + exclude legacy FSQ
 
-```csharp
-await _htmlPdfService.GeneratePdfAsync(
-    $"{_settings.PrintPafUrl}/{message.PafId}?PrintToken={printToken}",
-    _settings.WaitForSelector);
-```
+Approved direction: mirror PafReviewForm on PractitionerPafPrintPage.
+Do not invent RTKs. Do not change non-NPP Add Practitioner print behavior.
 
-That renders PractitionerPafPrintPage. Its `PractitionerPafPrintPage.razor.cs:40` loads `GetPafForPrint` and assigns the returned form data to `_pafData`.
+DO:
+1. On PractitionerPafPrintPage (razor + code-behind as needed):
+   - If TaskSelected == Npp (or equivalent from print payload) and Npp task loaded → render ReviewNppTask Print=true (or same props as review) with NPP task + practitioner key.
+   - Exclude TaskType.Npp from the AddPractitionerToFacilitiesTask / ReviewAddPractitionerToFacilityTask branch (same intent as PafReviewForm).
+2. Quote before/after for both branches.
+3. Build Client (or project that hosts print page). Note any compile issues.
+4. If unit/UI tests exist for print/review, add or extend a minimal NPP print assertion; otherwise document manual retest steps.
+5. Do not regenerate live PAF 5983 PDF in this turn unless you already have a safe local print path — list exact QA retest steps instead.
 
-There is **no NPP section/component invocation in the print template**.
-
-**2. Finding A: FSQ / Initial Processing**
-The `PractitionerPafPrintPage.razor:159` checks only whether the legacy task exists:
-
-```razor
-@if (_pafData?.AddPractitionerToFacilitiesTask != null)
-{
-    <div class="add-pract-wrapper">
-        <ReviewAddPractitionerToFacilityTask Print="true"
-            Task="@_pafData.AddPractitionerToFacilitiesTask">
-        </ReviewAddPractitionerToFacilityTask>
-    </div>
-}
-```
-
-`ReviewAddPractitionerToFacilityTask.razor:12` supplies:
-
-```razor
-<Text>Facility Specific Questions</Text>
-...
-<DescriptionsItem Title="Processing Type">
-    <span class="csp-color-link-blue">
-        @Task?.CorporateQuestions?.Type.GetDescription()
-    </span>
-</DescriptionsItem>
-```
-
-In `AddPractitionerToFacilitiesTask.cs:18`, `Initial` is the zero/default enum value:
-
-```csharp
-[Description("Initial Processing")]
-Initial,
-```
-
-`CorporateQuestions` also initializes with `new()`.
-
-**Root cause:** the print template does not exclude NPP from legacy FSQ rendering. A non-null legacy task with default corporate questions can therefore print “Initial Processing,” even though the selected task is NPP. I have not queried PAF `5983`, so whether its `Initial` value was defaulted or explicitly persisted remains unverified.
-
-**3. Finding B: Missing NPP Title**
-The existing `ReviewNppTask.razor:7` already supplies:
-
-```razor
-<Text>ADD NPP to Facility</Text>
-```
-
-It renders practitioner type, VA answer, conditional PA answer, applicable license details, and PSV attachment names. The print page never invokes it.
-
-**Root cause:** NPP was added to interactive review but omitted from the PAF print template. This title is not chosen by RTK or credentialing-group naming.
-
-**4. Reusable Pattern**
-The `PafReviewForm.razor:57` already implements the intended separation:
-
-```razor
-@if (StateContainer.PafState.TaskSelected == TaskType.Npp && _nppTask != null)
-{
-    <ReviewNppTask Task="@_nppTask"
-        PractitionerKey="@_practitionerAtLastLoad?.Key" ... />
-}
-```
-
-Its legacy FSQ condition explicitly includes:
-
-```csharp
-StateContainer.PafState.TaskSelected != TaskType.Npp
-```
-
-**5. Minimal Fix Plan**
-After approval:
-1. Add the equivalent NPP branch to the print page, reusing `ReviewNppTask` with the loaded NPP task and practitioner key.
-2. Exclude `TaskType.Npp` from the print page’s legacy FSQ branch.
-3. Preserve the existing Add Practitioner to Facility print behavior.
-4. Test NPP VA/PA=Yes, another NPP path, and a non-NPP Add Practitioner PDF. Regenerate an approved PAF PDF; an existing PDF will not automatically change.
-
-**STOP / Product Questions**
-No files changed; no builds or tests run. This is a two-part template correction, not a one-line omission.
-
-Before implementing, confirm whether the PDF should mirror the existing NPP review section exactly, including PSV filenames and task-status tags, or whether Product requires a different print-specific field set. No RTK changes are needed.
+RETURN:
+1. Diff summary / file quotes
+2. Build result
+3. Manual QA retest steps (NPP VA/PA Yes, other NPP path, non-NPP Add Practitioner PDF)
+4. STOP — ready to commit when user asks
