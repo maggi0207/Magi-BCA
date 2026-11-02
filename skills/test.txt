@@ -1,60 +1,22 @@
-The queue’s Type column renders two independent labels in `PafQueueSearch.razor:247`:
+TASK-148067 — Investigate duplicate ADD NPP (Begin PAF vs Begin NPP PAF)
 
-```razor
-@GetPafTypeDisplayName(context.Result.PafType)
-...
-@GetTaskSelectedDisplayName(context.Result.TaskSelected)
-```
+ADO 148067. QA: ADD NPP to Facility is available from both Begin PAF and Begin NPP PAF entry paths. Should be limited to one.
 
-In `PafQueueSearch.razor.cs:793`, the first mapper returns `"Existing Practitioner"` for `ManageExistingPractitioner`. The second had no NPP branch:
+Evidence: /Paf/New from MSP Dashboard shows ADD NPP in Practitioner Action list (Gupta).
 
-```csharp
-else if (taskSelected == TaskType.Recruitment)
-    return "Recruitment";
-else
-    return "Unknown";
-```
+GOAL this turn = investigate only. Do NOT remove/hide the action until Product/user confirms which path keeps it.
 
-Therefore an existing-practitioner NPP row deterministically displayed **Existing Practitioner + Unknown**. This mapper is shared across queue modes.
+DO:
+1. Quote where Begin PAF launches /Paf/New and builds Practitioner Action list (incl. ADD NPP / TaskType.Npp).
+2. Quote where Begin NPP PAF launches (search / enforce NPI / different action set).
+3. Explain why ADD NPP appears on both paths (shared action catalog? missing TaskSelected/entry-point filter?).
+4. List safe options (hide on classic Begin PAF only / hide on Begin NPP only / eligibility gate) with exact code touchpoints — no invent.
+5. STOP with recommendation + one Product question: which single entry should keep ADD NPP?
+6. Do not implement hide/remove in this turn.
 
-**Filter Comparison**
-The Completed queue filter uses a separate implementation in `PafQueueSearchCriteria.razor.cs:122`:
-
-```csharp
-Text = "Add NPP to Facility",
-Value = TaskType.Npp
-```
-
-That filter already supports NPP. It does not control the row label; no filter changes were needed.
-
-**Fix Applied**
-Reused the established label from `TaskType.cs`:
-
-```csharp
-[Description("NPP PAF")]
-Npp,
-```
-
-Added only:
-```diff
- else if (taskSelected == TaskType.Recruitment)
-     return "Recruitment";
-+else if (taskSelected == TaskType.Npp)
-+    return taskSelected.GetDescription();
- else
-     return "Unknown";
-```
-
-The row now displays **Existing Practitioner + NPP PAF**. Existing labels and the unknown-task fallback remain unchanged.
-
-**Validation**
-Client Release build passed. Editor diagnostics and `git diff --check` passed. No direct queue-display unit/UI tests were found, so rendered behavior remains for manual QA verification.
-
-**QA Retest**
-1. Deploy the updated Client assets and refresh QA to load the new version.
-2. Open the CPC Completed queue and locate the reported Poser NPP row.
-3. Verify its Type shows **Existing Practitioner / NPP PAF**, not Unknown.
-4. Apply **Add NPP to Facility** in the type filter and verify the row remains included.
-5. Check a non-NPP row to confirm its existing label is unchanged.
-
-One file changed, unstaged. No commit or push.
+RETURN:
+1. Code quotes (both entry paths + action visibility)
+2. Why duplicated
+3. Recommended single path + alternative
+4. Exact Product confirm question
+5. STOP — wait for user/Product before fix
