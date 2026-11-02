@@ -1,74 +1,22 @@
-**1. Entry Paths**
-Both dashboard actions are handled in `PafQueueSearchCriteria.razor.cs:546`:
+TASK-148065 — Investigate NPP MSO Due Date invalid
 
-```csharp
-private void NavigateToStartPaf()
-{
-    NavigationManager.NavigateTo(PageUri.PractitionerSearchUri);
-}
+ADO 148065. Rule from ticket: MSO Due Date = Acceptance Date + 3 Business Days.
+QA evidence: Poser NPP Cactus CV “10/28/2026 - AECO - NPP”; MSO Due Date shows 11/11/2026 (wrong).
+Expected ~10/28 + 3 business days (approx 11/02/2026 if Wed start; confirm holiday calendar).
 
-private void NavigateToStartNppPaf()
-{
-    NavigationManager.NavigateTo(PageUri.PractitionerNppSearchUri);
-}
-```
+GOAL this turn = investigate; fix only if formula/path for NPP is clearly wrong vs existing non-NPP pattern.
 
-`PageUri.cs:54` defines:
-```csharp
-PractitionerSearchUri = "/Practitioner/Search";
-PractitionerNppSearchUri = "/Practitioner/Search/Npp";
-NewPafUri = "/Paf/New";
-```
+DO:
+1. Find where MSO Due Date is set on CVI / credentialing group / entity create for PAF processing. Quote file/method.
+2. Quote the formula used (calendar days vs business days; which “acceptance” date field).
+3. Check whether TaskType.Npp uses a different path or falls into a default that yields 11/11 (e.g. +14 calendar, wrong base date).
+4. Compare to Add Practitioner / existing practitioner MSO due logic — reuse if correct.
+5. If clear bug: minimal fix + unit test if harness exists; build Processor.
+6. If holiday calendar / product rule unclear: STOP with quotes + questions. Do not invent business-day calendars.
 
-The NPP route sets search intent. `PractitionerSearchPage.razor:27` passes:
-```razor
-ForceNpiSearchMode="@_isNppEntry" IsNppRequest="@_isNppEntry"
-```
-This controls NPI-first search and NPP confirmation behavior, including the controlled exception-search path.
-
-Both paths ultimately call `NavigateToNewPaf(returnUri)`. `NavigationManagerExtensions.cs:16` constructs:
-```csharp
-var uri = $"{PageUri.NewPafUri}?{PageUri.ReturnUriParameter}={HttpUtility.UrlEncode(returnUri)}";
-```
-Only the return URI is carried forward, not NPP entry intent.
-
-**2. Action Visibility**
-PafTaskSelection.LoadAvailableTasks requests:
-```csharp
-Mode = isNewPractitioner ? TaskAllowedListMode.NewPractitioner
-                        : TaskAllowedListMode.ExistingPractitioner,
-PractitionerId = StateContainer.PafState.Practitioner.Id,
-IsPsgUserMode = _currentUserIsPsg,
-IsRecruitmentUserMode = _currentUserIsRecruitment
-```
-
-No entry-path field is supplied. `PafTaskSelection.razor:9` displays every returned task.
-
-For existing practitioners, `TaskDeterminationService.cs:131` adds:
-```csharp
-if (listParameters.IsMspUserMode)
-{
-    var eligibleFacilities =
-        await GetUserFacilitiesNotAddedToOrInactiveAtAsync(
-            listParameters.UserId, practitioner.Key);
-
-    if (eligibleFacilities?.Any() == true)
-        list.Add(new() { Name = "ADD NPP to Facility", Type = TaskType.Npp });
-}
-```
-The service also adds NPP for new, non-recruitment MSP practitioners.
-
-**Why Duplicated**
-Both entries use the same action catalog. NPP availability depends on MSP role and practitioner/facility eligibility, **not the button clicked**. The dedicated entry’s search flags stop before `/Paf/New` action selection. This explains the observed classic Begin PAF behavior.
-
-**3. Safe Options**
-- **Recommended: retain Begin NPP PAF only.** Preserve explicit entry intent through `PractitionerSearchTable.razor.cs:139`, `StateContainer.cs:54`, and new-PAF initialization; then exclude NPP from classic-entry results in `PafTaskSelection.LoadAvailableTasks`. This preserves the dedicated NPI-first workflow.
-- **Alternative: retain classic Begin PAF only.** Remove the dedicated entry button in `PafQueueSearchCriteria.razor:19`, with a Product-approved decision on direct `/Practitioner/Search/Npp` access. Keep the shared catalog’s NPP action.
-- **Eligibility gate:** adjust only the NPP additions in `TaskDeterminationService`. Eligibility alone cannot distinguish the two entry paths today; it would need propagated entry intent to enforce exclusivity.
-
-Simply hiding ADD NPP within the dedicated NPP path would leave that button unable to start an NPP request, so I do not recommend that approach.
-
-**4. Product Confirmation**
-**Which single entry should retain ADD NPP to Facility: the dedicated Begin NPP PAF path (recommended), or classic Begin PAF?**
-
-**STOP:** Read-only investigation completed. No visibility changes, code edits, builds, or tests performed. Waiting for user/Product confirmation.
+RETURN:
+1. Code quotes (set site + formula)
+2. Why 10/28 → 11/11
+3. Fix diff if applied, else STOP
+4. Build/test result
+5. QA retest steps (new NPP Path B → check MSO Due Date on Cactus)
