@@ -1,18 +1,22 @@
-TASK-COMMIT-148067 — Commit Begin NPP PAF-only ADD NPP visibility
+TASK-FIX-148065 — NPP MSO Due Date = acceptance + 3 business days
 
-Stage only the three Client files from this fix:
-- StateContainer.cs (PafStartingState.IsNppRequest + interface)
-- PractitionerSearchTable (sets IsNppRequest on StartPafFrom)
-- PafTaskSelection (filter TaskType.Npp when !IsNppRequest on new PAF)
+Product (Ashley):
+- Start dates OK: auto-accept → SubmittedDate; CPC accept → acceptance StatusDate
+- Holidays: same portal blackout calendar as Recred/Recruitment
+- NPP must NOT keep the existing +14 calendar-day fallthrough
 
-Do NOT stage 148062/148060/148065 files unless user asked a combined commit.
-Do NOT push.
+Prior investigation: GetMsoDueDate in CrudEntityCredentialingOperation; NPP hits AddDays(14). Recruitment already uses CalculateBusinessDueDate(start, 3, holidays) + PortalClient.GetBlackoutDates.
 
-Commit message:
+DO:
+1. Add an NPP branch in GetMsoDueDate BEFORE the new-practitioner exclusion / +14 fallthrough.
+2. Anchor date: for Path B auto-accept use SubmittedDate (date portion in approved timezone — quote what code already uses for Recruitment/similar); for CPC accept use StatusDate at Accepted/equivalent. Quote how you detect auto vs CPC.
+3. Reuse existing CalculateBusinessDueDate + GetBlackoutDates pattern (same as Recruitment). Do not invent a new calendar.
+4. Preserve all non-NPP formulas unchanged. Fix new-practitioner NPP null gap if still hit by same branch.
+5. Extend existing due-date unit tests: weekend, holiday, delayed processing, new+existing NPP; assert 10/28 + 3 biz days → 11/02 when no blackouts (or equivalent fixture).
+6. Build Processor + tests. No RTK invent.
 
-  fix(npp): show ADD NPP only when started via Begin NPP PAF
-
-  Propagate IsNppRequest into PafStartingState and hide TaskType.Npp
-  on classic Begin PAF new-entry task lists (ADO 148067 / Ashley).
-
-RETURN: hash, files committed, other dirty left unstaged.
+RETURN:
+1. Diff / key quotes
+2. Test results
+3. QA retest steps (Path B → USERDEF_D3 / MSO Due Date)
+4. STOP — ready to commit when asked
