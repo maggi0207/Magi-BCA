@@ -1,43 +1,21 @@
-**Changes**
-Updated only `PractitionerPafPrintPage.razor`.
+TASK-148060 — Investigate Completed queue PAF type “Unknown” for NPP
 
-**NPP branch:** previously absent; now:
-```razor
-@if (_pafData.TaskSelected == TaskType.Npp && _pafData.NppTask != null)
-{
-    <div class="break-page">
-        <ReviewNppTask Task="@_pafData.NppTask"
-            PractitionerKey="@_pafData.Practitioner?.Key">
-        </ReviewNppTask>
-    </div>
-}
-```
+ADO 148060. QA: Completed PAF shows Type “Unknown”; expected “NPP” / “NPP PAF”.
+Example: Poser, John S. — Existing Practitioner + Unknown (screenshot in ticket).
 
-`ReviewNppTask` has no `Print` parameter, so this uses the same task and practitioner-key props as the review form. No code-behind changes were needed.
+GOAL this turn = investigate; fix only if one clear missing TaskType.Npp case (like GetTypeName).
 
-**Legacy FSQ branch:**
-```diff
--@if (_pafData?.AddPractitionerToFacilitiesTask != null)
-+@if (_pafData?.AddPractitionerToFacilitiesTask != null &&
-+     _pafData.TaskSelected != TaskType.Npp)
-```
+DO:
+1. Find where Completed (and related) queue maps TaskSelected / PAF type to display string. Quote file/class/switch.
+2. Confirm TaskType.Npp is missing or maps to Unknown / default.
+3. Compare to CPC Completed Queue type filter work (131783/131784) if same mapper.
+4. Quote expected label string already used elsewhere for NPP (e.g. “NPP”, “NPP PAF”, “ADD NPP to Facility”) — reuse existing, do not invent.
+5. If root cause is a missing switch case with an established label: implement minimal fix + any existing unit tests; build.
+6. If multiple queues/APIs or product label unclear: STOP with quotes + questions — do not invent wording.
 
-Its existing `ReviewAddPractitionerToFacilityTask Print="true"` rendering remains unchanged for non-NPP forms. No RTKs changed.
-
-**Validation**
-- Client Release build: **passed**.
-- Editor diagnostics: no errors.
-- `git diff --check`: passed.
-- No active print/review unit or UI test harness was found. Visual PDF behavior remains for manual verification.
-
-**QA Retest**
-Deploy the updated Client assets used by the QA PAF print URL, then:
-
-1. **NPP VA=Yes / PA=Yes:** generate a fresh approved test PDF. Verify “ADD NPP to Facility,” both Yes answers, and applicable PSV filenames. Confirm legacy FSQ and its “Initial Processing” block are absent.
-2. **Other NPP path:** use VA=No or VA=Yes / PA=No. Verify answers, conditional PA/license fields, and available PSV data match the review form; legacy FSQ remains absent.
-3. **Non-NPP Add Practitioner:** generate a PDF and verify Facility Specific Questions, the selected Processing Type, and facility details still render as before.
-4. Check pagination, clipping, and absence of Edit buttons in all three PDFs.
-
-PAF `5983` was **not regenerated**. Its existing PDF will retain the old content until an approved regeneration.
-
-**STOP:** One file changed, unstaged. No commit or push; ready to commit when requested.
+RETURN:
+1. Mapper quote(s)
+2. Root cause
+3. Fix diff if applied, else STOP
+4. Build/test result
+5. QA retest steps (Completed queue NPP row)
