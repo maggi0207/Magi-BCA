@@ -1,22 +1,41 @@
-TASK-FIX-148065 — NPP MSO Due Date = acceptance + 3 business days
+**Fix Applied**
+Added an NPP branch at the beginning of `GetMsoDueDate` in `CrudEntityCredentialingOperation.cs:392`, before the new-practitioner exclusion and `+14` fallthrough:
 
-Product (Ashley):
-- Start dates OK: auto-accept → SubmittedDate; CPC accept → acceptance StatusDate
-- Holidays: same portal blackout calendar as Recred/Recruitment
-- NPP must NOT keep the existing +14 calendar-day fallthrough
+```csharp
+var acceptanceDate = NppAutoAcceptProcessingRules.IsAutoAcceptedNpp(paf)
+    ? paf.SubmittedDate
+    : paf.StatusDate;
 
-Prior investigation: GetMsoDueDate in CrudEntityCredentialingOperation; NPP hits AddDays(14). Recruitment already uses CalculateBusinessDueDate(start, 3, holidays) + PortalClient.GetBlackoutDates.
+var startDate = acceptanceDate.Value.ToLocalTime().Date;
+var holidays = await PortalClient.GetBlackoutDates(
+    startDate, startDate.AddDays(30));
+return CalculateBusinessDueDate(startDate, 3, holidays);
+```
 
-DO:
-1. Add an NPP branch in GetMsoDueDate BEFORE the new-practitioner exclusion / +14 fallthrough.
-2. Anchor date: for Path B auto-accept use SubmittedDate (date portion in approved timezone — quote what code already uses for Recruitment/similar); for CPC accept use StatusDate at Accepted/equivalent. Quote how you detect auto vs CPC.
-3. Reuse existing CalculateBusinessDueDate + GetBlackoutDates pattern (same as Recruitment). Do not invent a new calendar.
-4. Preserve all non-NPP formulas unchanged. Fix new-practitioner NPP null gap if still hit by same branch.
-5. Extend existing due-date unit tests: weekend, holiday, delayed processing, new+existing NPP; assert 10/28 + 3 biz days → 11/02 when no blackouts (or equivalent fixture).
-6. Build Processor + tests. No RTK invent.
+Auto-accept detection reuses the existing rule: NPP, accepted by `HCPSU`, VA=Yes, PA=Yes. Other NPP accepts use the loaded acceptance `StatusDate`.
 
-RETURN:
-1. Diff / key quotes
-2. Test results
-3. QA retest steps (Path B → USERDEF_D3 / MSO Due Date)
-4. STOP — ready to commit when asked
+Recruitment already uses `DateTime.Now.Date`, meaning the **processing host’s local timezone**. NPP converts its persisted UTC timestamp to that same timezone before taking the date; no named timezone or new calendar was introduced. QA should verify the host timezone matches the intended business timezone.
+
+Missing acceptance dates now produce an explicit processing error instead of substituting today. New-practitioner NPP no longer receives null from the old exclusion. All non-NPP formulas and RTKs remain unchanged.
+
+**Tests / Build**
+Extended `CrudEntityCredentialingOperationTests.cs`.
+
+**21 tests passed:** 13 new NPP cases plus 8 existing cases. Coverage includes:
+- Auto/CPC acceptance and new/existing practitioners.
+- Weekend and portal-blackout handling.
+- Persisted acceptance date rather than delayed processing/application-received date.
+- UTC-to-local date conversion.
+- Missing auto-accept date rejection.
+- **10/28/2026 → 11/02/2026** without blackouts; **11/03** with a 10/29 blackout.
+
+Processor and test-project Debug builds passed. Diagnostics and whitespace checks passed.
+
+**QA Retest**
+1. Deploy the updated PAF Processor.
+2. Create a new NPP Path B PAF and record `SubmittedDate`.
+3. After processing, verify Cactus CVI **`USERDEF_D3` / MSO Due Date** equals the acceptance date plus three business days using portal blackouts.
+4. Repeat for new-practitioner NPP and CPC-accepted NPP, using acceptance `StatusDate` for the latter.
+5. Verify delayed processing does not shift the deadline and non-NPP behavior is unchanged.
+
+**STOP:** Two files modified, unstaged. No commit or push; ready to commit when asked.
