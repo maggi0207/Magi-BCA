@@ -1,19 +1,44 @@
-TASK-FIX-148067 — Hide ADD NPP on classic Begin PAF; keep Begin NPP PAF only
+**Changes**
+Propagated NPP entry intent through the existing Client starting state. No API eligibility rules, search behavior, buttons, or RTKs changed.
 
-Product (Ashley): ADD NPP to Facility should only show when users choose Begin NPP PAF — so they cannot skip required NPP search/steps.
+In `StateContainer.cs`, added to `PafStartingState` and its interface:
+```csharp
+public bool IsNppRequest { get; set; }
+```
 
-Prior investigation: NPP entry intent is dropped before /Paf/New; TaskDeterminationService adds NPP for MSP eligibility on both paths.
+In PractitionerSearchTable.StartPafFrom, the handoff now records the existing search flag:
+```diff
+ StateContainer.PafStartingState.PractitionerSummary = practitioner;
++StateContainer.PafStartingState.IsNppRequest = IsNppRequest;
+```
+Every completed search handoff assigns this value, so classic entry resets it to `false`.
 
-DO:
-1. Propagate NPP entry intent from /Practitioner/Search/Npp through to New PAF / PafTaskSelection.LoadAvailableTasks (use existing StateContainer / search flags patterns from investigation — quote before/after). Do not invent new architecture.
-2. When entry is classic Begin PAF (not NPP entry), exclude TaskType.Npp from available tasks.
-3. When entry is Begin NPP PAF, keep ADD NPP to Facility when eligibility still passes.
-4. Do not remove Begin NPP PAF button. Do not weaken NPI-first / exception search.
-5. Build Client. Add/adjust unit tests if a task-list harness exists; else document manual QA steps.
-6. No RTK invent. No unrelated refactors.
+In PafTaskSelection.LoadAvailableTasks, after receiving the API’s eligible tasks:
+```csharp
+if (!IsExistingPaf && !StateContainer.PafStartingState.IsNppRequest)
+{
+    _currentAvailableTasks = _currentAvailableTasks
+        .Where(task => task.Type != TaskType.Npp)
+        .ToList();
+}
+```
 
-RETURN:
-1. Diff / key quotes (intent propagation + exclude NPP on classic)
-2. Build/test result
-3. QA retest: Begin PAF → no ADD NPP; Begin NPP PAF → ADD NPP present (eligible); eligibility still respected
-4. STOP — ready to commit when asked
+Before, both entries displayed the same eligible catalog. After:
+- **Classic Begin PAF:** removes ADD NPP.
+- **Begin NPP PAF:** retains ADD NPP only if the API returned it as eligible.
+- **Existing PAFs:** unaffected by this new-entry filter.
+
+Filtering occurs before the existing single-task auto-selection.
+
+**Validation**
+Client Release build **passed**. Editor diagnostics and `git diff --check` passed. No active task-selection/state unit or UI test harness was found; interactive behavior remains for manual QA verification.
+
+**QA Retest**
+1. Deploy the updated Client and refresh QA.
+2. **Begin PAF:** select an eligible existing practitioner and confirm ADD NPP is absent. Repeat for a new practitioner.
+3. **Begin NPP PAF:** complete NPI-first search or the approved exception workflow; confirm ADD NPP is present for an eligible practitioner.
+4. Use an existing practitioner with no eligible facilities; confirm ADD NPP remains absent.
+5. In the same session, enter through Begin NPP PAF, cancel, then use classic Begin PAF. Confirm NPP intent does not carry over.
+6. Open an existing NPP PAF and confirm its selected task remains intact.
+
+**STOP:** Three Client files changed, unstaged. No commit or push; ready to commit when asked.
