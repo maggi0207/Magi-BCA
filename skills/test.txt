@@ -1,44 +1,18 @@
-**Changes**
-Propagated NPP entry intent through the existing Client starting state. No API eligibility rules, search behavior, buttons, or RTKs changed.
+TASK-COMMIT-148067 — Commit Begin NPP PAF-only ADD NPP visibility
 
-In `StateContainer.cs`, added to `PafStartingState` and its interface:
-```csharp
-public bool IsNppRequest { get; set; }
-```
+Stage only the three Client files from this fix:
+- StateContainer.cs (PafStartingState.IsNppRequest + interface)
+- PractitionerSearchTable (sets IsNppRequest on StartPafFrom)
+- PafTaskSelection (filter TaskType.Npp when !IsNppRequest on new PAF)
 
-In PractitionerSearchTable.StartPafFrom, the handoff now records the existing search flag:
-```diff
- StateContainer.PafStartingState.PractitionerSummary = practitioner;
-+StateContainer.PafStartingState.IsNppRequest = IsNppRequest;
-```
-Every completed search handoff assigns this value, so classic entry resets it to `false`.
+Do NOT stage 148062/148060/148065 files unless user asked a combined commit.
+Do NOT push.
 
-In PafTaskSelection.LoadAvailableTasks, after receiving the API’s eligible tasks:
-```csharp
-if (!IsExistingPaf && !StateContainer.PafStartingState.IsNppRequest)
-{
-    _currentAvailableTasks = _currentAvailableTasks
-        .Where(task => task.Type != TaskType.Npp)
-        .ToList();
-}
-```
+Commit message:
 
-Before, both entries displayed the same eligible catalog. After:
-- **Classic Begin PAF:** removes ADD NPP.
-- **Begin NPP PAF:** retains ADD NPP only if the API returned it as eligible.
-- **Existing PAFs:** unaffected by this new-entry filter.
+  fix(npp): show ADD NPP only when started via Begin NPP PAF
 
-Filtering occurs before the existing single-task auto-selection.
+  Propagate IsNppRequest into PafStartingState and hide TaskType.Npp
+  on classic Begin PAF new-entry task lists (ADO 148067 / Ashley).
 
-**Validation**
-Client Release build **passed**. Editor diagnostics and `git diff --check` passed. No active task-selection/state unit or UI test harness was found; interactive behavior remains for manual QA verification.
-
-**QA Retest**
-1. Deploy the updated Client and refresh QA.
-2. **Begin PAF:** select an eligible existing practitioner and confirm ADD NPP is absent. Repeat for a new practitioner.
-3. **Begin NPP PAF:** complete NPI-first search or the approved exception workflow; confirm ADD NPP is present for an eligible practitioner.
-4. Use an existing practitioner with no eligible facilities; confirm ADD NPP remains absent.
-5. In the same session, enter through Begin NPP PAF, cancel, then use classic Begin PAF. Confirm NPP intent does not carry over.
-6. Open an existing NPP PAF and confirm its selected task remains intact.
-
-**STOP:** Three Client files changed, unstaged. No commit or push; ready to commit when asked.
+RETURN: hash, files committed, other dirty left unstaged.
