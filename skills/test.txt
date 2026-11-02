@@ -1,22 +1,61 @@
-TASK-148065 — Investigate NPP MSO Due Date invalid
+**1. Set Site / Formula**
+MSO Due Date is written to the **CVI’s `USERDEF_D3`**, not the credentialing group, in `CrudEntityCredentialingOperation.cs:264`:
 
-ADO 148065. Rule from ticket: MSO Due Date = Acceptance Date + 3 Business Days.
-QA evidence: Poser NPP Cactus CV “10/28/2026 - AECO - NPP”; MSO Due Date shows 11/11/2026 (wrong).
-Expected ~10/28 + 3 business days (approx 11/02/2026 if Wed start; confirm holiday calendar).
+```csharp
+parameters.Add("@USERDEF_D3",
+    auditRecord.UserdefD3 = await GetMsoDueDate());
+```
 
-GOAL this turn = investigate; fix only if formula/path for NPP is clearly wrong vs existing non-NPP pattern.
+`CrudEntityCredentialingOperation.cs:392` has no NPP-specific branch. Existing-practitioner NPP falls through to:
 
-DO:
-1. Find where MSO Due Date is set on CVI / credentialing group / entity create for PAF processing. Quote file/method.
-2. Quote the formula used (calendar days vs business days; which “acceptance” date field).
-3. Check whether TaskType.Npp uses a different path or falls into a default that yields 11/11 (e.g. +14 calendar, wrong base date).
-4. Compare to Add Practitioner / existing practitioner MSO due logic — reuse if correct.
-5. If clear bug: minimal fix + unit test if harness exists; build Processor.
-6. If holiday calendar / product rule unclear: STOP with quotes + questions. Do not invent business-day calendars.
+```csharp
+return GetApplicationReceivedDate()?.AddDays(14);
+```
 
-RETURN:
-1. Code quotes (set site + formula)
-2. Why 10/28 → 11/11
-3. Fix diff if applied, else STOP
-4. Build/test result
-5. QA retest steps (new NPP Path B → check MSO Due Date on Cactus)
+For that flow, `CrudEntityCredentialingOperation.cs:357` normally returns the processing machine’s current date:
+
+```csharp
+return ApplicationReceivedDate != DateTime.MaxValue
+    ? ApplicationReceivedDate
+    : DateTime.Now.Date;
+```
+
+Neither formula uses a PAF acceptance timestamp.
+
+**2. Why 10/28 → 11/11**
+The code’s default is **14 calendar days**: October 28 plus 14 days is November 11. That precisely matches the reported result if application-received/processing date was October 28. I have not queried the incident CVI to verify its stored base date.
+
+New-practitioner NPP has another gap: it hits the earlier `Practitioner.IsNew` exclusion and receives a null due date.
+
+**3. Reusable Business-Day Logic**
+The existing Recruitment branch uses:
+
+```csharp
+var startDate = DateTime.Now.Date;
+var holidays = await PortalClient.GetBlackoutDates(
+    startDate, startDate.AddDays(30));
+return CalculateBusinessDueDate(startDate, 3, holidays);
+```
+
+The helper excludes the starting day, Saturdays, Sundays, and dates returned by the existing portal blackout service.
+
+Classic Add Practitioner is not the correct formula to reuse: Initial/Temporary credentialing explicitly receives **no MSO due date**. Recruitment supplies the reusable calculation, but its processing-date base does not satisfy the ticket’s acceptance-date rule.
+
+**4. STOP: Acceptance Date Needs Confirmation**
+The wrong NPP formula is clear, but the correct date anchor is not fully defined in the model:
+
+- `ModelExtensions.cs:268` assigns acceptance identity only, with no timestamp.
+- Auto-accept records `SubmittedDate = DateTime.UtcNow`.
+- Manual CPC acceptance stamps `StatusDate` through `SetStatus`.
+- `StatusDate` changes on every status update; it is not a durable acceptance-date field.
+
+**Proposed minimal fix after confirmation:** add an NPP branch before the new-practitioner exclusion, using the confirmed acceptance date and existing portal blackout service/helper. Preserve all non-NPP formulas.
+
+Please confirm:
+1. For NPP, should the anchor be **`SubmittedDate` for auto-accept**, and **the acceptance `StatusDate` loaded before processing for CPC acceptance**? Which business timezone determines that date?
+2. Does the portal’s existing blackout calendar define the ticket’s holidays?
+
+No code changes, builds, or tests were performed. The existing due-date unit-test harness can cover weekends, supplied holidays, delayed processing, and both new/existing NPP once these choices are confirmed.
+
+**5. QA Retest**
+After the confirmed fix, create a new NPP Path B PAF and record its acceptance date. Verify Cactus `USERDEF_D3` equals that date plus three business days using the approved calendar. With an October 28, 2026 start and no intervening blackout dates, the expected result is **November 2, 2026**. Also verify delayed processing does not shift the deadline and non-NPP behavior remains unchanged.
