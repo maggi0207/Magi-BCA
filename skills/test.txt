@@ -1,60 +1,18 @@
-**Root Cause Status**
-The code explains the CA rejection, but **does not yet establish why the corrected TX Save hangs**. No fix was applied because stale binding, validation failure, and an exception during saving remain plausible.
+TASK-FIX-148170 — Clear save loading after TX-required validation
 
-**Save / TX Validation**
-NppTaskForm.SaveNppTask validates the form, then checks selected facility states:
+QA/user repro (2026-11-05):
+1. ADD NPP, new license State=CA → Save
+2. Toast: "A state license in the state of 'TX' is required..."
+3. Save button KEEPS LOADING
+4. Change State to TX → Save SUCCEEDS
 
-```csharp
-var missingLicenseState = GetMissingFacilityStateLicense();
-if (missingLicenseState != null)
-{
-    await ShowValidationError(
-        $"A state license in the state of '{missingLicenseState}' is required for PAF submission.");
-    _saving = false;
-    return;
-}
-```
+So TX path works. Bug = busy/loading stuck after CA validation error.
 
-The check reads the current model, not a saved CA value:
+DO:
+1. Quote NppTaskForm.SaveNppTask missing-license branch + how _saving is set/cleared.
+2. Quote parent PafFormComponent / TaskFooter save busy flags.
+3. Ensure every early-return validation path (including ShowValidationError for missing TX) clears _saving in finally (and parent flag if owned there).
+4. Do not weaken TX facility license requirement.
+5. Build Client. Document retest: CA Save → toast + Save NOT stuck loading; then TX Save succeeds.
 
-```csharp
-var hasNewLicense = ShouldShowNewLicenseFields &&
-    string.Equals(_task.NewLicenseState?.Trim(), facilityState,
-        StringComparison.OrdinalIgnoreCase);
-```
-
-State is bound directly to `context.NewLicenseState` in `NppTaskForm.razor:88`.
-
-**What Second Save Should Do**
-With `_task.NewLicenseState == "TX"` and no other missing required facility-state license, the state check passes. It then reaches:
-- Effective date must be today or later.
-- License number length and duplicate state/number checks.
-- `CompleteNppTask(true)`, which sets Complete and invokes persistence.
-
-A first-time TX Save follows this same path. The CA rejection does **not** mark the task Invalid or persist it, so stale task status is not supported as the cause.
-
-**Concrete Risks, Not Confirmed Incident Causes**
-Later checks use `.Value`, `.Length`, and `.Trim()`. The model validators should require those fields, but the runtime validation result is not available.
-
-Also, `CompleteNppTask` resets `_saving` only after:
-
-```csharp
-await OnComplete.InvokeAsync(_task);
-_saving = false;
-```
-
-The parent `PafFormComponent.razor.cs:862` similarly lacks `finally` cleanup for `_pafIsSaving`. An exception can leave a loading state, but adding cleanup alone would not explain or fix failed persistence.
-
-**STOP / Evidence Needed**
-Capture one corrected-TX Save with browser console and Network open:
-1. Does `SaveNppTask` run, and is `_task.NewLicenseState` actually `"TX"`?
-2. Does `_form.Validate()` return true?
-3. Is `UpdateTaskAndSavePaf?task=Npp&runValidation=False` sent?
-4. What exception or response follows, and does the hang occur from the header Save, footer Save, or both?
-
-No files changed or builds run. Existing model-validation tests do not cover this mounted form’s retry/busy-state behavior.
-
-**QA Retest Target**
-TX-required facility → complete new-license fields with CA → Save must show the TX-required message → change only State to TX → Save should persist and mark the card Complete, provided all remaining checks pass.
-
-**The real TX requirement remains unchanged:** CA alone is rejected when neither an existing TX license nor the entered new TX license satisfies it.
+RETURN: root cause quote, diff, build, retest. STOP for commit.
