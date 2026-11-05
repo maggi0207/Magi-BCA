@@ -1,8 +1,20 @@
-Fix all Datadog code-quality comments related to the use of `any` in the Active IPR delete implementation.
+TASK-148819 — Cross-check facility-status gate with 132327 / 132341 / 132308
 
-1. Replace `any` in `handleDeleteError` with an appropriate error type, preferably `unknown` with proper type checking.
-2. Replace `any` in the test mocks with the correct Angular service/interface types.
-3. Follow existing typing and mocking patterns used in nearby components and spec files.
-4. Do not use type assertions just to suppress warnings.
-5. Run the relevant unit tests and Angular build.
-6. Keep the changes limited to these code-quality fixes. Do not modify existing functionality.
+ADO 148819. Brand-new NPP (no facilities) sees:
+"Unable to verify practitioner facility status. Adding a primary address is unavailable until facility status can be verified."
+Add Address is blocked, so the PAF cannot be submitted.
+
+Requirements:
+- 132327: no primary → "No Primary Address on File" and Add Address ENABLED.
+- 132341: no active affiliations → Add Address ENABLED.
+- 132341/132308: affiliation cannot be verified → disable Add and show the standard error. Keep this.
+- 132308: active affiliations → disable Add with the privileges message. Keep this.
+
+DO:
+1. Quote the toast and the condition that disables Add Address.
+2. Quote what the affiliation call returns for a new practitioner with no facilities: empty list, null, or an error.
+3. If a successful empty result is treated as "cannot verify", fix only that case so Add Address is enabled (132327/132341). Do not allow Add when the call actually fails.
+4. Do not change the active-affiliation lock or Begin PAF behavior.
+5. Build Client if you change code.
+
+RETURN: which branch QA hit, quote, diff or STOP, retest for new NPP (Add enabled), lookup failure (still blocked), and active affiliation (still blocked).
