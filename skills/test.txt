@@ -1,24 +1,9 @@
-TASK-COMMIT-NPP-OPTIONAL-FIELDS — Commit NPP blank email/SSN guards only
+TASK-FIX-148700 — Swap NPP Exception Search help text only
 
-Stage only files for this NPP optional-field fix, including earlier uncommitted pieces of the same fix if still dirty:
-- PractitionerDuplicateCheckHelper.cs
-- ConfirmationWizardModal.razor.cs
-- VerifyExistingPractitionerForm.razor.cs
-- ManagePractitionerInformationTask.razor.cs
-- PractitionerPafPage.razor.cs
-- AddNewPractitionerForm.razor.cs
-- UpdateTaskManagePersonalInfoStrategy.cs
+On the No-NPI / license Exception Search header, replace the SSN/NPI help sentence with:
 
-Do NOT stage NppTaskForm (148170) in this commit if it is a separate commit already or still needs its own commit — if 148170 is still uncommitted, commit it FIRST as its own commit, then this one.
-Do NOT stage launchSettings or unrelated files. Do NOT push.
+"To begin creating a PAF, please search for and select a Practitioner below. To search, enter a Reason and at least 2 characters for Last Name. First Name is optional. If you use a license, enter both State and License Number."
 
-Commit message:
+Keep that exact opening clause. Do not change the classic /Practitioner/Search SSN/NPI/name sentence. Do not change validation or APIs. Build Client.
 
-  fix(npp): skip email-required lookups when NPP email or SSN is blank
-
-  Optional NPP email/SSN was sent into Delegate Search, Match Search,
-  and IdP checks that reject a missing email.
-
-Then git status and git show --stat HEAD.
-
-RETURN: hash, files in the commit, anything left dirty.
+RETURN: file, before/after, build. STOP for commit.
