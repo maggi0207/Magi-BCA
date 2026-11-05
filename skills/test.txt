@@ -1,15 +1,33 @@
-TASK-FIX-148697 — Hide Manage Delegate on NPP only
+Updated NPP-only rendering in two files.
 
-ADO 148697. ADD NPP PAF still shows the Delegate tab and Manage Delegate panel.
-132268 already required Delegate (and FSQ) hidden for NPP. QA still sees it.
+**Before → After**
+In `PractitionerPanel.razor`, the Delegate tab and `DelegateDisplay` previously rendered unconditionally in the non-Recruitment branch. Both now require:
 
-DO:
-1. Find where the Delegate tab and Manage Delegate panel are rendered on the PAF task page. Quote the condition.
-2. Hide both when TaskSelected == TaskType.Npp (reuse the existing NPP hide if one exists and is incomplete).
-3. Do not hide Delegate on classic Begin PAF or other task types.
-4. Do not change delegate save logic.
-5. Build Client.
+```razor
+@if (StateContainer.PafState.TaskSelected != TaskType.Npp)
+```
 
-RETEST: NPP PAF has no Delegate tab / Manage Delegate. A non-NPP PAF still shows it.
+In `PafFormComponent.razor`, the editor condition changed from:
 
-RETURN: before/after quote, build. STOP for commit.
+```razor
+_viewState == PractitionerPafViewState.ManageDelegate
+```
+
+to:
+
+```razor
+_viewState == PractitionerPafViewState.ManageDelegate &&
+StateContainer.PafState.TaskSelected != TaskType.Npp
+```
+
+The Manage Delegate card already had an NPP exclusion in its CSS-class condition. It now uses the same `@if` guard, so the card is not rendered at all for NPP.
+
+Classic and other non-NPP visibility is preserved. Delegate save logic is untouched; the review form’s existing NPP exclusion remains unchanged.
+
+**Build**
+Both edited Razor files have no editor diagnostics. **Client build success is not verified**: direct build attempts were interrupted or returned no usable result. The fallback workspace build failed in API dependencies due to a locked `Hca.Credentialing.Api.Shared.dll` (`CS2012`/`MSB3027`), before reaching Client.
+
+**Retest**
+Browser QA remains pending: confirm an NPP PAF has no Delegate tab or Manage Delegate panel, then confirm a non-NPP PAF still shows both.
+
+No commit or push performed.
