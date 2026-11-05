@@ -1,56 +1,24 @@
-**Audit Result**
-Fixed remaining NPP-only blank-field risks. No optional field was made required. Non-NPP and Recruitment behavior remains unchanged.
+TASK-COMMIT-NPP-OPTIONAL-FIELDS — Commit NPP blank email/SSN guards only
 
-| Field | Call | Required by API? | Blank on NPP today | Action (already safe / fixed) |
-|---|---|---|---|---|
-| Email | `FindDuplicates` → practitioner Match Search | Not individually. Email, SSN, and NPI all absent throws `"Invalid Search Parameters"` | Normalized to null; search continues with SSN/NPI. Skipped only when no usable identifier exists | **Fixed** |
-| Email | `SearchExistingDelegatesAsync` → Delegate Search | Yes: `"Email Address must be present."` | Null/empty/whitespace skips Delegate Search, including server revalidation | **Already safe client-side; fixed server propagation** |
-| Email | `UserAccountExistsAsync` → IdP | Client calls `email.Trim()`; route requires `{email}` | Add New already skips whitespace. Demographic now also skips NPP whitespace | **Fixed** |
-| Email | Create PAF / Update Task and Save PAF | No required-email rejection in these endpoints or demographic DTO | Blank accepted; populated-email checks retained | **Already safe**; Add New cleared email now normalized to null |
-| SSN | Practitioner Match Search | Optional with Email/NPI. Invalid supplied SSN throws `"Invalid value for SSN"` | NPP null/empty/whitespace becomes null; matching continues using other identifiers | **Fixed** |
-| SSN | Create PAF / Update Task and Save PAF | No required-SSN rejection | Blank accepted in payload | **Already safe** |
-| Cell | Create PAF / Update Task and Save PAF | No required-Phone rejection; no Cell lookup in these NPP handlers | Blank accepted in payload; no separate lookup to skip | **Already safe** |
-| DOB | Create PAF / Update Task and Save PAF | No required-DOB rejection; DTO uses `DateTime?` | Null accepted; supplied dates retain age validation | **Already safe** |
-| Gender | Create PAF / Update Task and Save PAF | No required-Gender rejection | Null/blank accepted; no separate lookup | **Already safe** |
-| Suffix | Create PAF / Update Task and Save PAF | No required-Suffix rejection | Null/blank accepted; existing length validation retained | **Already safe** |
+Stage only files for this NPP optional-field fix, including earlier uncommitted pieces of the same fix if still dirty:
+- PractitionerDuplicateCheckHelper.cs
+- ConfirmationWizardModal.razor.cs
+- VerifyExistingPractitionerForm.razor.cs
+- ManagePractitionerInformationTask.razor.cs
+- PractitionerPafPage.razor.cs
+- AddNewPractitionerForm.razor.cs
+- UpdateTaskManagePersonalInfoStrategy.cs
 
-The PAF initialization code marks the demographic task as needing completion when fields are missing; it does **not** reject Start. Create PAF’s explicit required check concerns an existing practitioner’s ID: `"Existing practitioner's id must be set to start an existing practitioner PAF"`.
+Do NOT stage NppTaskForm (148170) in this commit if it is a separate commit already or still needs its own commit — if 148170 is still uncommitted, commit it FIRST as its own commit, then this one.
+Do NOT stage launchSettings or unrelated files. Do NOT push.
 
-**Call Paths**
-- **Add New:** confirmation wizard → `FindDuplicates` → practitioner/delegate searches; populated email → IdP; Start → Create PAF.
-- **Verify:** email-only `FindDuplicates` lookup → practitioner/delegate searches; Start → Create PAF. Blank NPP email now skips the email-only lookup.
-- **Demographic:** `FindDuplicates` → practitioner/delegate searches; changed populated email → IdP; completion → Update Task and Save PAF.
-- Server demographic revalidation now passes `FormData.TaskSelected == TaskType.Npp`. Existing-practitioner retrieval uses ID, not these optional fields.
+Commit message:
 
-**Diff**
-Changed five files this turn:
+  fix(npp): skip email-required lookups when NPP email or SSN is blank
 
-- `PractitionerDuplicateCheckHelper.cs`: normalize NPP blank email/SSN; avoid Match requests with no usable identifier.
-- `VerifyExistingPractitionerForm.razor.cs`: skip NPP whitespace email-only lookup.
-- `ManagePractitionerInformationTask.razor.cs`: skip NPP whitespace IdP lookup.
-- `AddNewPractitionerForm.razor.cs`: normalize cleared NPP email to null.
-- `UpdateTaskManagePersonalInfoStrategy.cs`: propagate NPP context during revalidation.
+  Optional NPP email/SSN was sent into Delegate Search, Match Search,
+  and IdP checks that reject a missing email.
 
-Core added guard:
+Then git status and git show --stat HEAD.
 
-```csharp
-if (isNppRequest)
-{
-    emailAddress = string.IsNullOrWhiteSpace(emailAddress) ? null : emailAddress;
-    ssn = string.IsNullOrWhiteSpace(ssn) ? null : ssn;
-
-    if (emailAddress == null && ssn == null && string.IsNullOrWhiteSpace(npi))
-        return new DuplicateMatchResult();
-}
-```
-
-**Build And Retest**
-Client build passed with explicit exit code **0**. PAF API build also passed. Edited-file diagnostics and scoped whitespace checks passed.
-
-Browser retests are **pending**, not claimed as passed:
-1. NPP Add New and Demographic: clear Email, SSN, Cell, and DOB individually, then together with otherwise valid data. Save/Start should proceed without optional-field errors.
-2. Test null, empty, and whitespace Email/SSN. Delegate and IdP calls must be absent for blank email; practitioner matching must still run when SSN or NPI is available.
-3. Verify with blank email, then populated email. Blank skips email lookup; populated still searches.
-4. Confirm classic Begin PAF still requires its existing fields and populated-email IdP behavior is unchanged.
-
-No staging, commit, or push performed.
+RETURN: hash, files in the commit, anything left dirty.
