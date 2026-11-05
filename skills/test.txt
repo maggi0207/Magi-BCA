@@ -1,37 +1,15 @@
-**Root Cause**
-`_saving` stayed true while `ShowValidationError` awaited `NotificationService.Open`. AntDesign 0.13.3 waits for the notification’s removal timer; this toaster uses `Duration = 100`. Cleanup after the await, including `finally`, therefore ran about 100 seconds later.
+TASK-COMMIT-PUSH-148170 — Commit Save spinner fix and push
 
-**Save Path**
-- `NppTaskForm.razor:10` passes `Save="@SaveNppTask" Saving="@_saving"` to both header and footer.
-- `TaskHeader.razor` and `TaskFooter.razor` bind Save with `Loading="@Saving"` and forward the click through `Save.InvokeAsync(true)`.
-- `SaveNppTask` sets `_saving = true`, validates the form, detects the missing TX license, shows the toaster, and returns without calling `CompleteNppTask`.
-- The parent’s `_pafIsSaving` binds **Review & Submit**, not these Save buttons. `PafFormComponent.razor.cs:505` is not reached on this validation failure.
+Stage only NppTaskForm.razor.cs (clear _saving before NotificationService.Open + StateHasChanged in finally).
 
-**Diff**
-Changed only `NppTaskForm.razor.cs`. The existing `try/finally` was preserved.
+EXCLUDE launchSettings, UnityApiLoadBalancer, Background, unrelated dirty files.
 
-```diff
- finally
- {
-     _saving = false;
-+    await InvokeAsync(StateHasChanged);
- }
+Commit message:
 
--private Task ShowValidationError(string message)
-+private async Task ShowValidationError(string message)
- {
--    return NotificationService.Open(new NotificationConfig
-+    _saving = false;
-+    await InvokeAsync(StateHasChanged);
-+
-+    await NotificationService.Open(new NotificationConfig
-```
+  fix(npp): clear ADD NPP Save spinner before validation toaster
 
-Both NPP Save buttons now receive the cleared loading state before the toaster wait. TX validation and non-NPP Save behavior are unchanged.
+  ShowValidationError awaited AntDesign Open (~100s) while _saving stayed
+  true, so Save kept loading after the TX-required toast (ADO 148170).
 
-**Verification**
-Client build passed in 113.6 seconds. Editor diagnostics and `git diff --check` passed.
-
-Browser QA is **not yet verified**: no authenticated app page is shared. Retest with a TX facility and CA/non-TX license: toaster appears and both Save spinners stop within approximately one second; then select a valid TX license and confirm Save succeeds.
-
-No commit or push performed.
+Then git push -u origin HEAD (no force).
+RETURN: hash, branch, push result.
