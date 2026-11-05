@@ -1,33 +1,15 @@
-Updated NPP-only rendering in two files.
+TASK-FIX-148697-FLASH — Hide Delegate on first NPP render
 
-**Before → After**
-In `PractitionerPanel.razor`, the Delegate tab and `DelegateDisplay` previously rendered unconditionally in the non-Recruitment branch. Both now require:
+QA: On /Paf/New the Delegate tab is visible by default. After clicking ADD NPP to Facility it hides.
+Current guard is only TaskSelected != TaskType.Npp, so the first render (TaskSelected not Npp yet) still shows the tab.
 
-```razor
-@if (StateContainer.PafState.TaskSelected != TaskType.Npp)
-```
+DO:
+1. Quote PractitionerPanel Delegate tab / DelegateDisplay and PafFormComponent Manage Delegate conditions.
+2. Also hide when PafStartingState.IsNppRequest is true (same flag used for Begin NPP PAF), OR TaskSelected == TaskType.Npp.
+3. Apply that to the tab, DelegateDisplay, and Manage Delegate card/editor so none of them render on the first NPP paint.
+4. Classic Begin PAF (IsNppRequest false and task not Npp) still shows Delegate.
+5. Build Client.
 
-In `PafFormComponent.razor`, the editor condition changed from:
+RETEST: Begin NPP PAF → /Paf/New → Delegate tab is absent before and after selecting ADD NPP. Classic Begin PAF still shows Delegate.
 
-```razor
-_viewState == PractitionerPafViewState.ManageDelegate
-```
-
-to:
-
-```razor
-_viewState == PractitionerPafViewState.ManageDelegate &&
-StateContainer.PafState.TaskSelected != TaskType.Npp
-```
-
-The Manage Delegate card already had an NPP exclusion in its CSS-class condition. It now uses the same `@if` guard, so the card is not rendered at all for NPP.
-
-Classic and other non-NPP visibility is preserved. Delegate save logic is untouched; the review form’s existing NPP exclusion remains unchanged.
-
-**Build**
-Both edited Razor files have no editor diagnostics. **Client build success is not verified**: direct build attempts were interrupted or returned no usable result. The fallback workspace build failed in API dependencies due to a locked `Hca.Credentialing.Api.Shared.dll` (`CS2012`/`MSB3027`), before reaching Client.
-
-**Retest**
-Browser QA remains pending: confirm an NPP PAF has no Delegate tab or Manage Delegate panel, then confirm a non-NPP PAF still shows both.
-
-No commit or push performed.
+RETURN: before/after, build. STOP for commit.
