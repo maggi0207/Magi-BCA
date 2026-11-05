@@ -1,34 +1,21 @@
-**Cause And Fix**
-`FindDuplicates` triggered Delegate Search when **email or SSN** was present, but the delegate request contained only email. Blank-email NPP requests with SSN therefore caused the 400.
+TASK-AUDIT-NPP-OPTIONAL-FIELDS — Same null-safe guard for every NPP optional field
 
-Added one shared guard in `PractitionerDuplicateCheckHelper.cs:23`:
+NPP optional fields (do NOT make them required):
+- Add New 131795: Email, Cell, DOB, SSN, Gender, Suffix
+- Verify 132247/248/252: blank email optional
+- Demographic 132279: Email, Cell, DOB, SSN, Gender optional
 
-```diff
-+ bool isNppRequest = false  // optional final parameter
+Already fixed: NPP + blank email skips Delegate Search (even when SSN is present), because /api/Delegate/Search requires Email Address.
 
--if (!string.IsNullOrWhiteSpace(emailAddress) || !string.IsNullOrWhiteSpace(ssn))
-+if (!(isNppRequest && string.IsNullOrWhiteSpace(emailAddress)) &&
-+    (!string.IsNullOrWhiteSpace(emailAddress) || !string.IsNullOrWhiteSpace(ssn)))
-```
+DO — NPP path ONLY (IsNppRequest or TaskSelected == TaskType.Npp). Non-NPP unchanged.
 
-Only Delegate Search is skipped. Practitioner duplicate matching remains active. The default `false` preserves non-NPP behavior.
+1. From Add New, Verify, and Demographic Save/Start, list every outbound call that uses Email, Cell, DOB, SSN, or Gender (FindDuplicates, Delegate Search, practitioner search, IdP, any other client).
+2. For each call, quote which parameter the API requires (must be present / cannot be null).
+3. For each optional field that can be blank on NPP, confirm the call is skipped or the parameter is omitted when that field is null/whitespace.
+4. If any path still sends a required parameter as null (Cell, DOB, SSN, Gender, or Email), add the same NPP-only guard. Do not skip practitioner duplicate checks that work without that field.
+5. Build Client.
 
-**Call Sites**
-- **Add New:** `ConfirmationWizardModal.razor.cs:206` passes `IsNppRequest`.
-- **Verify:** `VerifyExistingPractitionerForm.razor.cs:70` passes `_model.IsNppRequest && !_model.IsRecruitmentRole`. Its classic branch is unchanged.
-- **Demographic:** `ManagePractitionerInformationTask.razor.cs:198` passes `IsNppPaf`, supplied from `TaskSelected == TaskType.Npp`.
-- **CPC edit-time duplicate check:** `PractitionerPafPage.razor.cs:146` passes `_pafData.TaskSelected == TaskType.Npp`, preventing the same blank-email failure when reopening a new NPP.
+RETURN a table:
+| Field | Call | Required by API? | Blank on NPP today | Action (already safe / fixed) |
 
-These paths reach Delegate Search through the shared helper. Recruitment and separate practitioner-management Add New helpers were untouched. Email requirements and IdP behavior, including the existing blank-email skip, were not changed.
-
-**Verification**
-Client build passed on retry after the first build was interrupted. All five edited files have no editor diagnostics; scoped whitespace checks passed. A 16-case predicate matrix confirmed NPP blank-email skipping, filled-email searching, and unchanged non-NPP behavior.
-
-**Retest**
-Browser QA remains pending; no authenticated app page is shared.
-
-1. For NPP Demographic, Verify, and Add New, use blank email with otherwise valid data, including SSN where applicable. Save/Start should proceed without a Delegate Search request or 400.
-2. Repeat with email populated. Delegate Search must still run, and duplicate-email blocking must remain.
-3. For classic Begin PAF, confirm blank email is still rejected; populated email still follows the existing search flow.
-
-Changes are uncommitted. No commit or push performed.
+Plus diff if you changed code, build result, and retest for blank Email, blank SSN, blank Cell, blank DOB on NPP Save/Start. STOP for commit.
