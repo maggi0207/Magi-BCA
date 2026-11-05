@@ -1,13 +1,34 @@
-Fix the Active IPR Details page button alignment.
+Perform the final code review for FOREP-2703 / FOREP-2711 – Active IPR DELETE implementation.
 
-Move both Delete Active IPR and Save Changes buttons to the bottom-right corner of the form.
+Review all changes across:
+1. FACTS API repository
+2. Formulation API repository
+3. FACTS Angular UI repository
 
-Keep Delete on the left and Save Changes on the right, with consistent spacing.
+### Review checklist
+- Verify DELETE API implementation and end-to-end API client integration.
+- Verify LeadChemist-only DELETE permissions in permissions.csv and generated JSON.
+- Verify the permission generator output matches the committed JSON.
+- Verify the ActiveIprId formulation usage check.
+- Verify safe transactional deletion of child records and parent record.
+- Verify correct HTTP responses: 204, 401, 403, 404, 409 and unexpected errors.
+- Verify Angular Delete button visibility, placement beside Save Changes, Kendo confirmation dialog, API integration and navigation.
+- Verify existing Save Changes functionality is unaffected.
+- Review unit tests, build results and any regressions.
 
-Ensure both buttons have matching height, proper alignment, and consistent styling.
+### Git review
+- Inspect all staged and unstaged changes.
+- Check for unrelated files, accidental changes, duplicate code and generated-file inconsistencies.
+- Run relevant tests and builds for all affected repositories.
+- Do not discard or overwrite existing work.
 
-Fix the confirmation popup using the existing Kendo UI Dialog and Button components/styles. Align Cancel and Delete actions to the right.
+### Final action
+First provide a review report with:
+- Issues found and severity.
+- Tests/builds executed and results.
+- Files that need correction.
+- Whether the changes are safe to commit.
 
-Follow existing Kendo UI patterns and styling used elsewhere in the project.
+If any critical issue exists, stop and report it. Do not commit.
 
-Check responsive behavior and avoid changing any existing delete/save functionality.
+If the review passes, stage only the intended changes and create separate meaningful commits in each affected repository. Do not force-push or merge the GitLab MRs. Report the commit hashes and push status so I can verify the MRs before merging.
