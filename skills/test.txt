@@ -1,9 +1,15 @@
-TASK-FIX-148700 — Swap NPP Exception Search help text only
+TASK-FIX-148697 — Hide Manage Delegate on NPP only
 
-On the No-NPI / license Exception Search header, replace the SSN/NPI help sentence with:
+ADO 148697. ADD NPP PAF still shows the Delegate tab and Manage Delegate panel.
+132268 already required Delegate (and FSQ) hidden for NPP. QA still sees it.
 
-"To begin creating a PAF, please search for and select a Practitioner below. To search, enter a Reason and at least 2 characters for Last Name. First Name is optional. If you use a license, enter both State and License Number."
+DO:
+1. Find where the Delegate tab and Manage Delegate panel are rendered on the PAF task page. Quote the condition.
+2. Hide both when TaskSelected == TaskType.Npp (reuse the existing NPP hide if one exists and is incomplete).
+3. Do not hide Delegate on classic Begin PAF or other task types.
+4. Do not change delegate save logic.
+5. Build Client.
 
-Keep that exact opening clause. Do not change the classic /Practitioner/Search SSN/NPI/name sentence. Do not change validation or APIs. Build Client.
+RETEST: NPP PAF has no Delegate tab / Manage Delegate. A non-NPP PAF still shows it.
 
-RETURN: file, before/after, build. STOP for commit.
+RETURN: before/after quote, build. STOP for commit.
