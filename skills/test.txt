@@ -1,23 +1,30 @@
-TASK-FIX-148819 — Allow Add Address when a new NPP has no practitioner key
+Fixed in `ManageAddressesTask.razor.cs:74`.
 
-ADO 148819. Brand-new NPP has no practitioner key.
-ManageAddressesTask throws "Practitioner key is unavailable." before the affiliation API, then the catch disables Add Address with the "Unable to verify practitioner facility status" toast.
-A successful empty affiliation list already leaves Add enabled. Do not change that.
+Previously, a missing key always threw:
+```csharp
+throw new InvalidOperationException("Practitioner key is unavailable.");
+```
+The catch then set `_disablePrimaryAddressAdd = true` and showed the verification-error toast.
 
-Requirements: 132327 / 132341 — no primary and no affiliations → Add Address enabled.
-132308 — real lookup failure or active affiliations → keep Add disabled.
+**Diff**
+```diff
+ if (string.IsNullOrWhiteSpace(practitionerKey))
++{
++    if (StateContainer.PafState.TaskSelected == TaskType.Npp || IsNewPractitioner)
++        return;
++
+     throw new InvalidOperationException("Practitioner key is unavailable.");
++}
+```
+Also added the `TaskType` namespace import. This check is still invoked only for `IsNppPaf`, so Begin PAF behavior is unchanged.
 
-DO:
-1. Quote the missing-key throw and the catch that sets _disablePrimaryAddressAdd.
-2. When TaskSelected == TaskType.Npp (or the practitioner is new) AND the key is missing, do not throw and do not disable Add. Treat it as no affiliations.
-3. Keep the disable when the affiliation call fails, returns null, or finds active facilities with an existing primary.
-4. Do not change Begin PAF.
-5. Build Client.
+**Verification**
+Client build passed in **118.2 seconds**, exit code **0**. Scoped whitespace check passed.
 
-RETEST:
-- New NPP with no key: toast gone, Add Address enabled, address can be saved.
-- Keyed practitioner with no facilities: Add still enabled.
-- Lookup failure: Add still blocked.
-- Active affiliation plus primary: privileges message, Add still blocked.
+Browser retests remain pending:
+- **New NPP, no key:** no affiliation lookup or verification toast; Add Address enabled. Confirm an address can be saved.
+- **Keyed, no facilities:** existing empty-result behavior still enables Add.
+- **Lookup throws or returns null:** existing catch still disables Add and shows the standard error.
+- **Active affiliation plus existing primary:** existing privileges message and Add lock remain unchanged.
 
-RETURN: diff, build, retest. STOP for commit.
+No commit or push performed.
