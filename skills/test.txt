@@ -1,20 +1,37 @@
-TASK-FIX-148170 — Save spinner stuck when TX-required toaster shows
+**Root Cause**
+`_saving` stayed true while `ShowValidationError` awaited `NotificationService.Open`. AntDesign 0.13.3 waits for the notification’s removal timer; this toaster uses `Duration = 100`. Cleanup after the await, including `finally`, therefore ran about 100 seconds later.
 
-CONFIRMED repro (screenshot): ADD NPP Save with missing TX license →
-toaster "A state license in the state of 'TX' is required for PAF submission."
-AND Save button remains in loading/spinner state at the same time.
+**Save Path**
+- `NppTaskForm.razor:10` passes `Save="@SaveNppTask" Saving="@_saving"` to both header and footer.
+- `TaskHeader.razor` and `TaskFooter.razor` bind Save with `Loading="@Saving"` and forward the click through `Save.InvokeAsync(true)`.
+- `SaveNppTask` sets `_saving = true`, validates the form, detects the missing TX license, shows the toaster, and returns without calling `CompleteNppTask`.
+- The parent’s `_pafIsSaving` binds **Review & Submit**, not these Save buttons. `PafFormComponent.razor.cs:505` is not reached on this validation failure.
 
-Code already has after ShowValidationError:
-  _saving = false; return;
-That is NOT enough — spinner still stuck (parent _pafIsSaving / TaskFooter Loading / missing StateHasChanged / await order).
+**Diff**
+Changed only `NppTaskForm.razor.cs`. The existing `try/finally` was preserved.
 
-DO:
-1. Quote what binds Save button Loading (NppTaskForm _saving vs PafFormComponent _pafIsSaving vs TaskFooter).
-2. Trace Save click from footer/header into SaveNppTask missing-license branch.
-3. Fix so when TX-required toaster is shown, ALL busy/loading flags clear immediately (use try/finally). Call StateHasChanged if needed.
-4. Keep TX license requirement. Do not change non-NPP Save.
-5. Build Client.
+```diff
+ finally
+ {
+     _saving = false;
++    await InvokeAsync(StateHasChanged);
+ }
 
-QA: CA (or non-TX) Save → toaster appears AND Save spinner stops within ~1s; then set TX → Save succeeds.
+-private Task ShowValidationError(string message)
++private async Task ShowValidationError(string message)
+ {
+-    return NotificationService.Open(new NotificationConfig
++    _saving = false;
++    await InvokeAsync(StateHasChanged);
++
++    await NotificationService.Open(new NotificationConfig
+```
 
-RETURN: root cause (which flag stayed true), diff, build, retest. STOP for commit/push.
+Both NPP Save buttons now receive the cleared loading state before the toaster wait. TX validation and non-NPP Save behavior are unchanged.
+
+**Verification**
+Client build passed in 113.6 seconds. Editor diagnostics and `git diff --check` passed.
+
+Browser QA is **not yet verified**: no authenticated app page is shared. Retest with a TX facility and CA/non-TX license: toaster appears and both Save spinners stop within approximately one second; then select a valid TX license and confirm Save succeeds.
+
+No commit or push performed.
