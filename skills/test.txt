@@ -1,15 +1,28 @@
-TASK-COMMIT-PUSH-148170 — Commit Save spinner fix and push
+TASK-FIX-NPP-DELEGATE-400 — Skip Delegate Search when NPP email is blank
 
-Stage only NppTaskForm.razor.cs (clear _saving before NotificationService.Open + StateHasChanged in finally).
+Confirmed QA: Demographic Save with blank email →
+POST /api/Delegate/Search → 400
+"Value cannot be null. (Parameter 'Email Address must be present.')"
+Stack: FindDuplicates → DelegateClient.SearchExistingDelegatesAsync
 
-EXCLUDE launchSettings, UnityApiLoadBalancer, Background, unrelated dirty files.
+Tickets: NPP email is OPTIONAL (131795 Add New, 132247/132248/132252 Verify, 132279 Demographic).
+Do NOT make Email required.
 
-Commit message:
+SCOPE — NPP ONLY:
+- Gate with existing IsNppRequest or TaskSelected == TaskType.Npp.
+- If NPP AND email null/whitespace: skip email-required Delegate/duplicate API.
+- If email is present: keep the existing search.
+- If NOT NPP: no behavior change (Begin PAF still requires email and still calls the API).
 
-  fix(npp): clear ADD NPP Save spinner before validation toaster
+DO:
+1. Find every FindDuplicates / SearchExistingDelegatesAsync call from Add New, Verify, and Demographic.
+2. Apply one shared NPP blank-email guard at the helper if all those paths go through it; otherwise guard each NPP call site. Quote the gate.
+3. Do not change non-NPP, Recruitment, or IdP-when-email-present behavior (148169 blank-email IdP skip stays).
+4. Build Client.
 
-  ShowValidationError awaited AntDesign Open (~100s) while _saving stayed
-  true, so Save kept loading after the TX-required toast (ADO 148170).
+RETEST:
+- NPP Demographic / Verify / Add New with blank email: Save or Start succeeds, no Delegate 400
+- Same paths with email filled: search still runs
+- Classic Begin PAF: Email still required, unchanged
 
-Then git push -u origin HEAD (no force).
-RETURN: hash, branch, push result.
+RETURN: call sites, diff, build, retest steps. STOP for commit.
