@@ -1,16 +1,33 @@
-Inspect the existing Angular project to understand how icons are currently rendered.
+Make the following UI refinements on the Active IPR Details page.
 
-1. Search the application for existing Delete, Trash, Edit, Close and other action icons.
-2. Identify which icon library or component is being used (Font Awesome, Bootstrap Icons, Material Icons, SVG, etc.).
-3. Check the HTML templates, imports and dependencies to understand the existing implementation pattern.
-4. Find an existing example of a delete/trash icon and reuse exactly the same approach.
-5. Apply that icon to the Delete Active IPR button.
+### 1. Move Delete button
+- Move the **Delete Active IPR** button from the bottom-left to the bottom-right.
+- Position it immediately to the left of the existing **Save Changes** button.
+- Keep both buttons horizontally aligned with consistent spacing.
+- Preserve the existing red styling for Delete and the current Save Changes styling.
+- Ensure the layout is responsive.
 
-Important:
-- Do not introduce a new icon library or dependency.
-- Do not use Unicode characters or emoji.
-- Follow existing project conventions.
-- If no delete icon exists, keep only the "Delete Active IPR" text.
-- Do not change button functionality or styling.
+### 2. Improve the Delete confirmation popup
+The current confirmation popup looks like a basic HTML dialog and does not match the application's UI.
 
-First report the existing icon implementation pattern and the files where it is used, then make the minimal required change.
+- Inspect existing Kendo UI Angular dialog and confirmation components used elsewhere in the project.
+- Reuse the existing Kendo UI Dialog/Window and button components.
+- Match the application's existing Kendo UI theme, typography, spacing, borders and button styles.
+- Use the title **Confirm Delete**.
+- Display the message:
+
+  "Are you sure you want to delete this Active IPR? This action cannot be undone."
+
+- Provide properly styled **Cancel** and **Delete** buttons.
+- Make Delete the destructive action using the existing danger-button styling.
+- Ensure the popup is centered and has appropriate width and spacing.
+- Support closing through the existing Kendo dialog close mechanism.
+
+### 3. Important constraints
+- Do not create a custom popup using plain HTML/CSS if an existing Kendo UI component is available.
+- Reuse existing dialog and button patterns from the application.
+- Do not introduce new dependencies.
+- Do not change DELETE API integration, role restrictions, confirmation logic or response handling.
+- Keep the existing Save Changes functionality unchanged.
+
+First inspect existing Kendo UI dialog implementations and identify the best reusable example. Then make the minimal changes and verify the UI.
