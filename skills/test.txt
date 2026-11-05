@@ -1,58 +1,16 @@
-Implement FOREP-2711 – Connect Active IPR DELETE API to the Angular UI.
+Inspect the existing Angular project to understand how icons are currently rendered.
 
-### 1. Button placement
-On the existing Active IPR Details page (`active-ipr-details`):
-- Add a red **Delete Active IPR** button with a trash icon at the bottom-left.
-- Keep the existing **Save Changes** button at the bottom-right without changing its behaviour.
-- Display the Delete button only when `mode=existing`.
-- Do not show it when creating a new Active IPR.
+1. Search the application for existing Delete, Trash, Edit, Close and other action icons.
+2. Identify which icon library or component is being used (Font Awesome, Bootstrap Icons, Material Icons, SVG, etc.).
+3. Check the HTML templates, imports and dependencies to understand the existing implementation pattern.
+4. Find an existing example of a delete/trash icon and reuse exactly the same approach.
+5. Apply that icon to the Delete Active IPR button.
 
-### 2. Role-based visibility
-- Only users with the `LeadChemist` role should see and use the Delete button.
-- Follow the existing authentication and role-checking patterns in the application.
-- Do not introduce a separate role-management mechanism.
-- Backend authorization remains the final security enforcement.
+Important:
+- Do not introduce a new icon library or dependency.
+- Do not use Unicode characters or emoji.
+- Follow existing project conventions.
+- If no delete icon exists, keep only the "Delete Active IPR" text.
+- Do not change button functionality or styling.
 
-### 3. Confirmation dialog
-When the user clicks Delete:
-- Show a confirmation dialog.
-- Message: "Are you sure you want to delete this Active IPR? This action cannot be undone."
-- Provide Cancel and Delete actions.
-- Do not call the API if the user cancels.
-
-### 4. API integration
-Use the existing API client/service and connect to:
-
-`DELETE /api/ActiveReaction/{activeIprId}`
-
-- Pass the current Active IPR ID from the details page.
-- Do not hardcode the ID.
-- Prevent multiple delete requests while one is in progress.
-
-### 5. Response handling
-- **204:** Show a success notification and navigate back to the Active IPR search/list page. Refresh the results.
-- **409:** Show a user-friendly message that the Active IPR is currently referenced by a formulation concept and cannot be deleted.
-- **404:** Show that the Active IPR was not found.
-- **403:** Show an appropriate permission error.
-- **401:** Follow existing authentication handling.
-- **Other errors:** Display a generic failure notification.
-
-### 6. Testing
-Add or update unit tests to verify:
-- Delete button visibility for existing versus new records.
-- Delete button visibility for LeadChemist versus other roles.
-- Confirmation and cancellation behaviour.
-- Correct Active IPR ID passed to the API.
-- Successful deletion and navigation.
-- 409, 404 and authorization error handling.
-- Duplicate requests are prevented.
-
-### 7. Implementation guidelines
-- First inspect the existing component, API service, routing, confirmation dialog and notification patterns.
-- Reuse existing components and styles.
-- Keep the existing Save Changes and Edit functionality unchanged.
-- Avoid unrelated refactoring or backend changes.
-- Do not duplicate existing API methods.
-- Run relevant unit tests and Angular build.
-
-Before implementation, briefly report the files you plan to modify. After implementation, summarize the files changed, behaviour implemented, and test/build results.
+First report the existing icon implementation pattern and the files where it is used, then make the minimal required change.
