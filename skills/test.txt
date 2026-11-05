@@ -1,33 +1,13 @@
-Make the following UI refinements on the Active IPR Details page.
+Fix the Active IPR Details page button alignment.
 
-### 1. Move Delete button
-- Move the **Delete Active IPR** button from the bottom-left to the bottom-right.
-- Position it immediately to the left of the existing **Save Changes** button.
-- Keep both buttons horizontally aligned with consistent spacing.
-- Preserve the existing red styling for Delete and the current Save Changes styling.
-- Ensure the layout is responsive.
+Move both Delete Active IPR and Save Changes buttons to the bottom-right corner of the form.
 
-### 2. Improve the Delete confirmation popup
-The current confirmation popup looks like a basic HTML dialog and does not match the application's UI.
+Keep Delete on the left and Save Changes on the right, with consistent spacing.
 
-- Inspect existing Kendo UI Angular dialog and confirmation components used elsewhere in the project.
-- Reuse the existing Kendo UI Dialog/Window and button components.
-- Match the application's existing Kendo UI theme, typography, spacing, borders and button styles.
-- Use the title **Confirm Delete**.
-- Display the message:
+Ensure both buttons have matching height, proper alignment, and consistent styling.
 
-  "Are you sure you want to delete this Active IPR? This action cannot be undone."
+Fix the confirmation popup using the existing Kendo UI Dialog and Button components/styles. Align Cancel and Delete actions to the right.
 
-- Provide properly styled **Cancel** and **Delete** buttons.
-- Make Delete the destructive action using the existing danger-button styling.
-- Ensure the popup is centered and has appropriate width and spacing.
-- Support closing through the existing Kendo dialog close mechanism.
+Follow existing Kendo UI patterns and styling used elsewhere in the project.
 
-### 3. Important constraints
-- Do not create a custom popup using plain HTML/CSS if an existing Kendo UI component is available.
-- Reuse existing dialog and button patterns from the application.
-- Do not introduce new dependencies.
-- Do not change DELETE API integration, role restrictions, confirmation logic or response handling.
-- Keep the existing Save Changes functionality unchanged.
-
-First inspect existing Kendo UI dialog implementations and identify the best reusable example. Then make the minimal changes and verify the UI.
+Check responsive behavior and avoid changing any existing delete/save functionality.
