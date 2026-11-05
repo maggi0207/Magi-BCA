@@ -1,30 +1,17 @@
-Fixed in `ManageAddressesTask.razor.cs:74`.
+TASK-COMMIT-148819 — Commit new-NPP address gate only
 
-Previously, a missing key always threw:
-```csharp
-throw new InvalidOperationException("Practitioner key is unavailable.");
-```
-The catch then set `_disablePrimaryAddressAdd = true` and showed the verification-error toast.
+Stage only ManageAddressesTask.razor.cs.
 
-**Diff**
-```diff
- if (string.IsNullOrWhiteSpace(practitionerKey))
-+{
-+    if (StateContainer.PafState.TaskSelected == TaskType.Npp || IsNewPractitioner)
-+        return;
-+
-     throw new InvalidOperationException("Practitioner key is unavailable.");
-+}
-```
-Also added the `TaskType` namespace import. This check is still invoked only for `IsNppPaf`, so Begin PAF behavior is unchanged.
+Do not stage Delegate-hide files, email-guard files, launchSettings, or unrelated files. Do not push.
 
-**Verification**
-Client build passed in **118.2 seconds**, exit code **0**. Scoped whitespace check passed.
+Commit message:
 
-Browser retests remain pending:
-- **New NPP, no key:** no affiliation lookup or verification toast; Add Address enabled. Confirm an address can be saved.
-- **Keyed, no facilities:** existing empty-result behavior still enables Add.
-- **Lookup throws or returns null:** existing catch still disables Add and shows the standard error.
-- **Active affiliation plus existing primary:** existing privileges message and Add lock remain unchanged.
+  fix(npp): allow Add Address when a new NPP has no practitioner key
 
-No commit or push performed.
+  A missing key threw before the affiliation lookup and was shown as
+  "Unable to verify practitioner facility status," which blocked Add
+  Address for a brand-new provider (ADO 148819).
+
+Then git status and git show --stat HEAD.
+
+RETURN: hash, files in the commit, anything left dirty.
