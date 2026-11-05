@@ -1,34 +1,8 @@
-Perform the final code review for FOREP-2703 / FOREP-2711 – Active IPR DELETE implementation.
+Fix all Datadog code-quality comments related to the use of `any` in the Active IPR delete implementation.
 
-Review all changes across:
-1. FACTS API repository
-2. Formulation API repository
-3. FACTS Angular UI repository
-
-### Review checklist
-- Verify DELETE API implementation and end-to-end API client integration.
-- Verify LeadChemist-only DELETE permissions in permissions.csv and generated JSON.
-- Verify the permission generator output matches the committed JSON.
-- Verify the ActiveIprId formulation usage check.
-- Verify safe transactional deletion of child records and parent record.
-- Verify correct HTTP responses: 204, 401, 403, 404, 409 and unexpected errors.
-- Verify Angular Delete button visibility, placement beside Save Changes, Kendo confirmation dialog, API integration and navigation.
-- Verify existing Save Changes functionality is unaffected.
-- Review unit tests, build results and any regressions.
-
-### Git review
-- Inspect all staged and unstaged changes.
-- Check for unrelated files, accidental changes, duplicate code and generated-file inconsistencies.
-- Run relevant tests and builds for all affected repositories.
-- Do not discard or overwrite existing work.
-
-### Final action
-First provide a review report with:
-- Issues found and severity.
-- Tests/builds executed and results.
-- Files that need correction.
-- Whether the changes are safe to commit.
-
-If any critical issue exists, stop and report it. Do not commit.
-
-If the review passes, stage only the intended changes and create separate meaningful commits in each affected repository. Do not force-push or merge the GitLab MRs. Report the commit hashes and push status so I can verify the MRs before merging.
+1. Replace `any` in `handleDeleteError` with an appropriate error type, preferably `unknown` with proper type checking.
+2. Replace `any` in the test mocks with the correct Angular service/interface types.
+3. Follow existing typing and mocking patterns used in nearby components and spec files.
+4. Do not use type assertions just to suppress warnings.
+5. Run the relevant unit tests and Angular build.
+6. Keep the changes limited to these code-quality fixes. Do not modify existing functionality.
