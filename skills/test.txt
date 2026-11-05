@@ -1,20 +1,40 @@
-TASK-148819 — Cross-check facility-status gate with 132327 / 132341 / 132308
+**STOP: Successful empty results are already safe.** The reported new-NPP case points to the **missing practitioner key branch**, not an empty affiliation result. No code changed.
 
-ADO 148819. Brand-new NPP (no facilities) sees:
-"Unable to verify practitioner facility status. Adding a primary address is unavailable until facility status can be verified."
-Add Address is blocked, so the PAF cannot be submitted.
+**Toast And Gate**
+`ManageAddressesTask.razor.cs:74` rejects a missing key before calling the API:
 
-Requirements:
-- 132327: no primary → "No Primary Address on File" and Add Address ENABLED.
-- 132341: no active affiliations → Add Address ENABLED.
-- 132341/132308: affiliation cannot be verified → disable Add and show the standard error. Keep this.
-- 132308: active affiliations → disable Add with the privileges message. Keep this.
+```csharp
+if (string.IsNullOrWhiteSpace(practitionerKey))
+    throw new InvalidOperationException("Practitioner key is unavailable.");
+```
 
-DO:
-1. Quote the toast and the condition that disables Add Address.
-2. Quote what the affiliation call returns for a new practitioner with no facilities: empty list, null, or an error.
-3. If a successful empty result is treated as "cannot verify", fix only that case so Add Address is enabled (132327/132341). Do not allow Add when the call actually fails.
-4. Do not change the active-affiliation lock or Begin PAF behavior.
-5. Build Client if you change code.
+Its catch sets `_disablePrimaryAddressAdd = true` and shows:
 
-RETURN: which branch QA hit, quote, diff or STOP, retest for new NPP (Add enabled), lookup failure (still blocked), and active affiliation (still blocked).
+> Unable to verify practitioner facility status.  
+> Adding a primary address is unavailable until facility status can be verified.
+
+`ManageAddresses.razor:8` binds the button to `Disabled="@DisableAddAddress"`.
+
+**Affiliation Result**
+- **Brand-new, keyless practitioner:** no affiliation request occurs; the local missing-key exception blocks Add. This is the source-indicated QA branch, not runtime-confirmed.
+- **Keyed practitioner with no matching facilities:** `FacilityRepository.cs:232` uses `QueryAsync`, returning an empty collection. That leaves Add enabled.
+- **Null or exception:** treated as unverifiable and blocked.
+
+The existing active-affiliation lock is:
+
+```csharp
+if (_primaryAddresses.Any() && activeFacilities.Any())
+```
+
+It disables Add with the privileges message. That condition is untouched. Non-NPP skips this check entirely.
+
+**Next Decision**
+Fixing the keyless-new-practitioner case would require an explicit exemption for a verified new practitioner, not an empty-result correction. I have not added that exemption because your instruction limits the fix to successful empty results and preserves unverifiable-status blocking.
+
+**Retest**
+- New NPP without a key: currently still blocked; confirm the missing-key branch with a breakpoint.
+- Successful empty affiliation lookup: Add enabled.
+- Lookup failure/null: Add remains blocked with the standard error.
+- Existing primary address plus active affiliation: Add remains blocked with the privileges message.
+
+No diff, build, commit, or push.
