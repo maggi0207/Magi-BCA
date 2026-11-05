@@ -1,15 +1,58 @@
-TASK-FIX-148697-FLASH — Hide Delegate on first NPP render
+Implement FOREP-2711 – Connect Active IPR DELETE API to the Angular UI.
 
-QA: On /Paf/New the Delegate tab is visible by default. After clicking ADD NPP to Facility it hides.
-Current guard is only TaskSelected != TaskType.Npp, so the first render (TaskSelected not Npp yet) still shows the tab.
+### 1. Button placement
+On the existing Active IPR Details page (`active-ipr-details`):
+- Add a red **Delete Active IPR** button with a trash icon at the bottom-left.
+- Keep the existing **Save Changes** button at the bottom-right without changing its behaviour.
+- Display the Delete button only when `mode=existing`.
+- Do not show it when creating a new Active IPR.
 
-DO:
-1. Quote PractitionerPanel Delegate tab / DelegateDisplay and PafFormComponent Manage Delegate conditions.
-2. Also hide when PafStartingState.IsNppRequest is true (same flag used for Begin NPP PAF), OR TaskSelected == TaskType.Npp.
-3. Apply that to the tab, DelegateDisplay, and Manage Delegate card/editor so none of them render on the first NPP paint.
-4. Classic Begin PAF (IsNppRequest false and task not Npp) still shows Delegate.
-5. Build Client.
+### 2. Role-based visibility
+- Only users with the `LeadChemist` role should see and use the Delete button.
+- Follow the existing authentication and role-checking patterns in the application.
+- Do not introduce a separate role-management mechanism.
+- Backend authorization remains the final security enforcement.
 
-RETEST: Begin NPP PAF → /Paf/New → Delegate tab is absent before and after selecting ADD NPP. Classic Begin PAF still shows Delegate.
+### 3. Confirmation dialog
+When the user clicks Delete:
+- Show a confirmation dialog.
+- Message: "Are you sure you want to delete this Active IPR? This action cannot be undone."
+- Provide Cancel and Delete actions.
+- Do not call the API if the user cancels.
 
-RETURN: before/after, build. STOP for commit.
+### 4. API integration
+Use the existing API client/service and connect to:
+
+`DELETE /api/ActiveReaction/{activeIprId}`
+
+- Pass the current Active IPR ID from the details page.
+- Do not hardcode the ID.
+- Prevent multiple delete requests while one is in progress.
+
+### 5. Response handling
+- **204:** Show a success notification and navigate back to the Active IPR search/list page. Refresh the results.
+- **409:** Show a user-friendly message that the Active IPR is currently referenced by a formulation concept and cannot be deleted.
+- **404:** Show that the Active IPR was not found.
+- **403:** Show an appropriate permission error.
+- **401:** Follow existing authentication handling.
+- **Other errors:** Display a generic failure notification.
+
+### 6. Testing
+Add or update unit tests to verify:
+- Delete button visibility for existing versus new records.
+- Delete button visibility for LeadChemist versus other roles.
+- Confirmation and cancellation behaviour.
+- Correct Active IPR ID passed to the API.
+- Successful deletion and navigation.
+- 409, 404 and authorization error handling.
+- Duplicate requests are prevented.
+
+### 7. Implementation guidelines
+- First inspect the existing component, API service, routing, confirmation dialog and notification patterns.
+- Reuse existing components and styles.
+- Keep the existing Save Changes and Edit functionality unchanged.
+- Avoid unrelated refactoring or backend changes.
+- Do not duplicate existing API methods.
+- Run relevant unit tests and Angular build.
+
+Before implementation, briefly report the files you plan to modify. After implementation, summarize the files changed, behaviour implemented, and test/build results.
