@@ -1,18 +1,20 @@
-TASK-FIX-148170 — Clear save loading after TX-required validation
+TASK-FIX-148170 — Save spinner stuck when TX-required toaster shows
 
-QA/user repro (2026-11-05):
-1. ADD NPP, new license State=CA → Save
-2. Toast: "A state license in the state of 'TX' is required..."
-3. Save button KEEPS LOADING
-4. Change State to TX → Save SUCCEEDS
+CONFIRMED repro (screenshot): ADD NPP Save with missing TX license →
+toaster "A state license in the state of 'TX' is required for PAF submission."
+AND Save button remains in loading/spinner state at the same time.
 
-So TX path works. Bug = busy/loading stuck after CA validation error.
+Code already has after ShowValidationError:
+  _saving = false; return;
+That is NOT enough — spinner still stuck (parent _pafIsSaving / TaskFooter Loading / missing StateHasChanged / await order).
 
 DO:
-1. Quote NppTaskForm.SaveNppTask missing-license branch + how _saving is set/cleared.
-2. Quote parent PafFormComponent / TaskFooter save busy flags.
-3. Ensure every early-return validation path (including ShowValidationError for missing TX) clears _saving in finally (and parent flag if owned there).
-4. Do not weaken TX facility license requirement.
-5. Build Client. Document retest: CA Save → toast + Save NOT stuck loading; then TX Save succeeds.
+1. Quote what binds Save button Loading (NppTaskForm _saving vs PafFormComponent _pafIsSaving vs TaskFooter).
+2. Trace Save click from footer/header into SaveNppTask missing-license branch.
+3. Fix so when TX-required toaster is shown, ALL busy/loading flags clear immediately (use try/finally). Call StateHasChanged if needed.
+4. Keep TX license requirement. Do not change non-NPP Save.
+5. Build Client.
 
-RETURN: root cause quote, diff, build, retest. STOP for commit.
+QA: CA (or non-TX) Save → toaster appears AND Save spinner stops within ~1s; then set TX → Save succeeds.
+
+RETURN: root cause (which flag stayed true), diff, build, retest. STOP for commit/push.
