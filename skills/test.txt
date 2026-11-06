@@ -1,25 +1,39 @@
-TASK-FIX-ISSUE3 — Blank NPP email must not fail the delegate-email check
+**Root Cause**
+The exact rejection is in `PafFormComponent.razor.cs:885`, method `ShowReviewAndSubmit()`:
 
-New practitioner Test NPPTESTS. Demographic, Addresses, Specialties, and ADD NPP are Complete.
-Review & Submit shows Email blank.
-Submit toast:
-  PAF Incomplete
-  Practitioner email cannot be the same as the Delegate email
+```csharp
+if(PafData.PractitionerDemographicTask?.Email == PafData.ManageDelegateTask.Delegate?.EmailAddress)
+{
+    var message = "Practitioner email cannot be the same as the Delegate email";
+```
 
-Existing practitioners can submit.
-Opening Demographic and clicking Save with no edits lets this new practitioner submit.
+**Before/After Values**
+These are source-derived values for the untouched new-NPP path, not runtime-inspected values for Test NPPTESTS.
 
-NPP email is optional. The Delegate card is hidden on NPP (132268). A blank practitioner email must not be compared to a delegate email.
+| Point | Practitioner email | Delegate email | Original comparison |
+|---|---|---|---|
+| Before Demographic Save | `null` | `null` | `true`, rejects |
+| After successful no-edit Save | `""` (empty) | `null` | `false`, passes |
 
-DO:
-1. Search the exact string "Practitioner email cannot be the same as the Delegate email". Quote the file, method, and the comparison. Do not guess the file.
-2. Quote both values being compared on a new NPP before any Demographic save, and again after a no-edit Demographic save. Show whether each side is null, empty, or whitespace.
-3. Do not code until those quotes are in the reply. Then change only the NPP path:
-   - If the PAF is NPP and the practitioner email is null or whitespace, skip this comparison. Do not toast.
-   - If both emails are non-blank and equal, keep the existing rejection wherever that rule already applies.
-   - Classic Begin PAF and other PAF types keep the current comparison.
-4. Do not make Email required. Do not show or require the Delegate card.
+Initialization preserves the blank model value through `EmailAddress = _model.Email?.Trim()`. Demographic Save instead emits:
 
-Build the project that owns the check. Run git diff --check on touched files. Do not commit. Do not push.
+```csharp
+Email = _model.Email?.Trim() ?? string.Empty
+```
 
-RETURN: quoted comparison, before/after values, diff, build result, and what you did not change.
+That converts null, empty, or whitespace-only email to `""`; it does not change the delegate.
+
+**Diff**
+```diff
+-if(PafData.PractitionerDemographicTask?.Email == PafData.ManageDelegateTask.Delegate?.EmailAddress)
++if ((StateContainer.PafState.TaskSelected != TaskType.Npp ||
++     !string.IsNullOrWhiteSpace(PafData.PractitionerDemographicTask?.Email)) &&
++    PafData.PractitionerDemographicTask?.Email == PafData.ManageDelegateTask.Delegate?.EmailAddress)
+```
+
+NPP null/empty/whitespace practitioner email now skips this comparison. Matching nonblank emails still trigger the existing rejection. Classic and other PAF types retain the original comparison.
+
+**Verification**
+Client, the owning project, built successfully in **147.5 seconds**, exit code **0**. `git diff --check` passed for the touched file.
+
+Email requiredness, Delegate-card visibility, save normalization, APIs, and other submission checks were not changed. Browser QA remains pending. No commit or push performed.
