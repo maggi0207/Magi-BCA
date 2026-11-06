@@ -1,21 +1,50 @@
-TASK-FIX-ISSUE1 — Begin NPP PAF shows only ADD NPP to Facility
+Updated `PafTaskSelection.razor.cs:175` so **Begin NPP PAF keeps only ADD NPP to Facility** for both new and existing practitioners.
 
-Begin NPP PAF (IsNppRequest) still lists other actions.
-Existing practitioner (Passmore): Personal Info, Add Practitioner to Facility, Request Processing Change, Off-Cycle RRFC, Off-Cycle PSV, Add Privilege MSS-18, and ADD NPP.
-New practitioner (NPPTESTS): Add Practitioner to Facility and ADD NPP.
+**List Construction**
+The component requests:
+```csharp
+Mode = isNewPractitioner
+    ? TaskAllowedListMode.NewPractitioner
+    : TaskAllowedListMode.ExistingPractitioner
+```
 
-Expected: on the Begin NPP PAF path only, both new and existing practitioners see only ADD NPP to Facility.
-Classic Begin PAF is unchanged: ADD NPP stays hidden (148067). Do not remove actions from classic Begin PAF.
+`TaskDeterminationService.cs:23` builds those lists:
+- New practitioner: Add Practitioner to Facility, plus NPP for eligible MSP mode.
+- Existing practitioner: personal information and other applicable actions, plus NPP when eligible facilities exist.
 
-DO:
-1. Quote PafTaskSelection / TaskDeterminationService where the action list is built for new vs existing, and where IsNppRequest already filters NPP off the classic path.
-2. When IsNppRequest is true, keep only TaskType.Npp. Apply this for both new and existing practitioners.
-3. Do not change eligibility inside ADD NPP itself.
-4. Build Client.
+Those service rules are unchanged.
 
-RETEST:
-- Begin NPP PAF, existing practitioner: only ADD NPP.
-- Begin NPP PAF, new practitioner: only ADD NPP.
-- Classic Begin PAF: other actions remain; ADD NPP stays hidden.
+**Before**
+Only the classic entry path filtered the returned list:
+```csharp
+if (!IsExistingPaf && !StateContainer.PafStartingState.IsNppRequest)
+{
+    _currentAvailableTasks = _currentAvailableTasks
+        .Where(task => task.Type != TaskType.Npp)
+        .ToList();
+}
+```
 
-RETURN: before/after, build. STOP for commit.
+**After**
+```csharp
+if (!IsExistingPaf)
+{
+    _currentAvailableTasks = _currentAvailableTasks
+        .Where(task => StateContainer.PafStartingState.IsNppRequest
+            ? task.Type == TaskType.Npp
+            : task.Type != TaskType.Npp)
+        .ToList();
+}
+```
+
+This filters the eligible list rather than adding NPP, so eligibility inside ADD NPP is preserved. Classic Begin PAF retains its other actions and continues hiding NPP.
+
+**Verification**
+Client build passed in **113.1 seconds**, exit code **0**. Scoped whitespace check passed.
+
+Browser QA remains pending:
+1. Begin NPP, existing practitioner: only ADD NPP.
+2. Begin NPP, new practitioner: only ADD NPP.
+3. Classic Begin PAF: other actions remain; ADD NPP absent.
+
+No commit or push performed.
