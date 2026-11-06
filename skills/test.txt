@@ -1,19 +1,34 @@
-TASK-FIX-ISSUE2 — No “Unable to load state licenses” toast for a new NPP
+**Root Cause**
+In `NppTaskForm.razor.cs:100`, initialization previously threw before any API call when the practitioner had no key:
 
-New practitioner opens ADD NPP to Facility and a toast appears immediately: "Unable to load state licenses." The user did not click anything. Existing practitioners do not get this toast.
+```csharp
+if (string.IsNullOrWhiteSpace(practitionerKey))
+    throw new InvalidOperationException("Practitioner key is unavailable.");
+```
 
-A new practitioner has no practitioner key and no licenses yet. That is not a load failure.
+The catch then showed `"Unable to load state licenses."`
 
-DO:
-1. Quote where the toast "Unable to load state licenses" is raised (NppTaskForm or license load).
-2. Quote what it calls and what happens when the practitioner key is missing or the license list is empty.
-3. For a new NPP / missing key / successful empty license list: do not show the error toast. Leave the license section empty so the user can add a license.
-4. Keep the toast only when a keyed practitioner's license call actually fails.
-5. Do not change existing-practitioner license recall. Build Client.
+For keyed practitioners, it calls:
+```csharp
+CactusClient.PractitionerLicenses.GetPractitionerStateLicensesAsync(practitionerKey)
+```
+A successful empty list already loads without a toast. A null result or exception still triggers the error toast.
 
-RETEST:
-- New NPP → ADD NPP: no toast; form is usable.
-- Existing NPP with licenses: licenses still load, no false toast.
-- Force a real license API failure if you can: toast still appears.
+**Diff**
+```diff
+ if (string.IsNullOrWhiteSpace(practitionerKey))
+-    throw new InvalidOperationException("Practitioner key is unavailable.");
++    return;
+```
 
-RETURN: root cause quote, diff, build. STOP for commit.
+The missing-key path now leaves the initialized `_licenses` list empty. Existing-practitioner recall, new-license entry, and keyed failure handling are unchanged.
+
+**Verification**
+Client build passed in **104.8 seconds**, exit code **0**. Scoped whitespace check passed.
+
+Browser retests remain pending:
+- New NPP → ADD NPP: no load-error toast; form and new-license entry usable.
+- Existing NPP with licenses: licenses still recalled.
+- Keyed license API failure/null result: error toast still appears. A real failure was not forced.
+
+No commit or push performed.
