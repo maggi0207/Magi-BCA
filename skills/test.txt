@@ -1,50 +1,16 @@
-Updated `PafTaskSelection.razor.cs:175` so **Begin NPP PAF keeps only ADD NPP to Facility** for both new and existing practitioners.
+TASK-COMMIT-ISSUE1 — Commit Begin NPP action filter only
 
-**List Construction**
-The component requests:
-```csharp
-Mode = isNewPractitioner
-    ? TaskAllowedListMode.NewPractitioner
-    : TaskAllowedListMode.ExistingPractitioner
-```
+Stage only PafTaskSelection.razor.cs.
 
-`TaskDeterminationService.cs:23` builds those lists:
-- New practitioner: Add Practitioner to Facility, plus NPP for eligible MSP mode.
-- Existing practitioner: personal information and other applicable actions, plus NPP when eligible facilities exist.
+Do not stage ManageAddressesTask, Delegate files, launchSettings, or unrelated files. Do not push.
 
-Those service rules are unchanged.
+Commit message:
 
-**Before**
-Only the classic entry path filtered the returned list:
-```csharp
-if (!IsExistingPaf && !StateContainer.PafStartingState.IsNppRequest)
-{
-    _currentAvailableTasks = _currentAvailableTasks
-        .Where(task => task.Type != TaskType.Npp)
-        .ToList();
-}
-```
+  fix(npp): show only ADD NPP on the Begin NPP PAF path
 
-**After**
-```csharp
-if (!IsExistingPaf)
-{
-    _currentAvailableTasks = _currentAvailableTasks
-        .Where(task => StateContainer.PafStartingState.IsNppRequest
-            ? task.Type == TaskType.Npp
-            : task.Type != TaskType.Npp)
-        .ToList();
-}
-```
+  Begin NPP PAF still listed other actions for new and existing
+  practitioners. Classic Begin PAF still hides ADD NPP.
 
-This filters the eligible list rather than adding NPP, so eligibility inside ADD NPP is preserved. Classic Begin PAF retains its other actions and continues hiding NPP.
+Then git status and git show --stat HEAD.
 
-**Verification**
-Client build passed in **113.1 seconds**, exit code **0**. Scoped whitespace check passed.
-
-Browser QA remains pending:
-1. Begin NPP, existing practitioner: only ADD NPP.
-2. Begin NPP, new practitioner: only ADD NPP.
-3. Classic Begin PAF: other actions remain; ADD NPP absent.
-
-No commit or push performed.
+RETURN: hash, files in the commit, anything left dirty.
