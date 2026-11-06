@@ -1,17 +1,21 @@
-TASK-COMMIT-148819 — Commit new-NPP address gate only
+TASK-FIX-ISSUE1 — Begin NPP PAF shows only ADD NPP to Facility
 
-Stage only ManageAddressesTask.razor.cs.
+Begin NPP PAF (IsNppRequest) still lists other actions.
+Existing practitioner (Passmore): Personal Info, Add Practitioner to Facility, Request Processing Change, Off-Cycle RRFC, Off-Cycle PSV, Add Privilege MSS-18, and ADD NPP.
+New practitioner (NPPTESTS): Add Practitioner to Facility and ADD NPP.
 
-Do not stage Delegate-hide files, email-guard files, launchSettings, or unrelated files. Do not push.
+Expected: on the Begin NPP PAF path only, both new and existing practitioners see only ADD NPP to Facility.
+Classic Begin PAF is unchanged: ADD NPP stays hidden (148067). Do not remove actions from classic Begin PAF.
 
-Commit message:
+DO:
+1. Quote PafTaskSelection / TaskDeterminationService where the action list is built for new vs existing, and where IsNppRequest already filters NPP off the classic path.
+2. When IsNppRequest is true, keep only TaskType.Npp. Apply this for both new and existing practitioners.
+3. Do not change eligibility inside ADD NPP itself.
+4. Build Client.
 
-  fix(npp): allow Add Address when a new NPP has no practitioner key
+RETEST:
+- Begin NPP PAF, existing practitioner: only ADD NPP.
+- Begin NPP PAF, new practitioner: only ADD NPP.
+- Classic Begin PAF: other actions remain; ADD NPP stays hidden.
 
-  A missing key threw before the affiliation lookup and was shown as
-  "Unable to verify practitioner facility status," which blocked Add
-  Address for a brand-new provider (ADO 148819).
-
-Then git status and git show --stat HEAD.
-
-RETURN: hash, files in the commit, anything left dirty.
+RETURN: before/after, build. STOP for commit.
