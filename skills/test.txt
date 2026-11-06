@@ -1,17 +1,27 @@
-TASK-COMMIT-ISSUE3 — Commit the blank-email delegate check only
+TASK-FIX-NPP-EXCEPTION-SEARCH — Required First Name, and the ADD NPP State dropdown
 
-In PafFormComponent.razor.cs, stage only the ShowReviewAndSubmit comparison that skips a blank practitioner email when TaskSelected is Npp.
+NPP Exception Search (No NPI Available) shows First Name as optional and State as a text box ("Enter state").
 
-If that file also has other uncommitted edits (Delegate hide or anything else), do not include them. Say which hunks you left out.
-Do not stage NppTaskForm, PafTaskSelection, or unrelated files. Do not push.
+Change only the NPP exception form (IsNppRequest / NPP route). Do not change Begin PAF, Recruitment, or PSG search.
 
-Commit message:
+1. First Name
+Quote the NPP exception First Name input and the rule that enables Search.
+Mark First Name required (show *).
+Search stays disabled until First Name has at least 1 alpha character, using the existing first-name message if one already exists. Do not invent a new message.
+Last Name rules stay (minimum 2 alpha).
+A last-name-only NPP exception search is no longer valid.
+If the NPP exception API still accepts a blank first name, require a first name there too, for that search type only.
 
-  fix(npp): allow submit when the practitioner email is blank
+2. State dropdown — reuse the ADD NPP card
+Open NppTaskForm.razor. Quote the State dropdown shown when the user selects "None of these apply. Add New State License Instead." Include the component and the option list it binds.
+Replace the Exception Search State text input with that same dropdown and the same option list. Do not create a new state list. Do not use a different screen's dropdown.
+Quote the value that dropdown stores (2-letter code or full name) and the STATE value NppExceptionSearchPagedQueryBuilder sends. They must be the same value. If they differ, STOP and report both. Do not invent a name/code map.
+State stays optional by itself. State and License Number are still entered together.
 
-  A new NPP compared two null emails and blocked submit with
-  "Practitioner email cannot be the same as the Delegate email."
+3. Header
+If the NPP exception header says First Name is optional, change that sentence so First Name is required. Leave the classic NPI/SSN header unchanged.
 
-Then git status and git show --stat HEAD.
+Do not change the ADD NPP card, license matching, audit, Cancel, or Reason.
+Build the client and the API if the API check changes. git diff --check on touched files. Do not commit. Do not push.
 
-RETURN: hash, files in the commit, anything left dirty.
+RETURN: quoted First Name rule, quoted NppTaskForm State dropdown and the value it stores, quoted STATE sent to the query, diff, build result.
