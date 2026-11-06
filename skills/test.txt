@@ -1,34 +1,16 @@
-**Root Cause**
-In `NppTaskForm.razor.cs:100`, initialization previously threw before any API call when the practitioner had no key:
+TASK-COMMIT-ISSUE2 — Commit missing-key license load only
 
-```csharp
-if (string.IsNullOrWhiteSpace(practitionerKey))
-    throw new InvalidOperationException("Practitioner key is unavailable.");
-```
+Stage only NppTaskForm.razor.cs if this change is the only uncommitted edit in that file.
+If the file also contains the 148170 spinner fix and that is already committed, stage only this return. If both are uncommitted, say so and commit them separately.
+Do not stage PafTaskSelection or unrelated files. Do not push.
 
-The catch then showed `"Unable to load state licenses."`
+Commit message:
 
-For keyed practitioners, it calls:
-```csharp
-CactusClient.PractitionerLicenses.GetPractitionerStateLicensesAsync(practitionerKey)
-```
-A successful empty list already loads without a toast. A null result or exception still triggers the error toast.
+  fix(npp): do not toast when a new NPP has no licenses to load
 
-**Diff**
-```diff
- if (string.IsNullOrWhiteSpace(practitionerKey))
--    throw new InvalidOperationException("Practitioner key is unavailable.");
-+    return;
-```
+  Opening ADD NPP threw on a missing practitioner key and showed
+  "Unable to load state licenses" before any license call.
 
-The missing-key path now leaves the initialized `_licenses` list empty. Existing-practitioner recall, new-license entry, and keyed failure handling are unchanged.
+Then git status and git show --stat HEAD.
 
-**Verification**
-Client build passed in **104.8 seconds**, exit code **0**. Scoped whitespace check passed.
-
-Browser retests remain pending:
-- New NPP → ADD NPP: no load-error toast; form and new-license entry usable.
-- Existing NPP with licenses: licenses still recalled.
-- Keyed license API failure/null result: error toast still appears. A real failure was not forced.
-
-No commit or push performed.
+RETURN: hash, files in the commit, anything left dirty.
