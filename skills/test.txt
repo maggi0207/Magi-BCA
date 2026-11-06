@@ -1,39 +1,17 @@
-**Root Cause**
-The exact rejection is in `PafFormComponent.razor.cs:885`, method `ShowReviewAndSubmit()`:
+TASK-COMMIT-ISSUE3 — Commit the blank-email delegate check only
 
-```csharp
-if(PafData.PractitionerDemographicTask?.Email == PafData.ManageDelegateTask.Delegate?.EmailAddress)
-{
-    var message = "Practitioner email cannot be the same as the Delegate email";
-```
+In PafFormComponent.razor.cs, stage only the ShowReviewAndSubmit comparison that skips a blank practitioner email when TaskSelected is Npp.
 
-**Before/After Values**
-These are source-derived values for the untouched new-NPP path, not runtime-inspected values for Test NPPTESTS.
+If that file also has other uncommitted edits (Delegate hide or anything else), do not include them. Say which hunks you left out.
+Do not stage NppTaskForm, PafTaskSelection, or unrelated files. Do not push.
 
-| Point | Practitioner email | Delegate email | Original comparison |
-|---|---|---|---|
-| Before Demographic Save | `null` | `null` | `true`, rejects |
-| After successful no-edit Save | `""` (empty) | `null` | `false`, passes |
+Commit message:
 
-Initialization preserves the blank model value through `EmailAddress = _model.Email?.Trim()`. Demographic Save instead emits:
+  fix(npp): allow submit when the practitioner email is blank
 
-```csharp
-Email = _model.Email?.Trim() ?? string.Empty
-```
+  A new NPP compared two null emails and blocked submit with
+  "Practitioner email cannot be the same as the Delegate email."
 
-That converts null, empty, or whitespace-only email to `""`; it does not change the delegate.
+Then git status and git show --stat HEAD.
 
-**Diff**
-```diff
--if(PafData.PractitionerDemographicTask?.Email == PafData.ManageDelegateTask.Delegate?.EmailAddress)
-+if ((StateContainer.PafState.TaskSelected != TaskType.Npp ||
-+     !string.IsNullOrWhiteSpace(PafData.PractitionerDemographicTask?.Email)) &&
-+    PafData.PractitionerDemographicTask?.Email == PafData.ManageDelegateTask.Delegate?.EmailAddress)
-```
-
-NPP null/empty/whitespace practitioner email now skips this comparison. Matching nonblank emails still trigger the existing rejection. Classic and other PAF types retain the original comparison.
-
-**Verification**
-Client, the owning project, built successfully in **147.5 seconds**, exit code **0**. `git diff --check` passed for the touched file.
-
-Email requiredness, Delegate-card visibility, save normalization, APIs, and other submission checks were not changed. Browser QA remains pending. No commit or push performed.
+RETURN: hash, files in the commit, anything left dirty.
