@@ -1,16 +1,25 @@
-TASK-COMMIT-ISSUE2 — Commit missing-key license load only
+TASK-FIX-ISSUE3 — Blank NPP email must not fail the delegate-email check
 
-Stage only NppTaskForm.razor.cs if this change is the only uncommitted edit in that file.
-If the file also contains the 148170 spinner fix and that is already committed, stage only this return. If both are uncommitted, say so and commit them separately.
-Do not stage PafTaskSelection or unrelated files. Do not push.
+New practitioner Test NPPTESTS. Demographic, Addresses, Specialties, and ADD NPP are Complete.
+Review & Submit shows Email blank.
+Submit toast:
+  PAF Incomplete
+  Practitioner email cannot be the same as the Delegate email
 
-Commit message:
+Existing practitioners can submit.
+Opening Demographic and clicking Save with no edits lets this new practitioner submit.
 
-  fix(npp): do not toast when a new NPP has no licenses to load
+NPP email is optional. The Delegate card is hidden on NPP (132268). A blank practitioner email must not be compared to a delegate email.
 
-  Opening ADD NPP threw on a missing practitioner key and showed
-  "Unable to load state licenses" before any license call.
+DO:
+1. Search the exact string "Practitioner email cannot be the same as the Delegate email". Quote the file, method, and the comparison. Do not guess the file.
+2. Quote both values being compared on a new NPP before any Demographic save, and again after a no-edit Demographic save. Show whether each side is null, empty, or whitespace.
+3. Do not code until those quotes are in the reply. Then change only the NPP path:
+   - If the PAF is NPP and the practitioner email is null or whitespace, skip this comparison. Do not toast.
+   - If both emails are non-blank and equal, keep the existing rejection wherever that rule already applies.
+   - Classic Begin PAF and other PAF types keep the current comparison.
+4. Do not make Email required. Do not show or require the Delegate card.
 
-Then git status and git show --stat HEAD.
+Build the project that owns the check. Run git diff --check on touched files. Do not commit. Do not push.
 
-RETURN: hash, files in the commit, anything left dirty.
+RETURN: quoted comparison, before/after values, diff, build result, and what you did not change.
