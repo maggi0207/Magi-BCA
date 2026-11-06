@@ -1,16 +1,19 @@
-TASK-COMMIT-ISSUE1 — Commit Begin NPP action filter only
+TASK-FIX-ISSUE2 — No “Unable to load state licenses” toast for a new NPP
 
-Stage only PafTaskSelection.razor.cs.
+New practitioner opens ADD NPP to Facility and a toast appears immediately: "Unable to load state licenses." The user did not click anything. Existing practitioners do not get this toast.
 
-Do not stage ManageAddressesTask, Delegate files, launchSettings, or unrelated files. Do not push.
+A new practitioner has no practitioner key and no licenses yet. That is not a load failure.
 
-Commit message:
+DO:
+1. Quote where the toast "Unable to load state licenses" is raised (NppTaskForm or license load).
+2. Quote what it calls and what happens when the practitioner key is missing or the license list is empty.
+3. For a new NPP / missing key / successful empty license list: do not show the error toast. Leave the license section empty so the user can add a license.
+4. Keep the toast only when a keyed practitioner's license call actually fails.
+5. Do not change existing-practitioner license recall. Build Client.
 
-  fix(npp): show only ADD NPP on the Begin NPP PAF path
+RETEST:
+- New NPP → ADD NPP: no toast; form is usable.
+- Existing NPP with licenses: licenses still load, no false toast.
+- Force a real license API failure if you can: toast still appears.
 
-  Begin NPP PAF still listed other actions for new and existing
-  practitioners. Classic Begin PAF still hides ADD NPP.
-
-Then git status and git show --stat HEAD.
-
-RETURN: hash, files in the commit, anything left dirty.
+RETURN: root cause quote, diff, build. STOP for commit.
