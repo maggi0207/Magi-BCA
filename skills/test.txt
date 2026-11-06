@@ -1,27 +1,60 @@
-TASK-FIX-NPP-EXCEPTION-SEARCH — Required First Name, and the ADD NPP State dropdown
+Implemented for **NPP exception search only**. Classic Begin PAF, Recruitment, and PSG search behavior is unchanged.
 
-NPP Exception Search (No NPI Available) shows First Name as optional and State as a text box ("Enter state").
+**First Name**
+In `PractitionerSearchForm.razor`, the existing input was:
+```razor
+<FormItem Label="First Name">
+    <ChildContent>
+        <InputHca Id="practitionerFirstName" @bind-Value="@_model.PractitionerFirstName"
+                  Placeholder="Enter first name" TValue="string"
+                  OnChange="@OnFieldChanged" Disabled="@(!_practitionerFirstNameEnabled)"
+                  DebounceMilliseconds="0"/>
+```
 
-Change only the NPP exception form (IsNppRequest / NPP route). Do not change Begin PAF, Recruitment, or PSG search.
+It now uses `Required="@IsNppRequest"` to show the asterisk.
 
-1. First Name
-Quote the NPP exception First Name input and the rule that enables Search.
-Mark First Name required (show *).
-Search stays disabled until First Name has at least 1 alpha character, using the existing first-name message if one already exists. Do not invent a new message.
-Last Name rules stay (minimum 2 alpha).
-A last-name-only NPP exception search is no longer valid.
-If the NPP exception API still accepts a blank first name, require a first name there too, for that search type only.
+Previously, NPP Search enabled with only:
+```csharp
+return !string.IsNullOrWhiteSpace(_model.PractitionerLastName);
+```
 
-2. State dropdown — reuse the ADD NPP card
-Open NppTaskForm.razor. Quote the State dropdown shown when the user selects "None of these apply. Add New State License Instead." Include the component and the option list it binds.
-Replace the Exception Search State text input with that same dropdown and the same option list. Do not create a new state list. Do not use a different screen's dropdown.
-Quote the value that dropdown stores (2-letter code or full name) and the STATE value NppExceptionSearchPagedQueryBuilder sends. They must be the same value. If they differ, STOP and report both. Do not invent a name/code map.
-State stays optional by itself. State and License Number are still entered together.
+It now uses `SearchModel.IsValidNppExceptionCriteria(...)`, requiring nonblank alphabetic First Name, at least two alphabetic Last Name characters, and a valid optional State/License pair. The existing message is reused:
+> Must be a minimum of 1 alpha characters
 
-3. Header
-If the NPP exception header says First Name is optional, change that sentence so First Name is required. Leave the classic NPI/SSN header unchanged.
+`PractitionerSearchParameters.cs` now rejects blank First Name in `ValidateForNppExceptionSearch()` too. NPP NPI searches remain exempt from the First Name requirement.
 
-Do not change the ADD NPP card, license matching, audit, Cancel, or Reason.
-Build the client and the API if the API check changes. git diff --check on touched files. Do not commit. Do not push.
+**State Dropdown**
+The ADD NPP reference in `NppTaskForm.razor` is:
+```razor
+<Neutron.Blazor.Components.Select Id="nppNewLicenseState" DataSource="@_states"
+                                  @bind-Value="@context.NewLicenseState"
+                                  ValueName="@nameof(FieldOption.Value)"
+                                  LabelName="@nameof(FieldOption.Text)">
+</Neutron.Blazor.Components.Select>
+```
+Its list is `private readonly ICollection<FieldOption> _states = OptionConstants.States;`.
 
-RETURN: quoted First Name rule, quoted NppTaskForm State dropdown and the value it stores, quoted STATE sent to the query, diff, build result.
+The exception form now uses that same component and option list, bound to `_model.State`. `FieldOption.cs` contains:
+```csharp
+new FieldOption { Value = "TX", Text = "Texas" }
+```
+The stored value is **`"TX"`**, not `"Texas"`.
+
+`NppExceptionSearchPagedQueryBuilder.cs` sends:
+```csharp
+where.Parameters.Add("@State", searchParameters.State.Trim(), DbType.String);
+```
+and compares `PL.STATE = @State`. The values match; no mapping or query change was needed.
+
+**Diff Summary**
+Five files changed: the exception form and code-behind, NPP header, NPP API validator, and focused tests. The header now says First Name is required. State remains optional unless License Number is supplied, and vice versa.
+
+The ADD NPP card, license matching, audit, Cancel, and Reason were not changed.
+
+**Verification**
+- Client build passed in **163.2 seconds**.
+- Cactus API build passed using separate outputs to avoid a running-service DLL lock.
+- Focused tests: **10 passed, 0 failed**.
+- `git diff --check` passed on all touched files.
+
+Browser interaction QA remains pending. No commit or push performed.
