@@ -1,60 +1,21 @@
-Implemented for **NPP exception search only**. Classic Begin PAF, Recruitment, and PSG search behavior is unchanged.
+TASK-COMMIT-NPP-EXCEPTION-SEARCH — Commit required First Name and the State dropdown
 
-**First Name**
-In `PractitionerSearchForm.razor`, the existing input was:
-```razor
-<FormItem Label="First Name">
-    <ChildContent>
-        <InputHca Id="practitionerFirstName" @bind-Value="@_model.PractitionerFirstName"
-                  Placeholder="Enter first name" TValue="string"
-                  OnChange="@OnFieldChanged" Disabled="@(!_practitionerFirstNameEnabled)"
-                  DebounceMilliseconds="0"/>
-```
+Stage only the five files from this change:
+- PractitionerSearchForm.razor
+- PractitionerSearchForm.razor.cs
+- the NPP exception header file
+- PractitionerSearchParameters.cs
+- the focused test file
 
-It now uses `Required="@IsNppRequest"` to show the asterisk.
+If git status shows any other file, leave it out and name it. Do not stage NppTaskForm. Do not push.
 
-Previously, NPP Search enabled with only:
-```csharp
-return !string.IsNullOrWhiteSpace(_model.PractitionerLastName);
-```
+Commit message:
 
-It now uses `SearchModel.IsValidNppExceptionCriteria(...)`, requiring nonblank alphabetic First Name, at least two alphabetic Last Name characters, and a valid optional State/License pair. The existing message is reused:
-> Must be a minimum of 1 alpha characters
+  fix(npp): require first name and use the ADD NPP state list on exception search
 
-`PractitionerSearchParameters.cs` now rejects blank First Name in `ValidateForNppExceptionSearch()` too. NPP NPI searches remain exempt from the First Name requirement.
+  Exception search allowed a last name alone and a free-text state.
+  First name is now required, and state uses the ADD NPP dropdown value.
 
-**State Dropdown**
-The ADD NPP reference in `NppTaskForm.razor` is:
-```razor
-<Neutron.Blazor.Components.Select Id="nppNewLicenseState" DataSource="@_states"
-                                  @bind-Value="@context.NewLicenseState"
-                                  ValueName="@nameof(FieldOption.Value)"
-                                  LabelName="@nameof(FieldOption.Text)">
-</Neutron.Blazor.Components.Select>
-```
-Its list is `private readonly ICollection<FieldOption> _states = OptionConstants.States;`.
+Then git status and git show --stat HEAD.
 
-The exception form now uses that same component and option list, bound to `_model.State`. `FieldOption.cs` contains:
-```csharp
-new FieldOption { Value = "TX", Text = "Texas" }
-```
-The stored value is **`"TX"`**, not `"Texas"`.
-
-`NppExceptionSearchPagedQueryBuilder.cs` sends:
-```csharp
-where.Parameters.Add("@State", searchParameters.State.Trim(), DbType.String);
-```
-and compares `PL.STATE = @State`. The values match; no mapping or query change was needed.
-
-**Diff Summary**
-Five files changed: the exception form and code-behind, NPP header, NPP API validator, and focused tests. The header now says First Name is required. State remains optional unless License Number is supplied, and vice versa.
-
-The ADD NPP card, license matching, audit, Cancel, and Reason were not changed.
-
-**Verification**
-- Client build passed in **163.2 seconds**.
-- Cactus API build passed using separate outputs to avoid a running-service DLL lock.
-- Focused tests: **10 passed, 0 failed**.
-- `git diff --check` passed on all touched files.
-
-Browser interaction QA remains pending. No commit or push performed.
+RETURN: hash, files in the commit, anything left dirty.
