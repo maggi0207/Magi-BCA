@@ -1,61 +1,48 @@
-## 132688 Monthly Add NPP Activity Report
+TASK-NPP-ADD-NEW-NO-NPI — analyze, then add the PSG No NPI choice to NPP Add New
 
-**Rule checks**
-1. **Timer — Pass:** `[TimerTrigger("0 0 8 1 * *", UseMonitor = false)]` schedules 08:00 on the first of each month in `NppActivityReportGeneration.cs:39`.
-2. **Previous-month period — Pass:** `GetPreviousCalendarMonth` returns the previous month’s first day and the current month’s first day as the exclusive end; the report displays `period.EndExclusive.AddDays(-1)`. The display therefore includes the previous month’s last day. `NppActivityReportGeneration.cs:42`
-3. **NPP-only — Pass:** `paf.IndexedTaskSelected = @NppTaskType`, with `NppTaskType = (int)TaskType.Npp`. `NppActivityReportGeneration.cs:69`
-4. **Received date — Pass:** The date window filters `paf.IndexedSubmittedDate >= @PeriodStart` and `< @PeriodEndExclusive`; it does not use `CreatedOn`. `NppActivityReportGeneration.cs:70`
-5. **Routed to CPC — Pass:** The query adds one for each PAF whose `cvi.CviCount > 0`; `CviCount` is from `OPENJSON(paf.FormData, '$.CreatedOrUpdatedCvis')`. This counts the PAF once even if multiple CVIs are in the array. `NppActivityReportGeneration.cs:62` Auto-accept status alone is not the criterion; an auto-accepted PAF with a created CVI is counted because its CVI is stored in `CreatedOrUpdatedCvis` by `PafDataContext.cs:61`. `SubmittedByMsp` alone does not satisfy the CVI-count condition.
-6. **Percentage — Pass:** `totalReceived == 0 ? 0 : (double)totalRoutedToCpc / totalReceived * 100`, formatted as `"F2"` plus `%`. `NppActivityReportGeneration.cs:129`
-7. **Recipients — Pass:** `PARADLAmericanSSCCPCFOMGMT@Parallon.com,PARA.CredentialReporting@Parallon.com`. `NppActivityReportGeneration.cs:21`
-8. **No activity — Pass:** Aggregate `COUNT_BIG(*)` yields zero and `COALESCE(..., 0)` yields zero for routed; the function still builds and queues the email. It displays `0`, `0`, and `0.00%`. `NppActivityReportGeneration.cs:61`
-9. **Recruitment report unchanged — Pass:** The NPP report commit has no diff for `RecruitmentReportGeneration.cs`; the existing Recruitment report file is also clean.
+One session. Quote the existing PSG control before editing. Then implement only the NPP Add New card.
 
-**S1–S6**
-- **S1 all metrics when activity exists — Pass** in the query, calculation, and email template; no end-to-end metric test.
-- **S2 previous calendar month only — Pass.**
-- **S3 CPC-routed count displayed — Pass:** the template binds `TotalRoutedToCpc`; query counts PAFs with at least one stored CVI.
-- **S4 percentage correct — Pass.**
-- **S5 both distribution lists — Pass.**
-- **S6 no activity still sends 0 / 0 / 0% — Pass** in code; the zero-percentage helper is tested, but no test asserts that an empty report is queued.
+DOCUMENT
+On NPP Add New Practitioner, NPI is required today. Add the PSG exception already on that dialog:
+- The user can enter an NPI or select No NPI.
+- When No NPI is selected, show a required dropdown labeled Reason NPI is not available.
+- Verify & Start PAF stays blocked until a reason is selected.
+- When Enter NPI is selected, hide the reason dropdown and do not require it.
+- A valid NPI still completes Verify & Start PAF.
 
-**Failures and tests**
-The trigger wraps data retrieval and report/email generation in a `try/catch`; the catch logs `"NPP activity report email message failed to send."` and rethrows. Thus SQL/data-extraction, report-generation, and email-queue exceptions are logged and propagated, not swallowed or recovered locally. Divide-by-zero is guarded with `totalReceived == 0`.
+Known host, from the 131794 office return:
+- AddNewPractitionerForm, opened from ConfirmationWizardModal.
+- ShowNoNpiOption is passed as IsNpiOptional.
+- IsNpiOptional is Recruitment or PSG only. IsNppRequest does not turn it on.
+- NewPractitionerModel.ShouldRequireNpi rejects a blank NPI when IsNppRequest is true.
 
-Tests: `PreviousCalendarMonthIncludesDecemberThroughDecember31`, `PercentRoutedIsZeroWhenNoPafsWereReceived`, and `PercentRoutedUsesTwoDecimalPlaces` in `NppActivityReportTests.cs:11`. There are no focused tests for the SQL filters/count, recipient list, empty-report email queueing, or failure handling.
+ANALYZE — quote these, then code
+1. The Enter NPI / No NPI radios and the Reason dropdown in AddNewPractitionerForm. Include the condition that shows them.
+2. The reason option source and every option text. Reuse that list. Do not add a reason.
+3. The validation that blocks Verify & Start PAF when No NPI is selected and Reason is blank. Quote the message.
+4. The model fields saved for No NPI and Reason on the PSG path.
+5. ShouldRequireNpi, and the line that passes ShowNoNpiOption.
 
-**Git:** The report and test files are clean and committed in `60919591f`, reachable from `origin/Feature-NPP`.
+STOP and do not code if the reason list or the saved field cannot be quoted from the PSG path. Report what is missing.
 
-## 132596 / 132597 PDF Attachment
+IMPLEMENT
+- On the NPP route only (IsNppRequest), show the same radios and the same Reason dropdown.
+- Enter NPI: NPI stays required. Reason is hidden and not required. Existing NPI format and duplicate checks stay.
+- No NPI: NPI is not required. Reason is required. Verify & Start PAF does not continue while Reason is blank. Use the existing message.
+- Save No NPI and the selected reason through the fields the PSG path already saves. Do not add a column or a new reason value.
+- Classic Begin PAF, PSG, and Recruitment keep today's ShowNoNpiOption and required fields.
+- NPP DOB, Gender, SSN, Email, and Cell stay optional.
+- Do not edit Exception Search or Verify Existing.
 
-**No-CVI / Provider branch — Pass in code; attachment assertion gap in tests**
-`CactusUpdater.cs:278` calls:
+Build the client. Cover these cases in the existing Add New tests, or add focused tests:
+1. NPP shows Enter NPI and No NPI.
+2. No NPI shows the required Reason dropdown.
+3. No NPI with a blank Reason blocks Verify & Start PAF.
+4. No NPI with a reason allows the existing save path.
+5. Enter NPI hides Reason, and a valid NPI still verifies.
+6. Switching from No NPI back to Enter NPI hides Reason and clears the requirement.
+7. A non-NPP MSP Add New still has no No NPI radio.
 
-```csharp
-if (NppAutoAcceptProcessingRules.ShouldAttachPafPdfToProvider(
-        paf, updateResult.AffectedCredentialingKeys.Count > 0))
-{
-    await UploadPafImageToProviderAsync(...);
-}
-```
+git diff --check on touched files. Do not commit. Do not push.
 
-The rule is:
-```csharp
-return IsAutoAcceptedNpp(paf) && !hasCredentialingRecord;
-```
- NppAutoAcceptProcessingRules.cs
-
-`UploadPafImageToProviderAsync` sets `ParentFileK = ImageParentFileKValues.Provider`, sets `ParentK` to the practitioner key, executes the image operation, and queues PDF processing. `CactusUpdater.cs:901`
-
-**Meaning of “no CVI”:** The decision does **not** directly test whether `CreatedOrUpdatedCvis` is empty or null. It passes `updateResult.AffectedCredentialingKeys.Count > 0`; that set is initialized as an empty `HashSet<string>`. Thus the rule’s “no credentialing record” value is `false` for that Boolean when no affected credentialing key was produced. `CactusUpdater.cs:2544` `PafDataContext` materializes the returned CVI summaries with `ToList()` and assigns `CreatedOrUpdatedCvis` only when `cvis.Count > 0`, but that property is not the provider-fallback condition.
-
-Tests named `AutoAcceptedNppWithoutCviUsesProviderPdfParent` and `AutoAcceptedNppWithCviDoesNotUseProviderPdfParent` assert the rule’s Boolean result in `NppAutoAcceptProcessingTests.cs:37`. **Gap:** They do not assert the actual Provider parent, practitioner key, image operation, or PDF-processing queue call.
-
-**CVI branch — Pass in code; attachment assertion gap in tests**
-When a credentialing record is created, the updater adds its key to `AffectedCredentialingKeys` and calls `AttachPafPdfToCredentialingAsync` with that `credentialingKey`. `CactusUpdater.cs:1099` That method uses `ParentFileK = ImageParentFileKValues.Credentialing` and `ParentK = credentialingK`, then queues PDF processing. `CactusUpdater.cs:1739` A nonzero affected-key count also prevents the provider fallback. The test only asserts the fallback rule is false when a credentialing record exists; it does not assert actual CVI attachment.
-
-**Git:** The four requested processor files are clean and committed, reachable from `origin/Feature-NPP`: `CactusUpdater.cs` latest `a77ec23dc`; `PafDataContext.cs`, `NppAutoAcceptProcessingRules.cs`, and `NppAutoAcceptProcessingTests.cs` latest `50ae504bb`.
-
-## Before Smoke
-
-No smoke run was started. Before smoke, add or perform verification that observes the actual Provider versus CVI image parent and PDF queue operation; the current tests only cover the fallback decision. Also verify the report’s SQL counts and queued email with prior-month activity and no activity, and confirm the failure paths in the target environment.
+RETURN: quoted PSG control, reason options, saved fields, diff, tests, and build result.
