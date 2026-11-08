@@ -1,21 +1,43 @@
-TASK-COMMIT-NPP-EXCEPTION-SEARCH — Commit required First Name and the State dropdown
+TASK-STATUS-132688-132596 — read-only status of the monthly report and the PDF attach
 
-Stage only the five files from this change:
-- PractitionerSearchForm.razor
-- PractitionerSearchForm.razor.cs
-- the NPP exception header file
-- PractitionerSearchParameters.cs
-- the focused test file
+Read only. Do not edit files, do not run the function, do not commit.
 
-If git status shows any other file, leave it out and name it. Do not stage NppTaskForm. Do not push.
+Part A — 132688 Monthly Add NPP Request Activity Report
+Open NppActivityReportGeneration and its tests. For each rule, quote the code or say missing.
 
-Commit message:
+1. Timer is 0 0 8 1 * * (08:00 on the 1st).
+2. Period is the previous calendar month and includes the last day. Quote start, exclusive end, and displayed end.
+3. Only TaskType.Npp is counted.
+4. Total received uses SubmittedDate / IndexedSubmittedDate, not CreatedOn.
+5. Routed to CPC counts a PAF once when a CVI was created (CreatedOrUpdatedCvis). Auto-accept that created a CVI counts. SubmittedByMsp alone does not.
+6. Percent is (routed ÷ received) × 100, two decimals, and 0% when received is 0.
+7. Email To is PARADLAmericanSSCCPCFOMGMT@Parallon.com and PARA.CredentialReporting@Parallon.com.
+8. No activity still sends 0 / 0 / 0.00%.
+9. Recruitment report code is unchanged.
 
-  fix(npp): require first name and use the ADD NPP state list on exception search
+Mark S1–S6 Pass or Gap from the code:
+S1 all metrics when activity exists
+S2 previous calendar month only
+S3 CPC routed count displayed
+S4 percentage correct
+S5 both distribution lists
+S6 no activity still sends 0 / 0 / 0%
 
-  Exception search allowed a last name alone and a free-text state.
-  First name is now required, and state uses the ADD NPP dropdown value.
+Quote generation failure, email failure, data-extraction failure, and divide-by-zero. Say if any are not handled.
+Quote test names. git log and git status for this file only: committed or still local?
 
-Then git status and git show --stat HEAD.
+Part B — 132596 Attach PAF PDF to Provider Record
+This is BR-007 under 132591. 132597 is the CVI branch in the same code. Open CactusUpdater and quote the NPP PDF decision.
 
-RETURN: hash, files in the commit, anything left dirty.
+1. When an auto-accepted NPP has no CVI, the PAF PDF attaches to the Provider Record. Quote the call.
+2. When a CVI exists, the PDF attaches to the CVI, not the Provider. Quote the branch.
+3. Quote what "no CVI" means in that if (empty CreatedOrUpdatedCvis, null, or something else).
+4. Quote the tests that cover Provider vs CVI. If none assert the Provider attach, say Gap.
+5. git log and git status for CactusUpdater.cs, PafDataContext.cs, NppAutoAcceptProcessingRules.cs, and NppAutoAcceptProcessingTests.cs. Committed or still local? Do not stage.
+
+RETURN:
+1. 132688: Pass or Gap per rule and per S1–S6, with quotes. Committed or local.
+2. 132596: Pass or Gap for Provider attach, with the quote. Committed or local.
+3. 132597: Pass or Gap for CVI attach, with the quote.
+4. Exception-handling gaps.
+5. What is left before smoke. Do not start a smoke run.
