@@ -1,43 +1,61 @@
-TASK-STATUS-132688-132596 — read-only status of the monthly report and the PDF attach
+## 132688 Monthly Add NPP Activity Report
 
-Read only. Do not edit files, do not run the function, do not commit.
+**Rule checks**
+1. **Timer — Pass:** `[TimerTrigger("0 0 8 1 * *", UseMonitor = false)]` schedules 08:00 on the first of each month in `NppActivityReportGeneration.cs:39`.
+2. **Previous-month period — Pass:** `GetPreviousCalendarMonth` returns the previous month’s first day and the current month’s first day as the exclusive end; the report displays `period.EndExclusive.AddDays(-1)`. The display therefore includes the previous month’s last day. `NppActivityReportGeneration.cs:42`
+3. **NPP-only — Pass:** `paf.IndexedTaskSelected = @NppTaskType`, with `NppTaskType = (int)TaskType.Npp`. `NppActivityReportGeneration.cs:69`
+4. **Received date — Pass:** The date window filters `paf.IndexedSubmittedDate >= @PeriodStart` and `< @PeriodEndExclusive`; it does not use `CreatedOn`. `NppActivityReportGeneration.cs:70`
+5. **Routed to CPC — Pass:** The query adds one for each PAF whose `cvi.CviCount > 0`; `CviCount` is from `OPENJSON(paf.FormData, '$.CreatedOrUpdatedCvis')`. This counts the PAF once even if multiple CVIs are in the array. `NppActivityReportGeneration.cs:62` Auto-accept status alone is not the criterion; an auto-accepted PAF with a created CVI is counted because its CVI is stored in `CreatedOrUpdatedCvis` by `PafDataContext.cs:61`. `SubmittedByMsp` alone does not satisfy the CVI-count condition.
+6. **Percentage — Pass:** `totalReceived == 0 ? 0 : (double)totalRoutedToCpc / totalReceived * 100`, formatted as `"F2"` plus `%`. `NppActivityReportGeneration.cs:129`
+7. **Recipients — Pass:** `PARADLAmericanSSCCPCFOMGMT@Parallon.com,PARA.CredentialReporting@Parallon.com`. `NppActivityReportGeneration.cs:21`
+8. **No activity — Pass:** Aggregate `COUNT_BIG(*)` yields zero and `COALESCE(..., 0)` yields zero for routed; the function still builds and queues the email. It displays `0`, `0`, and `0.00%`. `NppActivityReportGeneration.cs:61`
+9. **Recruitment report unchanged — Pass:** The NPP report commit has no diff for `RecruitmentReportGeneration.cs`; the existing Recruitment report file is also clean.
 
-Part A — 132688 Monthly Add NPP Request Activity Report
-Open NppActivityReportGeneration and its tests. For each rule, quote the code or say missing.
+**S1–S6**
+- **S1 all metrics when activity exists — Pass** in the query, calculation, and email template; no end-to-end metric test.
+- **S2 previous calendar month only — Pass.**
+- **S3 CPC-routed count displayed — Pass:** the template binds `TotalRoutedToCpc`; query counts PAFs with at least one stored CVI.
+- **S4 percentage correct — Pass.**
+- **S5 both distribution lists — Pass.**
+- **S6 no activity still sends 0 / 0 / 0% — Pass** in code; the zero-percentage helper is tested, but no test asserts that an empty report is queued.
 
-1. Timer is 0 0 8 1 * * (08:00 on the 1st).
-2. Period is the previous calendar month and includes the last day. Quote start, exclusive end, and displayed end.
-3. Only TaskType.Npp is counted.
-4. Total received uses SubmittedDate / IndexedSubmittedDate, not CreatedOn.
-5. Routed to CPC counts a PAF once when a CVI was created (CreatedOrUpdatedCvis). Auto-accept that created a CVI counts. SubmittedByMsp alone does not.
-6. Percent is (routed ÷ received) × 100, two decimals, and 0% when received is 0.
-7. Email To is PARADLAmericanSSCCPCFOMGMT@Parallon.com and PARA.CredentialReporting@Parallon.com.
-8. No activity still sends 0 / 0 / 0.00%.
-9. Recruitment report code is unchanged.
+**Failures and tests**
+The trigger wraps data retrieval and report/email generation in a `try/catch`; the catch logs `"NPP activity report email message failed to send."` and rethrows. Thus SQL/data-extraction, report-generation, and email-queue exceptions are logged and propagated, not swallowed or recovered locally. Divide-by-zero is guarded with `totalReceived == 0`.
 
-Mark S1–S6 Pass or Gap from the code:
-S1 all metrics when activity exists
-S2 previous calendar month only
-S3 CPC routed count displayed
-S4 percentage correct
-S5 both distribution lists
-S6 no activity still sends 0 / 0 / 0%
+Tests: `PreviousCalendarMonthIncludesDecemberThroughDecember31`, `PercentRoutedIsZeroWhenNoPafsWereReceived`, and `PercentRoutedUsesTwoDecimalPlaces` in `NppActivityReportTests.cs:11`. There are no focused tests for the SQL filters/count, recipient list, empty-report email queueing, or failure handling.
 
-Quote generation failure, email failure, data-extraction failure, and divide-by-zero. Say if any are not handled.
-Quote test names. git log and git status for this file only: committed or still local?
+**Git:** The report and test files are clean and committed in `60919591f`, reachable from `origin/Feature-NPP`.
 
-Part B — 132596 Attach PAF PDF to Provider Record
-This is BR-007 under 132591. 132597 is the CVI branch in the same code. Open CactusUpdater and quote the NPP PDF decision.
+## 132596 / 132597 PDF Attachment
 
-1. When an auto-accepted NPP has no CVI, the PAF PDF attaches to the Provider Record. Quote the call.
-2. When a CVI exists, the PDF attaches to the CVI, not the Provider. Quote the branch.
-3. Quote what "no CVI" means in that if (empty CreatedOrUpdatedCvis, null, or something else).
-4. Quote the tests that cover Provider vs CVI. If none assert the Provider attach, say Gap.
-5. git log and git status for CactusUpdater.cs, PafDataContext.cs, NppAutoAcceptProcessingRules.cs, and NppAutoAcceptProcessingTests.cs. Committed or still local? Do not stage.
+**No-CVI / Provider branch — Pass in code; attachment assertion gap in tests**
+`CactusUpdater.cs:278` calls:
 
-RETURN:
-1. 132688: Pass or Gap per rule and per S1–S6, with quotes. Committed or local.
-2. 132596: Pass or Gap for Provider attach, with the quote. Committed or local.
-3. 132597: Pass or Gap for CVI attach, with the quote.
-4. Exception-handling gaps.
-5. What is left before smoke. Do not start a smoke run.
+```csharp
+if (NppAutoAcceptProcessingRules.ShouldAttachPafPdfToProvider(
+        paf, updateResult.AffectedCredentialingKeys.Count > 0))
+{
+    await UploadPafImageToProviderAsync(...);
+}
+```
+
+The rule is:
+```csharp
+return IsAutoAcceptedNpp(paf) && !hasCredentialingRecord;
+```
+ NppAutoAcceptProcessingRules.cs
+
+`UploadPafImageToProviderAsync` sets `ParentFileK = ImageParentFileKValues.Provider`, sets `ParentK` to the practitioner key, executes the image operation, and queues PDF processing. `CactusUpdater.cs:901`
+
+**Meaning of “no CVI”:** The decision does **not** directly test whether `CreatedOrUpdatedCvis` is empty or null. It passes `updateResult.AffectedCredentialingKeys.Count > 0`; that set is initialized as an empty `HashSet<string>`. Thus the rule’s “no credentialing record” value is `false` for that Boolean when no affected credentialing key was produced. `CactusUpdater.cs:2544` `PafDataContext` materializes the returned CVI summaries with `ToList()` and assigns `CreatedOrUpdatedCvis` only when `cvis.Count > 0`, but that property is not the provider-fallback condition.
+
+Tests named `AutoAcceptedNppWithoutCviUsesProviderPdfParent` and `AutoAcceptedNppWithCviDoesNotUseProviderPdfParent` assert the rule’s Boolean result in `NppAutoAcceptProcessingTests.cs:37`. **Gap:** They do not assert the actual Provider parent, practitioner key, image operation, or PDF-processing queue call.
+
+**CVI branch — Pass in code; attachment assertion gap in tests**
+When a credentialing record is created, the updater adds its key to `AffectedCredentialingKeys` and calls `AttachPafPdfToCredentialingAsync` with that `credentialingKey`. `CactusUpdater.cs:1099` That method uses `ParentFileK = ImageParentFileKValues.Credentialing` and `ParentK = credentialingK`, then queues PDF processing. `CactusUpdater.cs:1739` A nonzero affected-key count also prevents the provider fallback. The test only asserts the fallback rule is false when a credentialing record exists; it does not assert actual CVI attachment.
+
+**Git:** The four requested processor files are clean and committed, reachable from `origin/Feature-NPP`: `CactusUpdater.cs` latest `a77ec23dc`; `PafDataContext.cs`, `NppAutoAcceptProcessingRules.cs`, and `NppAutoAcceptProcessingTests.cs` latest `50ae504bb`.
+
+## Before Smoke
+
+No smoke run was started. Before smoke, add or perform verification that observes the actual Provider versus CVI image parent and PDF queue operation; the current tests only cover the fallback decision. Also verify the report’s SQL counts and queued email with prior-month activity and no activity, and confirm the failure paths in the target environment.
