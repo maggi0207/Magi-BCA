@@ -1,6 +1,5 @@
-traces
-| where timestamp > ago(30d)
-| where message has '{"PafId":6166}'
-| project timestamp, message
-| order by timestamp desc
+exceptions
+| where timestamp > ago(90d)
+| where tostring(customDimensions.FormattedMessage) has "6166"
+| project timestamp, problemId, customDimensions
 | take 20
