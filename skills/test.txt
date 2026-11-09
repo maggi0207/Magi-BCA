@@ -1,48 +1,5 @@
-TASK-NPP-ADD-NEW-NO-NPI — analyze, then add the PSG No NPI choice to NPP Add New
-
-One session. Quote the existing PSG control before editing. Then implement only the NPP Add New card.
-
-DOCUMENT
-On NPP Add New Practitioner, NPI is required today. Add the PSG exception already on that dialog:
-- The user can enter an NPI or select No NPI.
-- When No NPI is selected, show a required dropdown labeled Reason NPI is not available.
-- Verify & Start PAF stays blocked until a reason is selected.
-- When Enter NPI is selected, hide the reason dropdown and do not require it.
-- A valid NPI still completes Verify & Start PAF.
-
-Known host, from the 131794 office return:
-- AddNewPractitionerForm, opened from ConfirmationWizardModal.
-- ShowNoNpiOption is passed as IsNpiOptional.
-- IsNpiOptional is Recruitment or PSG only. IsNppRequest does not turn it on.
-- NewPractitionerModel.ShouldRequireNpi rejects a blank NPI when IsNppRequest is true.
-
-ANALYZE — quote these, then code
-1. The Enter NPI / No NPI radios and the Reason dropdown in AddNewPractitionerForm. Include the condition that shows them.
-2. The reason option source and every option text. Reuse that list. Do not add a reason.
-3. The validation that blocks Verify & Start PAF when No NPI is selected and Reason is blank. Quote the message.
-4. The model fields saved for No NPI and Reason on the PSG path.
-5. ShouldRequireNpi, and the line that passes ShowNoNpiOption.
-
-STOP and do not code if the reason list or the saved field cannot be quoted from the PSG path. Report what is missing.
-
-IMPLEMENT
-- On the NPP route only (IsNppRequest), show the same radios and the same Reason dropdown.
-- Enter NPI: NPI stays required. Reason is hidden and not required. Existing NPI format and duplicate checks stay.
-- No NPI: NPI is not required. Reason is required. Verify & Start PAF does not continue while Reason is blank. Use the existing message.
-- Save No NPI and the selected reason through the fields the PSG path already saves. Do not add a column or a new reason value.
-- Classic Begin PAF, PSG, and Recruitment keep today's ShowNoNpiOption and required fields.
-- NPP DOB, Gender, SSN, Email, and Cell stay optional.
-- Do not edit Exception Search or Verify Existing.
-
-Build the client. Cover these cases in the existing Add New tests, or add focused tests:
-1. NPP shows Enter NPI and No NPI.
-2. No NPI shows the required Reason dropdown.
-3. No NPI with a blank Reason blocks Verify & Start PAF.
-4. No NPI with a reason allows the existing save path.
-5. Enter NPI hides Reason, and a valid NPI still verifies.
-6. Switching from No NPI back to Enter NPI hides Reason and clears the requirement.
-7. A non-NPP MSP Add New still has no No NPI radio.
-
-git diff --check on touched files. Do not commit. Do not push.
-
-RETURN: quoted PSG control, reason options, saved fields, diff, tests, and build result.
+traces
+| where timestamp > ago(7d)
+| where message has "6166"
+| project timestamp, message
+| order by timestamp desc
