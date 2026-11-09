@@ -1,7 +1,6 @@
-union traces, exceptions
+traces
 | where timestamp > ago(30d)
-| where message has "6166"
-| where message !has "Windows-Azure-Blob"
+| where message has '{"PafId":6166}'
 | project timestamp, message
 | order by timestamp desc
-| take 50
+| take 20
