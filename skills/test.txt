@@ -1,5 +1,5 @@
-traces
-| where timestamp > ago(7d)
-| where message has "6166"
+union traces, exceptions
+| where timestamp > ago(30d)
+| where message has '{"PafId":6166}' or message has "AttachPafPdfToCredentialingAsync" or message has "UploadPafImageToProviderAsync"
 | project timestamp, message
 | order by timestamp desc
