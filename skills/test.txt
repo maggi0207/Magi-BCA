@@ -1,23 +1,38 @@
-TASK-NPP-SEARCH-FIELDS-DISABLED — Re-enable fields after Cancel
+**Disabled Bindings**
+In `PractitionerSearchForm.razor`:
 
-NPP Practitioner Search on /Practitioner/Search/Npp. Two Cancel paths leave inputs disabled. Do not change First Name required, the State dropdown, or the search rules.
+> `Disabled="@(!_practitionerNpiEnabled)"`
+>
+> `Disabled="@(!_practitionerFirstNameEnabled)"`
+>
+> `Disabled="@(!_practitionerLastNameEnabled)"`
 
-Bug 1 — Exception Search, First Name and Last Name disabled
-Start on Exception Search. The fields are enabled. This is the good screen.
-Go to the normal NPI search, open Add New Practitioner, then Cancel back to Exception Search.
-First Name and Last Name are then disabled. State and License stay enabled.
+The NPI binding appears in both NPI and non-recruitment Exception Search modes.
 
-Bug 2 — NPI field disabled
-Begin NPP PAF → No NPI available → enter First Name and Last Name → Search → Cancel.
-The page returns to Practitioner Search (NPI mode). The NPI box is disabled and Search is disabled. The "No NPI available? Search without NPI" link is still shown.
+**Cancel Paths**
+In `PractitionerSearchForm.razor.cs`, NPP’s Exception Search Cancel calls `SwitchToNpiSearch()`. It clears the NPP criteria and now calls `ResetNppSearchFieldStates()`, which sets the NPI, First Name, and Last Name enabled flags to `true`. Switching back to Exception Search also resets those flags for NPP, so First Name and Last Name are enabled after stale NPI locks.
 
-Quote the Disabled flags on First Name, Last Name, and NPI in PractitionerSearchForm. Quote Cancel for the NPP exception mode and Cancel from Add New Practitioner, including what they set those flags to.
+Cancel in Add New Practitioner invokes the modal completion callback with `Status = Cancel`; `PractitionerSearchTable.razor.cs` handles that status with `break`. That modal Cancel does not set search-form flags; the NPP mode-switch reset handles the stale flags when returning to Exception Search.
 
-Then fix only the NPP reset:
-- Returning to Exception Search enables First Name and Last Name. Required and the State dropdown stay as they are.
-- Cancel from an NPP exception search returns to NPI mode with the NPI input enabled and Search enabled when the NPI is empty.
-- Classic Begin PAF, Recruitment, and PSG search are unchanged.
+Per your clarification to preserve the existing NPI validation rule, Cancel enables the empty NPI input, but Search remains disabled until a valid NPI is entered.
 
-Build the client. git diff --check on touched files. Do not commit. Do not push.
+**Diff**
+```diff
++ if (IsNppRequest)
++ {
++     ResetNppSearchFieldStates();
++ }
+...
+  _model.ResetNppExceptionCriteria();
++ ResetNppSearchFieldStates();
+...
++ private void ResetNppSearchFieldStates()
++ {
++     _practitionerNpiEnabled = true;
++     _practitionerSsnEnabled = true;
++     _practitionerFirstNameEnabled = true;
++     _practitionerLastNameEnabled = true;
++ }
+```
 
-RETURN: quoted flags, both Cancel paths, diff, and build result.
+Only `PractitionerSearchForm.razor.cs` changed for this task. The client build succeeded and `git diff --check` passed. No commit or push was made.
