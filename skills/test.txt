@@ -1,15 +1,28 @@
-TASK-149120-STATUS — Submitted chip must change the NPP PAF grid
+**Status Chip Path**
+The chip binding in `PafQueueSearchCriteria.razor` is:
 
-MSP queue, Type = NPP PAF. The dropdown value is NPP PAF and the row task type is NPP PAF. Status chips show Saved (50) and Submitted (20). The grid still shows a Saved row (Passmore, status Saved, Work and Delete). Clicking Submitted does not replace that row with the Submitted NPP PAFs.
+> `Checked="_selectedStatusFilterOptions.Contains(status)" CheckedChanged="_checked => OnStatusCheckChange(status, _checked)"`
 
-Quote the status-chip click in PafQueueSearch / PafQueueSearchCriteria: what it writes into the search request, and how IndexedPafStatus is applied together with TaskType.Npp.
+The handler sends the selected statuses through the existing criteria-change callback. The client search request writes:
 
-Then fix only that path:
-- Type NPP PAF plus Submitted returns only NPP PAFs whose status is Submitted.
-- Type NPP PAF plus Saved returns only NPP PAFs whose status is Saved.
-- Switching the chip replaces the grid. Do not leave the previous status on screen.
-- Other types and the NPP PAF option text stay as they are.
+> `Status = BuildStatusFilterForSearchCriteria(_searchCriteriaModel),`
+>
+> `TaskType = _searchCriteriaModel.TaskTypeFilter.Value.GetValueOrDefault(TaskType.Unknown),`
 
-Build the client. git diff --check on touched files. Do not commit. Do not push.
+The API query applies each ordinary status as `paf.IndexedPafStatus = @PafStatus{idx}` and ORs the selected statuses. Separately, NPP adds `paf.IndexedTaskSelected = @TaskType`; these predicates are combined with AND. The issue was that clicking Submitted while Saved was selected added Submitted without removing Saved.
 
-RETURN: quoted status binding, diff, and build result.
+For NPP PAF, a status-chip click now replaces the previous status selection with the clicked status. Other task types retain their existing multi-select behavior. The NPP PAF label and search path are unchanged.
+
+**Diff**
+```diff
++ if (_selectedTaskTypeFilterOption?.Value == TaskType.Npp)
++ {
++     _selectedStatusFilterOptions = new List<PafStatusFieldOption> { option };
++ }
++ else
++ {
++     // Existing multi-select behavior for other task types.
++ }
+```
+
+Only `PafQueueSearchCriteria.razor.cs` changed. Client build succeeded, and `git diff --check` passed. No commit or push was made.
