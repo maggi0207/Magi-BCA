@@ -1,33 +1,20 @@
-TASK-CPC-CVI-CHARTS-2 — add inactive, expired, and no-trigger NPP routing
+Implemented the chart-defined NPP routing; **no missing-credential CPC exception was added**.
 
-The chart is the requirement. Do not wait for an existing submit branch. Do not invent a missing-credential CPC exception. If a required credential is missing, keep the current block.
+**Active Status And Expiration**
+The reused Active license value is `"DRFB0IQ54S"` (now named `PractitionerLicense.ActiveStatusRtk`). The selected CACTUS license supplies `StatusRtk` and `Expirationdate`; the expiration trigger compares its date to today. Only recalled selections are evaluated, not “None of these apply” / new-license selections. The date comparison is strictly before today; no separate matured window was added.
 
-Quote before editing:
-1. The recalled license properties for StatusRtk and Expirationdate on the NPP task.
-2. The existing Active status RTK already used for an NPP license. Use that constant. Do not add a RTK.
-3. IsAutoAcceptedNpp in NppAutoAcceptProcessingRules. It now requires HCPSU plus VA and PA.
-4. The NPP call to CreateStandardCviRecordsAsync.
+**Changes**
+- Every MSP NPP submit now uses the existing auto-accept completion path. Failed NPP validation still returns the PAF to MSP.
+- `IsAutoAcceptedNpp` now means NPP with accepted-by user `HCPSU`; VA+PA remains one CVI trigger, not a prerequisite for auto-accept.
+- Added CVI trigger classification for VA+PA, non-Active recalled status, and recalled expiration before today. A trigger conditionally calls the existing standard CVI creation with type `HCA0095563` and initial status `UDP0000001`.
+- CVI notes name the matched trigger. Start, application-sent, and application-received dates use the auto-accept submission timestamp; the existing three-business-day MSO due-date calculation is retained.
+- Without a trigger, no NPP CVI is created; the existing Provider PDF fallback applies. With a trigger, the existing CVI attachment path applies.
+- The existing required-field validation remains the block; I added no allowed missing-credential exception.
+- No NP or Resident rules, `UDP0000002` assignment, close script, packet, or SSP Brief changes.
 
-Then implement only ADD NPP:
+Files changed: `SubmitPafStrategy.cs`, `NppAutoAcceptProcessingRules.cs`, `CactusUpdater.cs`, `CrudPractitionerLicensesOperation.cs`, `CrudEntityCredentialingOperation.cs`, `PractitionerLicense.cs`, and the processor tests and PAF API validation test.
 
-Triggers, using a recalled license only (not "None of these apply" / new license):
-- StatusRtk is present and is not the quoted Active RTK → inactive trigger.
-- Expirationdate is present and is before today → expired trigger.
-- VA = Yes and PA = Yes stays a trigger.
-Do not add a separate "matured" window. Do not add Nurse Practitioner or Resident rules.
+**Verification**
+The PAF API and PAF processor builds both passed using isolated output directories. Tests passed: **11 processor tests** and **1 PAF API blocked-submit test**. `git diff --check` passed on the touched files.
 
-Submit:
-- A trigger, or no trigger with validation passed: auto-accept through the existing NPP auto-accept method. Set AcceptedByCpcUserId to HCPSU.
-- Validation failed: ReturnedToMsp, unchanged.
-
-Processor:
-- IsAutoAcceptedNpp is NPP with AcceptedByCpcUserId == "HCPSU". Remove the requirement that VA and PA are both true.
-- A trigger creates one CVI: type HCA0095563, status UDP0000001, notes naming the trigger, MSO due = acceptance date + 3 business days, PDF parent = Credentialing.
-- No trigger: do not call CreateStandardCviRecordsAsync. PDF parent = Provider.
-- Do not assign UDP0000002. Do not add a close script. Do not create a packet. Do not change SSP Brief.
-
-Tests: VA+PA Yes still creates a CVI; inactive recalled license auto-accepts and creates a CVI; expired recalled license auto-accepts and creates a CVI; no trigger auto-accepts and does not create a CVI; a blocked submit stays blocked.
-
-Build the PAF API and the processor. git diff --check on touched files. Do not commit. Do not push.
-
-RETURN: quoted Active RTK and date field, diff, tests, and build result.
+The processor tests verify trigger classification and the Provider-versus-CVI decision; they do not execute a Cactus database write to assert the persisted CVI/PDF parent. No commit or push performed.
