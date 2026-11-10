@@ -1,20 +1,24 @@
-Implemented the chart-defined NPP routing; **no missing-credential CPC exception was added**.
+TASK-COMMIT-CPC-CVI-CHARTS — Commit NPP auto-accept and CVI triggers only
 
-**Active Status And Expiration**
-The reused Active license value is `"DRFB0IQ54S"` (now named `PractitionerLicense.ActiveStatusRtk`). The selected CACTUS license supplies `StatusRtk` and `Expirationdate`; the expiration trigger compares its date to today. Only recalled selections are evaluated, not “None of these apply” / new-license selections. The date comparison is strictly before today; no separate matured window was added.
+Stage only the files from this change:
+- SubmitPafStrategy.cs
+- NppAutoAcceptProcessingRules.cs
+- CactusUpdater.cs
+- CrudPractitionerLicensesOperation.cs
+- CrudEntityCredentialingOperation.cs
+- PractitionerLicense.cs
+- the processor test file
+- the PAF API validation test file
 
-**Changes**
-- Every MSP NPP submit now uses the existing auto-accept completion path. Failed NPP validation still returns the PAF to MSP.
-- `IsAutoAcceptedNpp` now means NPP with accepted-by user `HCPSU`; VA+PA remains one CVI trigger, not a prerequisite for auto-accept.
-- Added CVI trigger classification for VA+PA, non-Active recalled status, and recalled expiration before today. A trigger conditionally calls the existing standard CVI creation with type `HCA0095563` and initial status `UDP0000001`.
-- CVI notes name the matched trigger. Start, application-sent, and application-received dates use the auto-accept submission timestamp; the existing three-business-day MSO due-date calculation is retained.
-- Without a trigger, no NPP CVI is created; the existing Provider PDF fallback applies. With a trigger, the existing CVI attachment path applies.
-- The existing required-field validation remains the block; I added no allowed missing-credential exception.
-- No NP or Resident rules, `UDP0000002` assignment, close script, packet, or SSP Brief changes.
+If git status shows any other file, leave it out and name it. Do not push.
 
-Files changed: `SubmitPafStrategy.cs`, `NppAutoAcceptProcessingRules.cs`, `CactusUpdater.cs`, `CrudPractitionerLicensesOperation.cs`, `CrudEntityCredentialingOperation.cs`, `PractitionerLicense.cs`, and the processor tests and PAF API validation test.
+Commit message:
 
-**Verification**
-The PAF API and PAF processor builds both passed using isolated output directories. Tests passed: **11 processor tests** and **1 PAF API blocked-submit test**. `git diff --check` passed on the touched files.
+  fix(npp): auto-accept every allowed NPP and create a CVI only on a CPC trigger
 
-The processor tests verify trigger classification and the Provider-versus-CVI decision; they do not execute a Cactus database write to assert the persisted CVI/PDF parent. No commit or push performed.
+  CPC reviews the CVI for military PA, an inactive recalled license,
+  or a recalled license that expired. Other allowed NPP submits have no CVI.
+
+Then git status and git show --stat HEAD.
+
+RETURN: hash, files in the commit, anything left dirty.
