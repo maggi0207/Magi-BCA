@@ -1,5 +1,50 @@
-exceptions
-| where timestamp > ago(90d)
-| where tostring(customDimensions.FormattedMessage) has "6166"
-| project timestamp, problemId, customDimensions
-| take 20
+TASK-CPC-CVI-CHARTS — analyze, then align ADD NPP submit with the CPC charts
+
+One session. Quote the current branches before editing. Then change only ADD NPP submit and CVI creation.
+
+REQUIREMENT
+Every ADD NPP PAF that is allowed to submit is auto-accepted. CPC reviews a CVI, not the PAF. No credentialing packet.
+
+CPC trigger means one of these:
+1. VA / active-duty military = Yes AND practitioner is a PA.
+2. Existing practitioner selected a recalled license whose status is not Active.
+3. Existing practitioner selected a recalled license that is expired or matured.
+4. A required credential is missing AND the code already treats that case as an allowed CPC exception. If the code blocks it today, keep blocking it.
+7. A branch that already routes that NPP to CPC.
+
+When a trigger matches: auto-accept the PAF, create one CVI, attach the PAF PDF to the CVI.
+When no trigger matches and validation passed: auto-accept the PAF, update Cactus, attach the PAF PDF to the Provider, create no CVI.
+When validation fails: block submit. No CVI.
+
+CVI values already in code. Reuse them. Do not invent RTKs.
+- Type HCA0095563
+- Initial status UDP0000001
+- Complete status UDP0000002
+- MSO due = auto-accept date + 3 business days
+- Notes = the trigger that matched
+- Started / Received = auto-accept timestamp
+
+Do not implement Nurse Practitioner or Resident rules. The charts say those triggers are not defined.
+Do not write the database script that closes a CVI in UDP Facility Request Complete.
+Do not create a packet. Do not change SSP Brief.
+
+ANALYZE — quote, then code
+1. SubmitPafStrategy: the VA+PA Yes guard, ProcessSubmitForNppAutoAcceptAsync, and ProcessSubmitForMspAsync for other NPP.
+2. Where an inactive license and an expired or matured license are detected on ADD NPP. Quote the status values and the date check.
+3. Where a missing credential blocks submit versus routes to CPC.
+4. CreateStandardCviRecordsAsync for TaskType.Npp, including UDP0000001.
+5. The PDF decision: ShouldAttachPafPdfToProvider versus AttachPafPdfToCredentialingAsync.
+
+STOP and do not code a branch you cannot quote. In particular, stop on "missing credential explicitly allowed" if the code has no such exception. Report it. Do not invent one.
+
+IMPLEMENT
+- Keep VA = Yes and PA = Yes as auto-accept + CVI.
+- Inactive recalled license and expired or matured recalled license: auto-accept + CVI, using the checks you quoted. Do not leave those PAFs in PAF-level CPC review.
+- No quoted trigger: auto-accept, do not create a CVI, PDF parent = Provider.
+- A quoted trigger: create the CVI with the RTKs above, notes naming the trigger, PDF parent = Credentialing.
+- Leave a blocked submit blocked.
+- Do not add NP or Resident branches.
+
+Build the PAF API and the processor. Extend the existing NPP auto-accept tests for: VA+PA Yes still creates a CVI; inactive license auto-accepts and creates a CVI; expired license auto-accepts and creates a CVI; no trigger auto-accepts and does not create a CVI; a blocked submit still blocks. git diff --check on touched files. Do not commit. Do not push.
+
+RETURN: quoted branches, what you implemented, what you stopped, diff, tests, and build result.
