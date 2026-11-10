@@ -1,21 +1,28 @@
-TASK-149120 — Type filter option "NPP PAF" on Open and Completed queues
+**Analysis**
+1. Before the change, `BuildTaskTypeFilterOptions` had one NPP entry, shown as:
+   ```csharp
+   Text = "Add NPP to Facility",
+   Value = TaskType.Npp
+   ```
+   It was gated to CPC users in Completed mode. Open and Completed share the criteria component: its Queue radio switches `_mode`, and the same component rebuilds the Type list. See `PafQueueSearchCriteria.razor.cs` and `PafQueueSearch.razor`.
 
-User story 149120. MSP Dashboard PAFs tab, Open Queue and Completed Queue. The Type dropdown must include the selectable value "NPP PAF". Selecting it shows only NPP PAFs. Other Type options stay unchanged. Status, date, facility, and provider filters still combine with it.
+2. Selecting the entry sends its `TaskType.Npp` value through the existing criteria and search request. The API query builder compares non-Unknown types with `paf.IndexedTaskSelected = @TaskType`, so NPP remains an exact task-type filter. See `PafQueueSearch.razor.cs` and `PafSearchQueryBuilder.cs`.
 
-Known from 148060: PafQueueSearch already filters NPP under the text "Add NPP to Facility". The row display name is already "NPP PAF" via TaskType.Npp.GetDescription(). This story changes the dropdown value to "NPP PAF".
+3. The existing NPP entry is renamed, not duplicated. MSP-only users now see it in both modes; CPC users retain the existing Completed-only availability. Other Type options and the existing combined search path are unchanged.
 
-ANALYZE — quote, then code
-1. Where the Open Queue and Completed Queue Type options are built. Quote the NPP entry and its current text.
-2. The value sent to the search when that option is selected, and the comparison to TaskType.Npp.
-3. Whether Open and Completed share that list.
+**Diff**
+```diff
+- if (IsCpcUser && _mode == QueueMode.Completed)
++ if (IsMspOnlyUser || (IsCpcUser && _mode == QueueMode.Completed))
+  {
+      options.Add(new()
+      {
+-         Text = "Add NPP to Facility",
++         Text = "NPP PAF",
+          Value = TaskType.Npp
+      });
+  }
+```
 
-IMPLEMENT
-- The option text is exactly "NPP PAF" on both Open and Completed.
-- Selecting it still returns only TaskType.Npp.
-- Do not add a second NPP option. Do not remove "Add NPP to Facility" if that string is the same option; rename it.
-- Do not change other Type options, the Begin NPP PAF button, or CPC-only pages unless they use this same list. If they do, quote that and keep one shared label.
-- Combined filters stay on the existing search path.
-
-Build the client. git diff --check on touched files. Do not commit. Do not push.
-
-RETURN: quoted option source, diff, and build result.
+**Validation**
+Client build succeeded. `git diff --check` passed for the touched file. No commit or push was performed.
