@@ -1,50 +1,41 @@
-TASK-CPC-CVI-CHARTS — analyze, then align ADD NPP submit with the CPC charts
+**Stopped before editing** per your instruction. I found no source-backed exception that allows a missing required credential to route to CPC, and no existing NPP submit-routing checks for recalled-license inactive status or expiration/maturity. I did not invent those rules.
 
-One session. Quote the current branches before editing. Then change only ADD NPP submit and CVI creation.
+**Current Submit Branches**
+`SubmitPafStrategy.cs:53` currently dispatches MSP NPP as follows:
 
-REQUIREMENT
-Every ADD NPP PAF that is allowed to submit is auto-accepted. CPC reviews a CVI, not the PAF. No credentialing packet.
+```csharp
+if (TaskSelected == TaskType.Npp)
+{
+    if (IsActiveDutyMilitaryOrPracticingAtVa == true &&
+        IsPhysicianAssistant == true)
+        await ProcessSubmitForNppAutoAcceptAsync(...);
+    else
+        await ProcessSubmitForMspAsync(...);
+}
+```
 
-CPC trigger means one of these:
-1. VA / active-duty military = Yes AND practitioner is a PA.
-2. Existing practitioner selected a recalled license whose status is not Active.
-3. Existing practitioner selected a recalled license that is expired or matured.
-4. A required credential is missing AND the code already treats that case as an allowed CPC exception. If the code blocks it today, keep blocking it.
-7. A branch that already routes that NPP to CPC.
+The NPP auto-accept path reloads the practitioner and tasks, calls `UpdateTaskAsync` for NPP, and then calls `CompleteMspAutoAcceptedSubmitAsync` only if processing remains successful. That marks the PAF `SubmittedByMsp`, increments the CPC-submission count, records submit info, queues PAF processing, and sets accepted-by CPC user info. The other NPP path uses `ProcessSubmitForMspAsync`; it does not auto-accept through this method. A validation failure sets the PAF to `ReturnedToMsp`.
 
-When a trigger matches: auto-accept the PAF, create one CVI, attach the PAF PDF to the CVI.
-When no trigger matches and validation passed: auto-accept the PAF, update Cactus, attach the PAF PDF to the Provider, create no CVI.
-When validation fails: block submit. No CVI.
+The processor’s existing auto-accepted-NPP predicate also requires `AcceptedByCpcUserId == "HCPSU"` and both VA/active-duty and PA flags true in `NppAutoAcceptProcessingRules.cs:8`.
 
-CVI values already in code. Reuse them. Do not invent RTKs.
-- Type HCA0095563
-- Initial status UDP0000001
-- Complete status UDP0000002
-- MSO due = auto-accept date + 3 business days
-- Notes = the trigger that matched
-- Started / Received = auto-accept timestamp
+**License And Missing-Credential Branches**
+The ADD NPP form displays recalled licenses as state, license number, and expiration date, with a “None of these apply” option. The available NPP new-license status choices are Active, Temporary Permit, Active Military, and Active-Compact. I found no submit-routing comparison of a recalled license’s `StatusRtk` or expiration/maturity date.
 
-Do not implement Nurse Practitioner or Resident rules. The charts say those triggers are not defined.
-Do not write the database script that closes a CVI in UDP Facility Request Complete.
-Do not create a packet. Do not change SSP Brief.
+The license processor reads `selectedLicense.StatusRtk` and `selectedLicense.Expirationdate` to populate/update a license record, but does not branch on them to auto-accept or create a CVI. A missing selected key or a missing selected license is logged and returned from that operation; I found no CPC-exception routing there.
 
-ANALYZE — quote, then code
-1. SubmitPafStrategy: the VA+PA Yes guard, ProcessSubmitForNppAutoAcceptAsync, and ProcessSubmitForMspAsync for other NPP.
-2. Where an inactive license and an expired or matured license are detected on ADD NPP. Quote the status values and the date check.
-3. Where a missing credential blocks submit versus routes to CPC.
-4. CreateStandardCviRecordsAsync for TaskType.Npp, including UDP0000001.
-5. The PDF decision: ShouldAttachPafPdfToProvider versus AttachPafPdfToCredentialingAsync.
+The UI/API required-field rule for state licenses is conditional on `ShouldShowStateLicenses(task)`, and requires `SelectedStateLicenseKey`; when “new license” is selected, it requires the new-license fields and license PSV. I found no explicit rule that says a missing required credential is nevertheless allowed and should be routed to CPC. **This is the requested stop condition.**
 
-STOP and do not code a branch you cannot quote. In particular, stop on "missing credential explicitly allowed" if the code has no such exception. Report it. Do not invent one.
+**Existing CVI And PDF Branches**
+For a completed NPP task, `CactusUpdater.cs:663` calls `CreateStandardCviRecordsAsync`. The NPP credentialing type is `HCA0095563`; that CVI call sets status override to `UDP0000001` in `CactusUpdater.cs:1072`. `UDP0000002` exists as the `UdpFacilityRequestCompleteCviStatusRtk` constant, but I did not find it assigned in this creation path. Creation sets credentialing status-as-of and default start date to `DateTime.Now.Date`; NPP MSO due date is acceptance date plus three business days. Notes use `ResolveNotes()`, whose normal fallback is `Paf.MspReviewComments`, not a trigger description.
 
-IMPLEMENT
-- Keep VA = Yes and PA = Yes as auto-accept + CVI.
-- Inactive recalled license and expired or matured recalled license: auto-accept + CVI, using the checks you quoted. Do not leave those PAFs in PAF-level CPC review.
-- No quoted trigger: auto-accept, do not create a CVI, PDF parent = Provider.
-- A quoted trigger: create the CVI with the RTKs above, notes naming the trigger, PDF parent = Credentialing.
-- Leave a blocked submit blocked.
-- Do not add NP or Resident branches.
+The existing PDF decision is based on whether any credentialing key was affected:
 
-Build the PAF API and the processor. Extend the existing NPP auto-accept tests for: VA+PA Yes still creates a CVI; inactive license auto-accepts and creates a CVI; expired license auto-accepts and creates a CVI; no trigger auto-accepts and does not create a CVI; a blocked submit still blocks. git diff --check on touched files. Do not commit. Do not push.
+```csharp
+if (ShouldAttachPafPdfToProvider(paf, updateResult.AffectedCredentialingKeys.Count > 0))
+    await UploadPafImageToProviderAsync(...);
+```
 
-RETURN: quoted branches, what you implemented, what you stopped, diff, tests, and build result.
+Provider attachment uses `ParentFileK = ImageParentFileKValues.Provider`; the credentialing branch uses `ParentFileK = ImageParentFileKValues.Credentialing` and the credentialing key. These existing paths don’t implement the requested new inactive/expired trigger routing.
+
+**Result**
+No code changed; no tests, builds, or `git diff --check` run. The missing-credential CPC exception is not present to quote, and the inactive/expired recalled-license triggers are not present in the inspected submit logic. Implementing those branches would require a source-backed rule before proceeding.
