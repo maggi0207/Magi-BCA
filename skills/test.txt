@@ -1,24 +1,21 @@
-TASK-COMMIT-CPC-CVI-CHARTS — Commit NPP auto-accept and CVI triggers only
+TASK-149120 — Type filter option "NPP PAF" on Open and Completed queues
 
-Stage only the files from this change:
-- SubmitPafStrategy.cs
-- NppAutoAcceptProcessingRules.cs
-- CactusUpdater.cs
-- CrudPractitionerLicensesOperation.cs
-- CrudEntityCredentialingOperation.cs
-- PractitionerLicense.cs
-- the processor test file
-- the PAF API validation test file
+User story 149120. MSP Dashboard PAFs tab, Open Queue and Completed Queue. The Type dropdown must include the selectable value "NPP PAF". Selecting it shows only NPP PAFs. Other Type options stay unchanged. Status, date, facility, and provider filters still combine with it.
 
-If git status shows any other file, leave it out and name it. Do not push.
+Known from 148060: PafQueueSearch already filters NPP under the text "Add NPP to Facility". The row display name is already "NPP PAF" via TaskType.Npp.GetDescription(). This story changes the dropdown value to "NPP PAF".
 
-Commit message:
+ANALYZE — quote, then code
+1. Where the Open Queue and Completed Queue Type options are built. Quote the NPP entry and its current text.
+2. The value sent to the search when that option is selected, and the comparison to TaskType.Npp.
+3. Whether Open and Completed share that list.
 
-  fix(npp): auto-accept every allowed NPP and create a CVI only on a CPC trigger
+IMPLEMENT
+- The option text is exactly "NPP PAF" on both Open and Completed.
+- Selecting it still returns only TaskType.Npp.
+- Do not add a second NPP option. Do not remove "Add NPP to Facility" if that string is the same option; rename it.
+- Do not change other Type options, the Begin NPP PAF button, or CPC-only pages unless they use this same list. If they do, quote that and keep one shared label.
+- Combined filters stay on the existing search path.
 
-  CPC reviews the CVI for military PA, an inactive recalled license,
-  or a recalled license that expired. Other allowed NPP submits have no CVI.
+Build the client. git diff --check on touched files. Do not commit. Do not push.
 
-Then git status and git show --stat HEAD.
-
-RETURN: hash, files in the commit, anything left dirty.
+RETURN: quoted option source, diff, and build result.
