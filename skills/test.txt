@@ -1,28 +1,15 @@
-**Status Chip Path**
-The chip binding in `PafQueueSearchCriteria.razor` is:
+TASK-149120-COUNTS — Status counts must follow the Type filter
 
-> `Checked="_selectedStatusFilterOptions.Contains(status)" CheckedChanged="_checked => OnStatusCheckChange(status, _checked)"`
+MSP Open queue. The badges stay Saved (50) and Submitted (20), and Open stays (70), after Type is changed to NPP PAF or to Add Practitioner to Facility. The grid then shows one row. The badge totals are the whole queue. They do not match the filtered rows.
 
-The handler sends the selected statuses through the existing criteria-change callback. The client search request writes:
+Quote where the Saved and Submitted badge counts are loaded, and whether that query receives TaskType. Quote the grid query that already applies TaskType.Npp as IndexedTaskSelected.
 
-> `Status = BuildStatusFilterForSearchCriteria(_searchCriteriaModel),`
->
-> `TaskType = _searchCriteriaModel.TaskTypeFilter.Value.GetValueOrDefault(TaskType.Unknown),`
+Then make the badge counts use the selected Type:
+- Type = NPP PAF: Saved shows how many NPP PAFs are Saved. Submitted shows how many NPP PAFs are Submitted. The grid for that chip shows those same rows, and the row count matches the badge.
+- Type = Add Practitioner to Facility: the badges count only that type, and the grid matches.
+- Type cleared: the badges return to the current whole-queue counts.
+- Do not change the NPP PAF option text. Other status chips use the same Type scope.
 
-The API query applies each ordinary status as `paf.IndexedPafStatus = @PafStatus{idx}` and ORs the selected statuses. Separately, NPP adds `paf.IndexedTaskSelected = @TaskType`; these predicates are combined with AND. The issue was that clicking Submitted while Saved was selected added Submitted without removing Saved.
+Build the client and the API if the count query changes. git diff --check on touched files. Do not commit. Do not push.
 
-For NPP PAF, a status-chip click now replaces the previous status selection with the clicked status. Other task types retain their existing multi-select behavior. The NPP PAF label and search path are unchanged.
-
-**Diff**
-```diff
-+ if (_selectedTaskTypeFilterOption?.Value == TaskType.Npp)
-+ {
-+     _selectedStatusFilterOptions = new List<PafStatusFieldOption> { option };
-+ }
-+ else
-+ {
-+     // Existing multi-select behavior for other task types.
-+ }
-```
-
-Only `PafQueueSearchCriteria.razor.cs` changed. Client build succeeded, and `git diff --check` passed. No commit or push was made.
+RETURN: quoted count query, diff, and build result.
