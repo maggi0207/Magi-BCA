@@ -1,15 +1,15 @@
-TASK-COMMIT-149120 — Commit the NPP PAF queue filter label
+TASK-149120-STATUS — Submitted chip must change the NPP PAF grid
 
-Stage only PafQueueSearchCriteria.razor.cs if that is the only file in this change.
-If git status shows any other file, leave it out and name it. Do not push.
+MSP queue, Type = NPP PAF. The dropdown value is NPP PAF and the row task type is NPP PAF. Status chips show Saved (50) and Submitted (20). The grid still shows a Saved row (Passmore, status Saved, Work and Delete). Clicking Submitted does not replace that row with the Submitted NPP PAFs.
 
-Commit message:
+Quote the status-chip click in PafQueueSearch / PafQueueSearchCriteria: what it writes into the search request, and how IndexedPafStatus is applied together with TaskType.Npp.
 
-  fix(npp): show NPP PAF in the MSP queue type filter
+Then fix only that path:
+- Type NPP PAF plus Submitted returns only NPP PAFs whose status is Submitted.
+- Type NPP PAF plus Saved returns only NPP PAFs whose status is Saved.
+- Switching the chip replaces the grid. Do not leave the previous status on screen.
+- Other types and the NPP PAF option text stay as they are.
 
-  Open and Completed queues listed the NPP type as Add NPP to Facility
-  for CPC Completed only. MSP queues now offer NPP PAF on both.
+Build the client. git diff --check on touched files. Do not commit. Do not push.
 
-Then git status and git show --stat HEAD.
-
-RETURN: hash, files in the commit, anything left dirty.
+RETURN: quoted status binding, diff, and build result.
