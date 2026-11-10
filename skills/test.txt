@@ -1,28 +1,15 @@
-**Analysis**
-1. Before the change, `BuildTaskTypeFilterOptions` had one NPP entry, shown as:
-   ```csharp
-   Text = "Add NPP to Facility",
-   Value = TaskType.Npp
-   ```
-   It was gated to CPC users in Completed mode. Open and Completed share the criteria component: its Queue radio switches `_mode`, and the same component rebuilds the Type list. See `PafQueueSearchCriteria.razor.cs` and `PafQueueSearch.razor`.
+TASK-COMMIT-149120 — Commit the NPP PAF queue filter label
 
-2. Selecting the entry sends its `TaskType.Npp` value through the existing criteria and search request. The API query builder compares non-Unknown types with `paf.IndexedTaskSelected = @TaskType`, so NPP remains an exact task-type filter. See `PafQueueSearch.razor.cs` and `PafSearchQueryBuilder.cs`.
+Stage only PafQueueSearchCriteria.razor.cs if that is the only file in this change.
+If git status shows any other file, leave it out and name it. Do not push.
 
-3. The existing NPP entry is renamed, not duplicated. MSP-only users now see it in both modes; CPC users retain the existing Completed-only availability. Other Type options and the existing combined search path are unchanged.
+Commit message:
 
-**Diff**
-```diff
-- if (IsCpcUser && _mode == QueueMode.Completed)
-+ if (IsMspOnlyUser || (IsCpcUser && _mode == QueueMode.Completed))
-  {
-      options.Add(new()
-      {
--         Text = "Add NPP to Facility",
-+         Text = "NPP PAF",
-          Value = TaskType.Npp
-      });
-  }
-```
+  fix(npp): show NPP PAF in the MSP queue type filter
 
-**Validation**
-Client build succeeded. `git diff --check` passed for the touched file. No commit or push was performed.
+  Open and Completed queues listed the NPP type as Add NPP to Facility
+  for CPC Completed only. MSP queues now offer NPP PAF on both.
+
+Then git status and git show --stat HEAD.
+
+RETURN: hash, files in the commit, anything left dirty.
