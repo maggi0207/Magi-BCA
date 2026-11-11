@@ -1,114 +1,27 @@
-132644 NPP: State License Records Preserve Existing Active Practitioner State Licenses
+TASK-132643-EXPIRED-WARN — Past expiration warns, then creates a CVI
 
-User Story 5.3 – Preserve Existing Active Practitioner State Licenses
-As a Credentialing Specialist
-I want prepopulated licenses preserved
-So that verified licensure information remains intact.
+Laura, on 132643: if the expiration date is before today, show:
 
-Acceptance Criteria
-Given practitioner is active elsewhere
-When license exists
-Then no updates occur.
+The expiration date entered is in the past. Are you sure you want to continue?
 
-Comment
-As discussed with Laura and Mahendra, this is a new change request from the user. I do not want to modify the original user story description, so I am documenting the requested enhancement in the comments section. Please review and validate the following changes for this ticket.
+This is not a validation error. Do not block the field.
+Yes continues the save and a CVI is created.
+No stays on the ADD NPP form. Do not submit. Do not create a CVI.
+Show the warning only when the expiration date is before today.
 
-Ticket Title
-State License Section Should Prepopulate Existing License Records and Allow Editing
+The screenshot is Add New State License: Texas, status Active, expiration 11/03/2026. That date is before today.
 
-Description
-Currently, when a provider record contains existing State License information, the State Licenses section does not prepopulate the previously saved records. Users are required to re-enter license information instead of updating existing details.
-The application should automatically populate all existing State License records when the page is opened in Edit mode. Users should be able to review and modify the prepopulated information as needed.
+Quote the current expired-license CVI trigger. It compares a recalled license Expirationdate to today and does not include the new-license expiration.
 
-Acceptance Criteria
-Existing State License records are automatically displayed when editing a record.
-All previously saved license field values are prepopulated.
-Users can edit and update:
-State
-Effective Date
-License Number
-Status
-Expiration Date
-Field of Licensure
-Updated values are saved and persist after refresh/reopening the record.
-No duplicate license records are created during the update process.
-Expected Behavior
-When a user opens an existing provider/application record, the system should:
+Then:
+- On NppTaskForm, run the warning for a new license and for a recalled license when that expiration is before today.
+- Yes sets the existing expired-license CVI trigger, including a new license whose expiration is before today. One CVI, type HCA0095563, status UDP0000001. The PAF still auto-accepts.
+- No does not set that trigger and does not leave the form.
+- A date of today or later does not warn and does not create a CVI by itself.
+- Do not change the Active recalled-license trigger or the VA+PA trigger.
+- Do not update an existing active license. 132644 still means no Cactus update when the practitioner is active elsewhere. Prepopulate the recalled list. Do not add edit fields that write State, dates, number, status, or field of licensure back onto that license.
+- Do not invent LICMONENROLLMENTSTATUS_RTK.
 
-Retrieve and display all existing State License records.
-Prepopulate the following fields with saved values:
-State
-Effective Date
-License Number
-Status
-Expiration Date
-Field of Licensure
-Allow users to edit any of the prepopulated fields.
-Save updates successfully without requiring a new license record to be created.
+Build the client and the processor. git diff --check on touched files. Do not commit. Do not push.
 
-
-132643 - NPP: State License Records Create State License Record
-
-User Story 5.2 – Create State License Record
-As an MSP
-I want new state licenses added from the PAF
-So that licensing information is available for credentialing.
-
-Acceptance Criteria
-Given no duplicate exists
-When a new license is submitted
-Then a state license record is created.
-
-Required Values
-Field
-
-Value
-
-PersistentVerification
-
-T
-
-Type_RTK
-
-NPDSTATEx
-
-NPDBPrimaryLicense
-
-T
-
-License_RTK
-
-State License
-
-License Number
-
-PAF Value
-
-Award Date
-
-PAF Value
-
-Expiration Date
-
-PAF Value
-
-LicensureField_RTK
-
-PAF Value
-
-LICMONENROLLMENTSTATUS_RTK
-
-Requesting – Ready to enroll in LEMM
-
-Comment : Expected :
-
-If the entered Expiration Date is earlier than the current date, the system should display a warning message:
-
-"The expiration date entered is in the past. Are you sure you want to continue?"
-
-An expired license date triggers a warning message, not a validation error.
-Users are not blocked from continuing when an expired license is entered.
-Selecting Yes on the warning message allows the process to continue and creates a CVI.
-Selecting No returns the user to the form without creating a CVI.
-The warning message is displayed only when the license expiration date is in the past.
-
+RETURN: quoted trigger, where Yes and No are handled, diff, and build result.
