@@ -1,61 +1,24 @@
-**Verdict**
-**Not every chart passes.** The current local code satisfies 148741, but required-credential server validation and shared CVI-creation paths prevent full chart sign-off. Read-only audit only; no files changed, builds run, or fixes started.
+TASK-COMMIT-PUSH-148741 — Commit the remaining NPP CPC-queue guard and push
 
-**Charts 1–9**
-1. **Pass for the normal triggered path: Military / VA PA.** `NppAutoAcceptProcessingRules.cs:24`:
-   `paf.NppTask?.IsActiveDutyMilitaryOrPracticingAtVa == true && paf.NppTask.IsPhysicianAssistant == true`
-   adds `"VA/active-duty military and PA"`. `NppTask.cs:74` requires `nameof(SanctionsPsvAttachmentUrl) or nameof(NpiPsvAttachmentUrl) => true`. Matching reasons produce one standard CVI call, with its PDF attached to the CVI. Initial status is `UDP0000001`, supporting the CPC CVI-review workflow; HCP does not assign a CPC reviewer here. **HCP does not perform the UDP Facility Request Complete auto-close in this processor path**; that remains external database-script behavior. See validation and lifecycle qualifications in rows 4 and 9.
+The auto-accept rule is already committed as d92a74d1e. Do not recommit SubmitPafStrategy.cs, NppAutoAcceptProcessingRules.cs, or CactusUpdater.cs if git status shows them clean.
 
-2. **Pass: Recalled license not Active.** `NppAutoAcceptProcessingRules.cs:34`:
-   `!string.IsNullOrWhiteSpace(selectedLicenseStatusRtk) && selectedLicenseStatusRtk != PractitionerLicense.ActiveStatusRtk`
-   adds `"recalled license status is not Active"`. Active falls through to the expiration check. Blank status does not itself trigger. Submit still auto-accepts; CVI creation requires `IsAutoAcceptedNpp(paf) && !string.IsNullOrWhiteSpace(trigger)`.
+Run git status. Stage only the uncommitted 148741 files:
+- the acceptance helper that sets AcceptedByCpcUserId to HCPSU for every MSP NPP (ModelExtensions or the file git status names)
+- PafStatusFilter.cs, the CPC review-count exclusion for TaskType.Npp
+- CpcReviewDetailsForm.razor and CpcReviewDetailsForm.razor.cs, the guard that skips packet actions when the PAF is NPP
+- the regression test files for those guards
 
-3. **Pass for expiration; separate matured window Not defined.** `NppAutoAcceptProcessingRules.cs:40`:
-   `selectedLicenseExpirationDate.HasValue && selectedLicenseExpirationDate.Value.Date < today.Date`
-   adds `"recalled license is expired"`. The caller supplies `DateTime.Today`. Expiration today does not trigger. There is no separate matured-window calculation.
+If git status shows any other file, leave it out and name it. Do not stage launchSettings, skills, or unrelated work.
 
-4. **Gap: Missing required credential is not reliably blocked server-side.** Client validation requires the applicable license fields and PSV URLs. However, the closest `UpdateTaskNppStrategy.cs:27` first sets `task.Status = TaskStatus.Complete;` and only rejects:
-   `!task.IsActiveDutyMilitaryOrPracticingAtVa.HasValue || (task.IsActiveDutyMilitaryOrPracticingAtVa == true && !task.IsPhysicianAssistant.HasValue)`.
-   It does not validate all required credential/PSV fields. **No missing-credential CPC exception was found or added.**
+Commit message:
 
-5. **Not defined: Nurse Practitioner-only trigger.** No NP-only CPC branch exists. The `NppAutoAcceptProcessingRules.cs:17` ends with `return triggers.Count == 0 ? null : string.Join("; ", triggers);`, after only VA+PA, non-Active recalled license, and expired recalled license checks. No other trigger means standard processing, subject to row 8’s gap.
+  fix(npp): keep a new-license NPP out of the CPC queue
 
-6. **Not defined: Resident-only trigger.** Same `NppAutoAcceptProcessingRules.cs:17`: `return triggers.Count == 0 ? null : string.Join("; ", triggers);`. There is no Resident-only condition. Resident status alone does not route to CPC.
+  A new state license was waiting for CPC acceptance. NPP is excluded
+  from that queue, and the packet actions are not offered.
 
-7. **Gap against an exclusive charts-1–3 CVI policy.** Charts 1–3 are the only **explicit NPP trigger-builder conditions**, and no other NPP “Route to CPC” branch was found. However, `CactusUpdater.cs:887` also executes `if (paf.DoesPafRequirePersonalInfoChangeCvi())` and creates a `ChangeInfoCredentialingTypeRtk` CVI. Its `PafExtensions.cs:331` checks completed demographics and changed names/suffix/degrees/NPI, without excluding NPP. This is an existing shared branch, **not an invented NPP trigger**.
+Then git status and git show --stat HEAD.
 
-8. **Gap overall; existing-practitioner no-trigger path passes.** `CactusUpdater.cs:675` runs `await crudPractitionerLicensesOperation.ExecuteAsync();` and gates CVI creation with `if (NppAutoAcceptProcessingRules.ShouldCreateNppCvi(paf, nppCviTrigger))`. `NppAutoAcceptProcessingRules.cs:55` is `return IsAutoAcceptedNpp(paf) && !hasCredentialingRecord;`. A new license is excluded from recalled-license triggers by `selectedLicenseKey != NppTask.NewLicenseOption`.
-   **Closest conflicting branch:** net-new practitioners dispatch through `else if (paf.Practitioner.IsNew)` and `CactusUpdater.cs:344` with `await CreateStandardCviRecordsAsync(...)`, without the NPP trigger guard. Missing credentials can also escape server validation, as row 4 describes. Detected validation failures do block auto-accept through `if (pafProcessingResult.Status == PafProcessingResultStatus.Success)`.
+Push the current branch to its existing remote. Do not force push. Do not create a new branch.
 
-9. **Gap for an unconditional lifecycle guarantee; ordinary triggered-path fields pass.** `CactusUpdater.cs:1094` supplies the following:
-   - **Type/status:** constants are `"HCA0095563"` and `"UDP0000001"` in `CommonCactusRtks.cs:41`; creation chooses `? CommonCactusRtks.UdpFacilityRequestCviStatusRtk : null`. `UDP0000002` is not assigned on NPP create.
-   - **Started/Received:** `CredentialingStartDate = paf.TaskSelected == TaskType.Npp ? paf.SubmittedDate : null` and `ApplicationReceivedDate = paf.TaskSelected == TaskType.Npp ? paf.SubmittedDate : DateTime.MaxValue`. This is the submission timestamp recorded during auto-accept, not later processor execution time or a separate acceptance timestamp.
-   - **MSO due:** `CrudEntityCredentialingOperation.cs:407` uses `? paf.SubmittedDate : paf.StatusDate`, then `return CalculateBusinessDueDate(startDate, 3, holidays);`. The helper excludes Saturday, Sunday, and returned blackout dates.
-   - **Notes/PDF:** `CrudEntityCredentialingOperation.cs:725` return `$"NPP auto-accept trigger: {NppCviTrigger}"`; `CactusUpdater.cs:1763` uses `ParentFileK = ImageParentFileKValues.Credentialing`.
-   - **Qualification:** the net-new call omits `nppCviTrigger`, so trigger-naming notes are not universal; row 7’s shared branch can add another CVI. No close-script invocation was found in the inspected HCP processor path. External database automation was not verified.
-
-**148741: Pass**
-For the reported new-license scenario on an existing practitioner, current local source auto-accepts and excludes NPP from CPC review queues.
-
-`SubmitPafStrategy.cs:49`:
-```csharp
-if (pafProcessingResult.PafFormData.TaskSelected == TaskType.Npp)
-{
-    await ProcessSubmitForNppAutoAcceptAsync(pafProcessingResult);
-}
-```
-A new license does **not** call `ProcessSubmitForMspAsync` under this MSP NPP guard. `ModelExtensions.cs:274` includes all MSP NPPs and assigns `formData.AcceptedByCpcUserId = "HCPSU";`. `PafStatusFilter.cs:33` includes `AND paf.IndexedTaskSelected <> {(int)TaskType.Npp}`; the repository applies the same exclusion to review counts and next-PAF selection.
-
-The `CpcAction.cs:7`: “Accept Request and send full R/RFC packet”, “Accept Request - Paper Packet: Update Credentialing System”, “Send request back to MSP”, and “Process Request Manually”. They are **not built for NPP**, because `CpcReviewDetailsForm.razor.cs:73` starts with `if (pafState.TaskSelected == TaskType.Npp) return;`. The `CpcReviewDetailsForm.razor:14` is also guarded by `@if (StateContainer.PafState.TaskSelected != TaskType.Npp)`.
-
-`NppAutoAcceptProcessingRules.cs:11` is exactly:
-```csharp
-return paf?.TaskSelected == TaskType.Npp &&
-       paf.AcceptedByCpcUserId == "HCPSU";
-```
-**Pass:** VA+PA is a CVI trigger, not an auto-accept prerequisite. This is source verification, not a live retest of QA PAF 6058.
-
-**Committed Or Local**
-`git status --short` shows the three requested files clean. Each file’s latest `git log` entry is **`d92a74d1e`**, “fix(npp): auto-accept every allowed NPP and create a CVI only on a CPC trigger”, dated **2026-11-09T20:42:04−06:00**, equivalent to **2026-11-10 UTC**. The described chart-rule change is **committed**.
-
-The acceptance-helper correction, CPC queue exclusions, action-list/visibility guards, and regression tests remain **local modifications**. Other pre-existing worktree changes are also present. No fix started during this audit.
+RETURN: commit hash, files in the commit, files left dirty, and the push result.
