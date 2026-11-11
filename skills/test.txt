@@ -1,52 +1,12 @@
-Implemented the expiration warning. No commit or push.
+Commit only the expiration warning. Do not push.
 
-**Original Trigger**
-The existing `NppAutoAcceptProcessingRules.cs:30` only considers recalled licenses:
-```csharp
-var isRecalledLicense = !string.IsNullOrWhiteSpace(selectedLicenseKey) &&
-                        selectedLicenseKey != NppTask.NewLicenseOption;
-```
-Inside that branch:
-```csharp
-if (selectedLicenseExpirationDate.HasValue &&
-    selectedLicenseExpirationDate.Value.Date < today.Date)
-{
-    triggers.Add("recalled license is expired");
-}
-```
-That date comes from the recalled Cactus license’s `Expirationdate`, not the new-license field.
+Five files: NppTaskForm markup, NppTaskForm code, the shared NPP task, NppAutoAcceptProcessingRules, and the focused processor tests.
 
-**Yes And No**
-`NppTaskForm.razor:200` now shows exactly:
+Quote any Active-status constant hunk in that diff. If it only keeps DRFB0IQ54S for the recalled Active trigger, leave it. If it changes the RTK or adds a new constant, leave that hunk out and stop.
 
-> The expiration date entered is in the past. Are you sure you want to continue?
+Do not stage SubmitPafStrategy, CactusUpdater, launchSettings, UnityApiLoadBalancer, Background, TestCactusUpdater, or skills.
 
-The warning runs after validation, before saving, for either the entered new-license expiration or the selected recalled-license expiration.
+Message:
+warn on a past NPP license expiration and create a CVI only after Yes
 
-In `NppTaskForm.razor.cs:186`:
-- **Yes:** `ConfirmExpiredLicense` sets `ConfirmedExpiredLicense = true` and calls `CompleteNppTask(true)`.
-- **No:** `CancelExpiredLicense` clears confirmation and closes the warning. It does not invoke the save callback or leave the form.
-- **Today or later:** no warning and no expiration-only CVI trigger.
-
-**Diff**
-Five files changed: the form markup/code, shared NPP task, processor rules, and focused tests. The new processor branch is:
-```csharp
-else if (selectedLicenseKey == NppTask.NewLicenseOption &&
-         paf.NppTask?.ConfirmedExpiredLicense == true &&
-         paf.NppTask.NewLicenseExpirationDate.HasValue &&
-         paf.NppTask.NewLicenseExpirationDate.Value.Date < today.Date)
-{
-    triggers.Add("new license is expired");
-}
-```
-It feeds the existing single-CVI creation path, using type `HCA0095563` and initial status `UDP0000001`. Auto-accept remains unchanged.
-
-The recalled-license status trigger, VA+PA trigger, prepopulated recalled list, and active-practitioner no-update guard are unchanged. No recalled-license edit fields or `LICMONENROLLMENTSTATUS_RTK` were added. The pre-existing local Active-status constant change was preserved.
-
-**Verification**
-- Client build: **passed**
-- Processor build: **passed**
-- Focused processor tests: **16 passed**
-- `git diff --check` on all five touched files: **passed**
-
-The browser interaction and live Cactus CVI creation were not exercised.
+Return the hash and git status. Do not push.
