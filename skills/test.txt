@@ -1,59 +1,10 @@
-Implemented TASK-132644-EDIT. Changes remain local; no commit or push.
+Commit the past-expiration warning and the selected-license edit together. Do not push.
 
-**Original Preserve Branch**
-The previous `CrudPractitionerLicensesOperation.cs:432` skipped updates for active practitioners:
-```csharp
-licenseKey = existingLicense.ProviderlicenseK;
-if (PafDataContext.Practitioner.IsNew || !PafDataContext.Practitioner.Active)
-{
-    await UpdateNppStateLicenseAsync(existingLicense, state, licenseNumber,
-        statusRtk, awardedDate, expirationDate, licensureFieldRtk);
-}
-```
+Include only the NPP license files in this diff: NppTaskForm markup and code, the shared NPP task, the license response, CrudPractitionerLicensesOperation, the processor rules, and their tests.
 
-The recalled list remains loaded on open and still displays:
-```razor
-@license.State | @license.LicenseNumber | @license.ExpirationDate?.ToString("MM/dd/yyyy")
-```
-plus “None of these apply. Add New State License Instead.”
+Leave out SubmitPafStrategy, CactusUpdater, launchSettings, UnityApiLoadBalancer, Background, TestCactusUpdater, and skills.
 
-**Fields And Persistence**
-`NppTaskForm.razor.cs:215` calls `NppTask.cs:67`, which fills all six editable fields:
-```csharp
-SelectedStateLicenseKey = license.Key;
-EditedStateLicenseKey = license.Key;
-NewLicenseState = license.State;
-NewLicenseEffectiveDate = license.AwardedDate;
-NewLicenseNumber = license.LicenseNumber;
-NewLicenseStatusRtk = license.StatusRtk;
-NewLicenseExpirationDate = license.ExpirationDate;
-NewLicenseFieldOfLicensure = license.FieldOfLicensureRtk;
-```
-Saved task values are retained on reopening when the edit marker matches the selected key. The Cactus response now includes raw status and licensure RTKs for prepopulation.
+Message:
+warn on a past NPP license expiration and update the selected existing license in place
 
-**Same-Key Update**
-The processor resolves the selected license by key and practitioner, then fixes the target:
-```csharp
-var existingLicense = isNewLicense
-    ? matchingLicenses.FirstOrDefault()
-    : selectedLicense;
-```
-The update guard now permits that selected recalled row:
-```csharp
-if (!isNewLicense || PafDataContext.Practitioner.IsNew ||
-    !PafDataContext.Practitioner.Active)
-```
-The existing audited update method retains `ProviderlicenseK` and calls `Connection.UpdateAsync(updatedLicense, DbTransaction)`. A duplicate state/number on another key is rejected in both client validation and processor processing. Unselected state-license rows are not updated.
-
-**Diff And Verification**
-Seven files changed: **172 insertions, 21 deletions**. The changes cover the response fields, task-backed edits, form controls, selected-key processor update, and regression tests.
-
-Add New’s insertion behavior is preserved. The past-expiration warning, `ConfirmedExpiredLicense`, and `"new license is expired"` trigger remain. Edited recalled status and expiration feed the existing recalled CVI triggers. No packet, Begin PAF, NP, Resident, or invented RTK changes.
-
-- Client build: **passed**
-- Processor build: **passed**
-- Focused tests: **19 passed**
-- Cactus API build with isolated outputs: **passed**
-- `git diff --check` on all seven touched files: **passed**
-
-Browser interaction and live database updates were not exercised.
+Return the hash and git status. Do not push.
