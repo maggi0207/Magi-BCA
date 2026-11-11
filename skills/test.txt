@@ -1,38 +1,20 @@
-**Disabled Bindings**
-In `PractitionerSearchForm.razor`:
+TASK-148741 — A new NPP state license must auto-accept, not enter the CPC queue
 
-> `Disabled="@(!_practitionerNpiEnabled)"`
->
-> `Disabled="@(!_practitionerFirstNameEnabled)"`
->
-> `Disabled="@(!_practitionerLastNameEnabled)"`
+QA PAF 6058, practitioner TC000BT0IR. Adding a new state license put the NPP PAF on the CPC Open queue. CPC Next Action shows packet actions: Accept Request and send full R/RFC packet, Accept Request - Paper Packet, Send request back to MSP, Process Request Manually. Those actions do not work for NPP. NPP does not create a packet.
 
-The NPI binding appears in both NPI and non-recruitment Exception Search modes.
+A new license ("None of these apply") is not a CPC trigger. VA = Yes and PA = Yes, a recalled license that is not Active, and a recalled license that expired before today are the only CVI triggers. Every other allowed NPP submit auto-accepts and stays out of the CPC PAF queue.
 
-**Cancel Paths**
-In `PractitionerSearchForm.razor.cs`, NPP’s Exception Search Cancel calls `SwitchToNpiSearch()`. It clears the NPP criteria and now calls `ResetNppSearchFieldStates()`, which sets the NPI, First Name, and Last Name enabled flags to `true`. Switching back to Exception Search also resets those flags for NPP, so First Name and Last Name are enabled after stale NPI locks.
+ANALYZE — quote, then code
+1. For a new-license NPP, which submit method runs: ProcessSubmitForNppAutoAcceptAsync or ProcessSubmitForMspAsync. Quote the guard.
+2. Where the CPC Next Action list is built. Quote the four labels and the condition that shows them.
+3. Whether the 2026-11-10 chart change (IsAutoAcceptedNpp = NPP + HCPSU, new license is not a CVI trigger) is in this branch.
 
-Cancel in Add New Practitioner invokes the modal completion callback with `Status = Cancel`; `PractitionerSearchTable.razor.cs` handles that status with `break`. That modal Cancel does not set search-form flags; the NPP mode-switch reset handles the stale flags when returning to Exception Search.
+IMPLEMENT
+- A new state license on an otherwise valid NPP auto-accepts. It is not sent to the CPC queue for acceptance.
+- The three CVI triggers above still create a CVI. Do not add a missing-credential CPC exception.
+- When the open PAF is NPP, do not show those packet next-actions. Quote the list first. Do not invent a new action. If NPP has no valid CPC PAF action, hide the packet actions.
+- Do not create a packet. Do not change SSP Brief.
 
-Per your clarification to preserve the existing NPI validation rule, Cancel enables the empty NPI input, but Search remains disabled until a valid NPI is entered.
+Build the PAF API and the client if the action list is client-side. git diff --check on touched files. Do not commit. Do not push.
 
-**Diff**
-```diff
-+ if (IsNppRequest)
-+ {
-+     ResetNppSearchFieldStates();
-+ }
-...
-  _model.ResetNppExceptionCriteria();
-+ ResetNppSearchFieldStates();
-...
-+ private void ResetNppSearchFieldStates()
-+ {
-+     _practitionerNpiEnabled = true;
-+     _practitionerSsnEnabled = true;
-+     _practitionerFirstNameEnabled = true;
-+     _practitionerLastNameEnabled = true;
-+ }
-```
-
-Only `PractitionerSearchForm.razor.cs` changed for this task. The client build succeeded and `git diff --check` passed. No commit or push was made.
+RETURN: quoted submit guard, quoted action list, diff, and build result.
