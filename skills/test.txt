@@ -1,30 +1,59 @@
-TASK-132644-EDIT — Prepopulate an existing state license and update that same record
+Implemented TASK-132644-EDIT. Changes remain local; no commit or push.
 
-132644 comment. Do not rewrite the original story. When the ADD NPP State License section opens, show the practitioner’s existing state licenses. When the user selects one, fill these fields from that license and let the user change them:
+**Original Preserve Branch**
+The previous `CrudPractitionerLicensesOperation.cs:432` skipped updates for active practitioners:
+```csharp
+licenseKey = existingLicense.ProviderlicenseK;
+if (PafDataContext.Practitioner.IsNew || !PafDataContext.Practitioner.Active)
+{
+    await UpdateNppStateLicenseAsync(existingLicense, state, licenseNumber,
+        statusRtk, awardedDate, expirationDate, licensureFieldRtk);
+}
+```
 
-State
-Effective Date
-License Number
-Status
-Expiration Date
-Field of Licensure
+The recalled list remains loaded on open and still displays:
+```razor
+@license.State | @license.LicenseNumber | @license.ExpirationDate?.ToString("MM/dd/yyyy")
+```
+plus “None of these apply. Add New State License Instead.”
 
-Save writes those values back onto that same license. Reopening the PAF shows the saved values. Do not insert a second license. Licenses the user does not select are not updated.
+**Fields And Persistence**
+`NppTaskForm.razor.cs:215` calls `NppTask.cs:67`, which fills all six editable fields:
+```csharp
+SelectedStateLicenseKey = license.Key;
+EditedStateLicenseKey = license.Key;
+NewLicenseState = license.State;
+NewLicenseEffectiveDate = license.AwardedDate;
+NewLicenseNumber = license.LicenseNumber;
+NewLicenseStatusRtk = license.StatusRtk;
+NewLicenseExpirationDate = license.ExpirationDate;
+NewLicenseFieldOfLicensure = license.FieldOfLicensureRtk;
+```
+Saved task values are retained on reopening when the edit marker matches the selected key. The Cactus response now includes raw status and licensure RTKs for prepopulation.
 
-Quote the current NppTaskForm recalled list and the CrudPractitionerLicensesOperation preserve branch. The list already shows State, License Number, and Expiration Date, plus “None of these apply. Add New State License Instead.” Selecting a recalled license currently hides the edit fields. The preserve branch skips an update when the practitioner is active elsewhere.
+**Same-Key Update**
+The processor resolves the selected license by key and practitioner, then fixes the target:
+```csharp
+var existingLicense = isNewLicense
+    ? matchingLicenses.FirstOrDefault()
+    : selectedLicense;
+```
+The update guard now permits that selected recalled row:
+```csharp
+if (!isNewLicense || PafDataContext.Practitioner.IsNew ||
+    !PafDataContext.Practitioner.Active)
+```
+The existing audited update method retains `ProviderlicenseK` and calls `Connection.UpdateAsync(updatedLicense, DbTransaction)`. A duplicate state/number on another key is rejected in both client validation and processor processing. Unselected state-license rows are not updated.
 
-Then:
-- Keep loading the existing licenses on open.
-- Selecting one shows the six fields above, filled from that license, and editable. Store the edits on the NPP task against that license key.
-- On the processor, update that license key in place. The active-elsewhere skip applies only to licenses that were not selected.
-- Add New still creates a license. Do not change that path.
-- A changed State or License Number that matches another license on the same practitioner still hits the existing duplicate check.
-- The past-expiration warning stays. Do not remove ConfirmedExpiredLicense or the “new license is expired” trigger.
-- A recalled license whose edited status is not Active, or whose edited expiration is before today, still uses the existing recalled CVI triggers.
-- Do not invent LICMONENROLLMENTSTATUS_RTK. Do not change Begin PAF, packets, NP, or Resident.
+**Diff And Verification**
+Seven files changed: **172 insertions, 21 deletions**. The changes cover the response fields, task-backed edits, form controls, selected-key processor update, and regression tests.
 
-If the license operation cannot update an existing row by key, quote that method and stop. Do not add an insert to get around it.
+Add New’s insertion behavior is preserved. The past-expiration warning, `ConfirmedExpiredLicense`, and `"new license is expired"` trigger remain. Edited recalled status and expiration feed the existing recalled CVI triggers. No packet, Begin PAF, NP, Resident, or invented RTK changes.
 
-Build the client and the processor. git diff --check on touched files. Do not commit. Do not push.
+- Client build: **passed**
+- Processor build: **passed**
+- Focused tests: **19 passed**
+- Cactus API build with isolated outputs: **passed**
+- `git diff --check` on all seven touched files: **passed**
 
-RETURN: quoted preserve branch, where the six fields are filled, where the same license key is updated, diff, and build result.
+Browser interaction and live database updates were not exercised.
