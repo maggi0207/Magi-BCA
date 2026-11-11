@@ -1,20 +1,59 @@
-TASK-148741 — A new NPP state license must auto-accept, not enter the CPC queue
+TASK-CHECK-CVI-CHARTS-148741 — Does the current code satisfy every CVI chart and the new CPC-queue issue?
 
-QA PAF 6058, practitioner TC000BT0IR. Adding a new state license put the NPP PAF on the CPC Open queue. CPC Next Action shows packet actions: Accept Request and send full R/RFC packet, Accept Request - Paper Packet, Send request back to MSP, Process Request Manually. Those actions do not work for NPP. NPP does not create a packet.
+Read only. Do not edit files. Do not commit. Quote the current code for each row. If a rule is missing, say Gap and quote the closest branch. Do not invent a trigger.
 
-A new license ("None of these apply") is not a CPC trigger. VA = Yes and PA = Yes, a recalled license that is not Active, and a recalled license that expired before today are the only CVI triggers. Every other allowed NPP submit auto-accepts and stays out of the CPC PAF queue.
+Charts to check:
 
-ANALYZE — quote, then code
-1. For a new-license NPP, which submit method runs: ProcessSubmitForNppAutoAcceptAsync or ProcessSubmitForMspAsync. Quote the guard.
-2. Where the CPC Next Action list is built. Quote the four labels and the condition that shows them.
-3. Whether the 2026-11-10 chart change (IsAutoAcceptedNpp = NPP + HCPSU, new license is not a CVI trigger) is in this branch.
+1. Military / VA PA
+VA = Yes and practitioner is PA, with Sanctions PSV and NPI PSV.
+Pass = auto-accept, create one CVI, CPC reviews the CVI, PDF on the CVI.
+UDP Facility Request Complete auto-close is a database script. Say if HCP does not close it.
 
-IMPLEMENT
-- A new state license on an otherwise valid NPP auto-accepts. It is not sent to the CPC queue for acceptance.
-- The three CVI triggers above still create a CVI. Do not add a missing-credential CPC exception.
-- When the open PAF is NPP, do not show those packet next-actions. Quote the list first. Do not invent a new action. If NPP has no valid CPC PAF action, hide the packet actions.
-- Do not create a packet. Do not change SSP Brief.
+2. Recalled license not Active
+Pass = auto-accept, create one CVI. A license that is Active falls through to the other checks.
 
-Build the PAF API and the client if the action list is client-side. git diff --check on touched files. Do not commit. Do not push.
+3. Recalled license expired or matured
+Pass = expiration before today auto-accepts and creates one CVI. Quote the date comparison. If there is no separate matured window, say that in this row.
 
-RETURN: quoted submit guard, quoted action list, diff, and build result.
+4. Missing credential
+Pass = a missing required credential still blocks submit. A CPC exception for a missing credential must not exist. If one was added, say Gap.
+
+5. Nurse Practitioner
+The chart says the NP trigger is not defined. Pass = no NP-only CPC branch. An NP with no other trigger uses standard processing.
+
+6. Resident
+Same as chart 5. Pass = no Resident-only CPC branch.
+
+7. Any other branch that already says Route to CPC
+Quote it. If the only CPC triggers are charts 1–3, say that.
+
+8. Standard processing, no CVI
+Validation fails = block submit, no CVI.
+Validation passes and no trigger = auto-accept, update Cactus, PDF on the Provider, no CVI.
+A new state license ("None of these apply") is this no-trigger path.
+
+9. CVI lifecycle, when a trigger matches
+Type Facility Undefined Practitioner HCA0095563.
+Initial status UDP Facility Request UDP0000001.
+Started / Received = auto-accept time.
+MSO due = that date + 3 business days.
+Notes name the trigger.
+PDF is on the CVI, not the Provider.
+UDP0000002 is not assigned on create.
+No close script in HCP.
+
+New issue 148741
+QA PAF 6058, practitioner TC000BT0IR. Adding a new state license put the NPP PAF on the CPC Open queue. CPC Next Action shows: Accept Request and send full R/RFC packet, Accept Request - Paper Packet, Send request back to MSP, Process Request Manually.
+Quote whether a new license still calls ProcessSubmitForMspAsync.
+Quote whether those packet actions are still built for TaskType.Npp.
+Pass for 148741 = a new license auto-accepts, does not enter the CPC PAF queue, and those packet actions are not offered for NPP.
+
+Also quote IsAutoAcceptedNpp. Pass = NPP with AcceptedByCpcUserId HCPSU, and VA+PA is only a CVI trigger.
+
+git status and git log for SubmitPafStrategy.cs, NppAutoAcceptProcessingRules.cs, and CactusUpdater.cs. Say if the 2026-11-10 chart change is committed or still local.
+
+RETURN:
+1. Pass, Gap, or Not defined for charts 1–9, each with a quote.
+2. Pass or Gap for 148741, with the submit method and the CPC action list.
+3. Committed or still local.
+4. Do not start a fix.
