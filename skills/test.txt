@@ -1,27 +1,52 @@
-TASK-132643-EXPIRED-WARN — Past expiration warns, then creates a CVI
+Implemented the expiration warning. No commit or push.
 
-Laura, on 132643: if the expiration date is before today, show:
+**Original Trigger**
+The existing `NppAutoAcceptProcessingRules.cs:30` only considers recalled licenses:
+```csharp
+var isRecalledLicense = !string.IsNullOrWhiteSpace(selectedLicenseKey) &&
+                        selectedLicenseKey != NppTask.NewLicenseOption;
+```
+Inside that branch:
+```csharp
+if (selectedLicenseExpirationDate.HasValue &&
+    selectedLicenseExpirationDate.Value.Date < today.Date)
+{
+    triggers.Add("recalled license is expired");
+}
+```
+That date comes from the recalled Cactus license’s `Expirationdate`, not the new-license field.
 
-The expiration date entered is in the past. Are you sure you want to continue?
+**Yes And No**
+`NppTaskForm.razor:200` now shows exactly:
 
-This is not a validation error. Do not block the field.
-Yes continues the save and a CVI is created.
-No stays on the ADD NPP form. Do not submit. Do not create a CVI.
-Show the warning only when the expiration date is before today.
+> The expiration date entered is in the past. Are you sure you want to continue?
 
-The screenshot is Add New State License: Texas, status Active, expiration 11/03/2026. That date is before today.
+The warning runs after validation, before saving, for either the entered new-license expiration or the selected recalled-license expiration.
 
-Quote the current expired-license CVI trigger. It compares a recalled license Expirationdate to today and does not include the new-license expiration.
+In `NppTaskForm.razor.cs:186`:
+- **Yes:** `ConfirmExpiredLicense` sets `ConfirmedExpiredLicense = true` and calls `CompleteNppTask(true)`.
+- **No:** `CancelExpiredLicense` clears confirmation and closes the warning. It does not invoke the save callback or leave the form.
+- **Today or later:** no warning and no expiration-only CVI trigger.
 
-Then:
-- On NppTaskForm, run the warning for a new license and for a recalled license when that expiration is before today.
-- Yes sets the existing expired-license CVI trigger, including a new license whose expiration is before today. One CVI, type HCA0095563, status UDP0000001. The PAF still auto-accepts.
-- No does not set that trigger and does not leave the form.
-- A date of today or later does not warn and does not create a CVI by itself.
-- Do not change the Active recalled-license trigger or the VA+PA trigger.
-- Do not update an existing active license. 132644 still means no Cactus update when the practitioner is active elsewhere. Prepopulate the recalled list. Do not add edit fields that write State, dates, number, status, or field of licensure back onto that license.
-- Do not invent LICMONENROLLMENTSTATUS_RTK.
+**Diff**
+Five files changed: the form markup/code, shared NPP task, processor rules, and focused tests. The new processor branch is:
+```csharp
+else if (selectedLicenseKey == NppTask.NewLicenseOption &&
+         paf.NppTask?.ConfirmedExpiredLicense == true &&
+         paf.NppTask.NewLicenseExpirationDate.HasValue &&
+         paf.NppTask.NewLicenseExpirationDate.Value.Date < today.Date)
+{
+    triggers.Add("new license is expired");
+}
+```
+It feeds the existing single-CVI creation path, using type `HCA0095563` and initial status `UDP0000001`. Auto-accept remains unchanged.
 
-Build the client and the processor. git diff --check on touched files. Do not commit. Do not push.
+The recalled-license status trigger, VA+PA trigger, prepopulated recalled list, and active-practitioner no-update guard are unchanged. No recalled-license edit fields or `LICMONENROLLMENTSTATUS_RTK` were added. The pre-existing local Active-status constant change was preserved.
 
-RETURN: quoted trigger, where Yes and No are handled, diff, and build result.
+**Verification**
+- Client build: **passed**
+- Processor build: **passed**
+- Focused processor tests: **16 passed**
+- `git diff --check` on all five touched files: **passed**
+
+The browser interaction and live Cactus CVI creation were not exercised.
