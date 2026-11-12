@@ -1,10 +1,17 @@
-Commit the past-expiration warning and the selected-license edit together. Do not push.
+TASK-132644-WORK-CRASH — NppTaskForm RadioGroup must use @bind-Value
 
-Include only the NPP license files in this diff: NppTaskForm markup and code, the shared NPP task, the license response, CrudPractitionerLicensesOperation, the processor rules, and their tests.
+Repro: /Paf/New, add ADD NPP to Facility, click Work. The form does not open.
 
-Leave out SubmitPafStrategy, CactusUpdater, launchSettings, UnityApiLoadBalancer, Background, TestCactusUpdater, and skills.
+System.InvalidOperationException: Please use @bind-Value (or @bind-Values for selected components) in the control with generic type `System.String`.
+at AntDesign.FormItem.AddControl[String]
+at AntDesign.RadioGroup<string>.OnInitialized
 
-Message:
-warn on a past NPP license expiration and update the selected existing license in place
+Quote every RadioGroup in NppTaskForm.razor. For each RadioGroup<string> inside a FormItem, the binding must be @bind-Value. Value and ValueChanged alone are the crash.
 
-Return the hash and git status. Do not push.
+Keep the selected-license fill. Use @bind-Value on the license key, and call the existing fill method from OnChange or @bind-Value:after. Do not remove EditedStateLicenseKey, the six fields, ConfirmedExpiredLicense, or the past-expiration warning.
+
+Also quote any other string Input, Select, or Radio added in this form that sits in a FormItem without @bind-Value, and bind those the same way. Do not change Begin PAF or the processor.
+
+Build the client. git diff --check on NppTaskForm.razor. Do not commit. Do not push.
+
+RETURN: each quoted radio before and after, the build result.
