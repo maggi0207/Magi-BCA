@@ -1,11 +1,8 @@
-TASK-132644-FOL-MATCH — Select the existing Field of Licensure option for a padded Cactus code
+Implemented the Field of Licensure match while keeping `@bind-Value`.
 
-TN | 32048 | 06/30/2027 returns FieldOfLicensureRtk "       010". The options use "10" for Physician (MD). Do not add an option.
+- **Match:** `"       010"` selects existing value `"10"`: **Physician (MD)**.
+- **Unchanged:** Saves the original Cactus RTK `"       010"`.
+- **Changed:** Saves the selected option’s existing Value. Unmatched or non-digit RTKs display empty.
+- **Validation:** Client build succeeded, behavior checks passed, and `git diff --check` passed on both touched files.
 
-When filling a selected license, trim the RTK. If it is all digits, select the existing option whose numeric value equals that number. "       010" selects "10". "       400" selects "400". If no option matches, leave the dropdown empty.
-
-If the user does not change Field of Licensure, save the original Cactus RTK "       010" on that license. If the user picks a different option, save that option's existing Value. Do not invent a new RTK or a new pad format.
-
-Keep @bind-Value. Do not change the other five fields, the past-expiration warning, or the same-key update. Build the client. git diff --check on touched files. Do not commit. Do not push.
-
-RETURN: the match for "       010", what is saved when the user leaves it unchanged, and the build result.
+The other five fields, past-expiration warning, and same-key update were left unchanged. No commit or push.
