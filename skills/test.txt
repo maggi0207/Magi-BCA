@@ -1,13 +1,32 @@
-TASK-132644-FOL — Field of Licensure stays blank on a selected license
+For **TN | 32048 | 06/30/2027**, the read-only Cactus lookup found one matching license.
 
-Browser: select TN | 32048 | 06/30/2027. State, Effective Date, License Number, Status, and Expiration Date fill. Field of Licensure stays empty.
+- **License RTK:** `"       010"` (seven leading spaces, then `010`; length 10).
+- **Matching option:** None. `"       010"` does not equal `"10"` (`"Physician (MD)"`), or any other option value.
+- **Code changed:** No. Stopped as requested. No client build, commit, or push.
 
-Quote the Field of Licensure select options (Value and Text) and the FieldOfLicensureRtk returned for this license.
+The Field of Licensure options in `NppTaskForm.razor.cs:31` are:
 
-If that RTK equals an option Value, bind the select so the matching text shows. Keep @bind-Value.
-If the RTK is null or blank, stop and say the Cactus license has no licensure field.
-If the RTK is present and not in the option list, quote both and stop. Do not add an RTK.
+| Value | Text |
+|---|---|
+| `"10"` | `"Physician (MD)"` |
+| `"15"` | `"Physician Resident (MD)"` |
+| `"400"` | `"Audiologist"` |
+| `"603"` | `"Chiropractor"` |
+| `"30"` | `"Dentist"` |
+| `"624"` | `"Midwife, Lay (Non-Nurse)"` |
+| `"627"` | `"Naturopath"` |
+| `"110"` | `"Nurse Anesthetist"` |
+| `"120"` | `"Nurse Midwife"` |
+| `"130"` | `"Nurse Practitioner"` |
+| `"410"` | `"Occupational Therapist"` |
+| `"636"` | `"Optometrist"` |
+| `"20"` | `"Osteopathic Physician (DO)"` |
+| `"25"` | `"Osteopathic Physician Resident (DO)"` |
+| `"50"` | `"Pharmacist"` |
+| `"642"` | `"Physician Assistant"` |
+| `"350"` | `"Podiatrist"` |
+| `"460"` | `"Speech/Language Pathologist"` |
+| `"371"` | `"Psychologist"` |
+| `"141"` | `"Clinical Nurse Specialist"` |
 
-Do not change the other five fields, the past-expiration warning, or the same-key update. Build the client only if you change a binding. Do not commit. Do not push.
-
-RETURN: the license RTK, the option it should select, and whether you changed code.
+The API returns this database field directly, without translation or trimming. No changes were made to `@bind-Value`, the other five fields, the past-expiration warning, or the same-key update.
