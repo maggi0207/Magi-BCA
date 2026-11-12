@@ -1,1 +1,13 @@
-Azurite is listening on 10000. Paf.Api is calling 10003, so the upload still fails.
+TASK-132644-FOL — Field of Licensure stays blank on a selected license
+
+Browser: select TN | 32048 | 06/30/2027. State, Effective Date, License Number, Status, and Expiration Date fill. Field of Licensure stays empty.
+
+Quote the Field of Licensure select options (Value and Text) and the FieldOfLicensureRtk returned for this license.
+
+If that RTK equals an option Value, bind the select so the matching text shows. Keep @bind-Value.
+If the RTK is null or blank, stop and say the Cactus license has no licensure field.
+If the RTK is present and not in the option list, quote both and stop. Do not add an RTK.
+
+Do not change the other five fields, the past-expiration warning, or the same-key update. Build the client only if you change a binding. Do not commit. Do not push.
+
+RETURN: the license RTK, the option it should select, and whether you changed code.
