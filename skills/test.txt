@@ -1,17 +1,1 @@
-TASK-132644-WORK-CRASH — NppTaskForm RadioGroup must use @bind-Value
-
-Repro: /Paf/New, add ADD NPP to Facility, click Work. The form does not open.
-
-System.InvalidOperationException: Please use @bind-Value (or @bind-Values for selected components) in the control with generic type `System.String`.
-at AntDesign.FormItem.AddControl[String]
-at AntDesign.RadioGroup<string>.OnInitialized
-
-Quote every RadioGroup in NppTaskForm.razor. For each RadioGroup<string> inside a FormItem, the binding must be @bind-Value. Value and ValueChanged alone are the crash.
-
-Keep the selected-license fill. Use @bind-Value on the license key, and call the existing fill method from OnChange or @bind-Value:after. Do not remove EditedStateLicenseKey, the six fields, ConfirmedExpiredLicense, or the past-expiration warning.
-
-Also quote any other string Input, Select, or Radio added in this form that sits in a FormItem without @bind-Value, and bind those the same way. Do not change Begin PAF or the processor.
-
-Build the client. git diff --check on NppTaskForm.razor. Do not commit. Do not push.
-
-RETURN: each quoted radio before and after, the build result.
+Azurite is listening on 10000. Paf.Api is calling 10003, so the upload still fails.
