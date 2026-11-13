@@ -1,18 +1,58 @@
-TASK-149235 — Record a successful ADD NPP submit in the ADMIN audit log
+**Finding**
+Neither permitted cause was established: I found no existing ADMIN audit write on the normal Add Practitioner to Facility submit path to reuse, and the ADMIN query does not exclude NPP. Stopped without changing code.
 
-149235. These completed NPP PAFs are not in the ADMIN audit log:
-H2000013419, Roger Passmore, submitted 11-09-2026 12:50:26 AM CST
-TD000CB4TLJ, submitted 11-10-2026 02:24:26 PM CST
-TC0004BN1Z, Aaron Sookhoo, submitted 11-11-2026 11:30:16 AM CST
+**Existing Submit Write**
+The normal facility submit records submission metadata in `SubmitPafStrategy.cs:162`:
 
-131729 AC6: a successful ADD NPP submit records the submitting user and the timestamp.
+```csharp
+FormData.SetStatus(FormData.Status == PafStatus.SavedByMsp
+    ? PafStatus.SubmittedByMsp : PafStatus.ResubmittedByMsp, null);
+// ...
+await FormData.SetSubmitInfoAsync(StrategyContext, _cactusClient);
+```
 
-Quote the audit write used when Add Practitioner to Facility is submitted, and the query that fills the ADMIN audit log. Then quote the NPP submit path.
+The shared persistence path writes **PAF history, not ADMIN AuditLog**:
+```csharp
+await StrategyContext.GetPafRepository().CreatePafHistoryAsync(history);
+```
 
-If that write is skipped for TaskType.Npp, call the same write with the submitting user and the submit timestamp. If the row is written but the ADMIN query excludes NPP, include NPP in that existing query. Do not add an AuditAction. Do not add a new log screen. Do not backfill the three PAFs above.
+Its user/time fields in `PafExtensions.cs:100` are:
+```csharp
+PractitionerActionFormId = formData.FormId,
+Status = formData.Status,
+UpdatedByName = formData.LastUpdatedBy,
+UpdatedOn = DateTime.UtcNow
+```
 
-Do not change MSP authorization, auto-accept, or CVI creation. Build the project you change. git diff --check on touched files. Do not commit. Do not push.
+The repository inserts that history with `await conn.InsertAsync(pafHistory)`.
 
-If neither the write nor the ADMIN query explains the missing rows, quote both and stop.
+**ADMIN Filter**
+`AuditLogSearchQueryBuilder.cs:86` reads:
+```sql
+FROM dbo.AuditLog al (NOLOCK)
+LEFT JOIN dbo.AspNetUsers users (NOLOCK) on users.Id = al.UserId
+```
 
-RETURN: the quoted write, the quoted ADMIN filter, the diff, and the build result.
+Optional filters cover provider, username, and action. Its date filter is:
+```csharp
+where.Part += "al.LogDate >= @StartDate AND al.LogDate < @EndDateExclusive";
+```
+
+There is no NPP/task-type filter or PAF-history join.
+
+**NPP Submit**
+The successful NPP branch calls:
+```csharp
+if (pafProcessingResult.Status == PafProcessingResultStatus.Success)
+    await CompleteMspAutoAcceptedSubmitAsync();
+```
+
+That method also calls:
+```csharp
+await FormData.SetSubmitInfoAsync(StrategyContext, _cactusClient);
+```
+
+Thus NPP reaches the shared submission-metadata and history path; no NPP-specific skipped ADMIN write was found.
+
+**Diff And Build**
+No diff. No build because no code changed. No backfill, new audit action, authorization changes, auto-accept changes, CVI changes, commit, or push.
