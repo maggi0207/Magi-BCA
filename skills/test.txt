@@ -1,32 +1,10 @@
-Replaced the hardcoded NPP Reason in `PractitionerSearchForm.razor`.
+Commit only the NPP Exception Search Reason dropdown. Do not push.
 
-**Before**
-```razor
-<p><strong>Reason:</strong> Practitioner does not have NPI</p>
-```
+Include PractitionerSearchForm and any code-behind or test changed so Reason is required. The dropdown has one option, Practitioner does not have NPI, and it starts unselected.
 
-The neighboring State Select remains unchanged:
-```razor
-<Neutron.Blazor.Components.Select Id="nppExceptionState" DataSource="@_states"
-    @bind-Value="@_model.State" @bind-Value:after="OnFieldChanged"
-    ValueName="@nameof(FieldOption.Value)"
-    LabelName="@nameof(FieldOption.Text)">
-</Neutron.Blazor.Components.Select>
-```
+Do not stage NppExceptionSearchPagedQueryBuilder, NppTaskForm, CrudPractitionerLicensesOperation, launchSettings, UnityApiLoadBalancer, Background, TestCactusUpdater, or skills.
 
-**After**
-```razor
-<FormItem Required="true" Label="Reason">
-    <ChildContent>
-        <Neutron.Blazor.Components.Select Id="nppExceptionReason" DataSource="@_exceptionReasons"
-            @bind-Value="@_selectedReason" @bind-Value:after="OnFieldChanged"
-            ValueName="@nameof(FieldOption.Value)"
-            LabelName="@nameof(FieldOption.Text)">
-        </Neutron.Blazor.Components.Select>
-    </ChildContent>
-</FormItem>
-```
+Message:
+require the NPP exception-search reason before search
 
-Reason starts unselected. Its only option is **Practitioner does not have NPI**. Search and submission remain blocked until Reason is selected **and** the existing First Name, Last Name, and State/License criteria pass.
-
-**Validation:** Client build succeeded with 0 warnings and 0 errors. `git diff --check` passed. All excluded workflows and filters remain unchanged. No commit or push; browser behavior has not been retested.
+Return the hash and git status. Do not push.
