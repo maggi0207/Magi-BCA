@@ -1,18 +1,19 @@
-TASK-132643-EFFECTIVE-POPUP — Warn when a new-license Effective Date is before today
+TASK-149234 — NPP exception search license number uses a like match
 
-The expiration dialog is already showing: The expiration date entered is in the past. Are you sure you want to continue?
+149234. NPP Exception Search returns a practitioner only on an exact license number. A partial number returns no one. 131788 AC3: a partial license number uses a like comparison.
 
-Add the same kind of dialog for the Effective Date when that date is before today. Title it Effective Date. The message is:
+These searches must return the practitioner:
 
-The effective date entered is in the past. Are you sure you want to continue?
+OPC5700 searched as OP57, state FL, last Mou, first Ale
+OPC5700 searched as 5700, state FL, last Mou, first Ale
+49646 searched as 646, state TN, last Ric, first Ad
+49646 searched as 496, state TN, last Ric, first Ad
+ME105168 searched as ME105, state FL, last Lur, first Ale
 
-Show it for “None of these apply. Add New State License Instead.” and for a practitioner added with Add New Practitioner. Both use the new-license Effective Date. Do not show it for a recalled license.
+Quote the license predicate in NppExceptionSearchPagedQueryBuilder. If it compares the license number with =, change only that comparison to a contains like after the existing normalization. OP57, 5700, 646, 496, and ME105 all match. State stays PL.STATE = @State on the same license row. First and Last stay as they are. An exact number still matches. A value that is not in the license number does not match. A different state does not match.
 
-Yes continues the save. No stays on the form and does not save. This is not a validation error. Do not show “Date must be greater than or equal to today.”
-The Effective Date dialog does not create a CVI.
-If the Expiration Date is also before today, keep its dialog. Yes on that dialog still creates one CVI. Both answers must be Yes before the save. No on either dialog stays on the form.
-Today or later shows no dialog.
+Do not change NPI search, Begin PAF, Recruitment, or PSG. Do not add a new audit type.
 
-Do not change Begin PAF or any RTK. Build the client. git diff --check on touched files. Do not commit. Do not push.
+Build the Cactus API. Run the focused exception-search tests. git diff --check on touched files. Do not commit. Do not push.
 
-RETURN: where the Effective Date dialog is shown, what Yes and No do, and the build result.
+RETURN: the quoted predicate before and after, the five examples, and the build result.
