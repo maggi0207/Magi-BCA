@@ -1,10 +1,18 @@
-Commit only the NPP Exception Search Reason dropdown. Do not push.
+TASK-149235 — Record a successful ADD NPP submit in the ADMIN audit log
 
-Include PractitionerSearchForm and any code-behind or test changed so Reason is required. The dropdown has one option, Practitioner does not have NPI, and it starts unselected.
+149235. These completed NPP PAFs are not in the ADMIN audit log:
+H2000013419, Roger Passmore, submitted 11-09-2026 12:50:26 AM CST
+TD000CB4TLJ, submitted 11-10-2026 02:24:26 PM CST
+TC0004BN1Z, Aaron Sookhoo, submitted 11-11-2026 11:30:16 AM CST
 
-Do not stage NppExceptionSearchPagedQueryBuilder, NppTaskForm, CrudPractitionerLicensesOperation, launchSettings, UnityApiLoadBalancer, Background, TestCactusUpdater, or skills.
+131729 AC6: a successful ADD NPP submit records the submitting user and the timestamp.
 
-Message:
-require the NPP exception-search reason before search
+Quote the audit write used when Add Practitioner to Facility is submitted, and the query that fills the ADMIN audit log. Then quote the NPP submit path.
 
-Return the hash and git status. Do not push.
+If that write is skipped for TaskType.Npp, call the same write with the submitting user and the submit timestamp. If the row is written but the ADMIN query excludes NPP, include NPP in that existing query. Do not add an AuditAction. Do not add a new log screen. Do not backfill the three PAFs above.
+
+Do not change MSP authorization, auto-accept, or CVI creation. Build the project you change. git diff --check on touched files. Do not commit. Do not push.
+
+If neither the write nor the ADMIN query explains the missing rows, quote both and stop.
+
+RETURN: the quoted write, the quoted ADMIN filter, the diff, and the build result.
