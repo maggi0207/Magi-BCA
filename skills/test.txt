@@ -1,29 +1,10 @@
-Changed only the license comparison in `NppExceptionSearchPagedQueryBuilder.cs:60`, preserving the existing trimming, state, and name filters.
+Commit only the NPP exception-search license like match. Do not push.
 
-**Before**
-```sql
-AND PL.STATE = @State
-AND PL.LICENSENUMBER = @LicenseNumber
-```
+Include NppExceptionSearchPagedQueryBuilder and any test file changed for this comparison. The license predicate is PL.LICENSENUMBER LIKE ('%' + @LicenseNumber + '%'). State, name, and trim filters stay as they are.
 
-**After**
-```sql
-AND PL.STATE = @State
-AND PL.LICENSENUMBER LIKE ('%' + @LicenseNumber + '%')
-```
+Do not stage NppTaskForm, CrudPractitionerLicensesOperation, NppAutoAcceptProcessingRules, SubmitPafStrategy, CactusUpdater, launchSettings, UnityApiLoadBalancer, Background, TestCactusUpdater, or skills.
 
-Read-only Cactus checks returned:
+Message:
+match a partial NPP exception-search license number
 
-| License | Search | State / Names | Matches |
-|---|---|---|---:|
-| OPC5700 | OP57 | FL / Mou, Ale | **0** |
-| OPC5700 | 5700 | FL / Mou, Ale | 1 |
-| 49646 | 646 | TN / Ric, Ad | 1 |
-| 49646 | 496 | TN / Ric, Ad | 1 |
-| ME105168 | ME105 | FL / Lur, Ale | 1 |
-
-**Remaining requirement conflict:** `OP57` is not a contiguous substring of `OPC5700`. Existing normalization only trims whitespace. Making it match requires a different matching rule beyond the requested contains comparison; I did not introduce one.
-
-Exact `OPC5700` matched. An absent value and a different state returned zero.
-
-**Validation:** Cactus API built successfully in isolated outputs after the normal build hit running-service DLL locks. All **16 focused tests passed**; `git diff --check` passed. No commit or push.
+Return the hash and git status. Do not push.
