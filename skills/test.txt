@@ -1,18 +1,16 @@
-TASK-132643-NEW-LICENSE-WARN — Same past-expiration warning for Add New State License and Add New Practitioner
+TASK-132643-EFFECTIVE-DATE — Allow a past Effective Date on a new NPP license
 
-The warning already runs for a new-license expiration and a recalled license. Confirm it also runs when:
+Browser: /Paf/New, Karan Gupta, VA = No, “None of these apply. Add New State License Instead.”, State Texas, Effective Date 1/11/2026, Expiration Date 1/12/2026. Save shows three toasts: Date must be greater than or equal to today.
 
-1. The user selects “None of these apply. Add New State License Instead.”
-2. The practitioner was created with Add New Practitioner and then enters a new state license.
+Quote every NPP check that emits that sentence.
 
-Quote the NppTaskForm check. Both paths must use the new-license expiration date. The message stays: The expiration date entered is in the past. Are you sure you want to continue?
+Then:
+- A past Effective Date saves. No toast. No warning. No CVI from the Effective Date.
+- Apply that to “None of these apply. Add New State License Instead.” and to a practitioner added with Add New Practitioner. Both use the new-license Effective Date.
+- A past Expiration Date does not use that toast. Keep the existing warning: The expiration date entered is in the past. Are you sure you want to continue? Yes creates one CVI. No stays on the form.
+- Today or later shows neither the toast nor the warning.
+- A recalled license is unchanged.
 
-Yes sets ConfirmedExpiredLicense and creates one CVI, type HCA0095563, status UDP0000001.
-No does not save and does not create a CVI.
-Today or later does not warn.
+Do not change Begin PAF or any RTK. Build the client. git diff --check on touched files. Do not commit. Do not push.
 
-Quote the net-new branch that calls CreateStandardCviRecordsAsync. If Yes on a past date would create a second CVI, keep one CVI only. Do not remove a CVI that a new practitioner already gets when the expiration date is today or later.
-
-Do not change the recalled-license warning, Begin PAF, or any RTK. Build only if you change code. Do not commit. Do not push.
-
-RETURN: quoted form check for both paths, whether a new practitioner gets one CVI or two, and any diff.
+RETURN: the quoted check, the Effective Date rule after the change, and the build result.
