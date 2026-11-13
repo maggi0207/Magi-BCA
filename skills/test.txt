@@ -1,19 +1,29 @@
-TASK-149234 — NPP exception search license number uses a like match
+Changed only the license comparison in `NppExceptionSearchPagedQueryBuilder.cs:60`, preserving the existing trimming, state, and name filters.
 
-149234. NPP Exception Search returns a practitioner only on an exact license number. A partial number returns no one. 131788 AC3: a partial license number uses a like comparison.
+**Before**
+```sql
+AND PL.STATE = @State
+AND PL.LICENSENUMBER = @LicenseNumber
+```
 
-These searches must return the practitioner:
+**After**
+```sql
+AND PL.STATE = @State
+AND PL.LICENSENUMBER LIKE ('%' + @LicenseNumber + '%')
+```
 
-OPC5700 searched as OP57, state FL, last Mou, first Ale
-OPC5700 searched as 5700, state FL, last Mou, first Ale
-49646 searched as 646, state TN, last Ric, first Ad
-49646 searched as 496, state TN, last Ric, first Ad
-ME105168 searched as ME105, state FL, last Lur, first Ale
+Read-only Cactus checks returned:
 
-Quote the license predicate in NppExceptionSearchPagedQueryBuilder. If it compares the license number with =, change only that comparison to a contains like after the existing normalization. OP57, 5700, 646, 496, and ME105 all match. State stays PL.STATE = @State on the same license row. First and Last stay as they are. An exact number still matches. A value that is not in the license number does not match. A different state does not match.
+| License | Search | State / Names | Matches |
+|---|---|---|---:|
+| OPC5700 | OP57 | FL / Mou, Ale | **0** |
+| OPC5700 | 5700 | FL / Mou, Ale | 1 |
+| 49646 | 646 | TN / Ric, Ad | 1 |
+| 49646 | 496 | TN / Ric, Ad | 1 |
+| ME105168 | ME105 | FL / Lur, Ale | 1 |
 
-Do not change NPI search, Begin PAF, Recruitment, or PSG. Do not add a new audit type.
+**Remaining requirement conflict:** `OP57` is not a contiguous substring of `OPC5700`. Existing normalization only trims whitespace. Making it match requires a different matching rule beyond the requested contains comparison; I did not introduce one.
 
-Build the Cactus API. Run the focused exception-search tests. git diff --check on touched files. Do not commit. Do not push.
+Exact `OPC5700` matched. An absent value and a different state returned zero.
 
-RETURN: the quoted predicate before and after, the five examples, and the build result.
+**Validation:** Cactus API built successfully in isolated outputs after the normal build hit running-service DLL locks. All **16 focused tests passed**; `git diff --check` passed. No commit or push.
