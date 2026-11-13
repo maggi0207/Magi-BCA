@@ -1,16 +1,18 @@
-TASK-132643-EFFECTIVE-DATE — Allow a past Effective Date on a new NPP license
+TASK-132643-EFFECTIVE-POPUP — Warn when a new-license Effective Date is before today
 
-Browser: /Paf/New, Karan Gupta, VA = No, “None of these apply. Add New State License Instead.”, State Texas, Effective Date 1/11/2026, Expiration Date 1/12/2026. Save shows three toasts: Date must be greater than or equal to today.
+The expiration dialog is already showing: The expiration date entered is in the past. Are you sure you want to continue?
 
-Quote every NPP check that emits that sentence.
+Add the same kind of dialog for the Effective Date when that date is before today. Title it Effective Date. The message is:
 
-Then:
-- A past Effective Date saves. No toast. No warning. No CVI from the Effective Date.
-- Apply that to “None of these apply. Add New State License Instead.” and to a practitioner added with Add New Practitioner. Both use the new-license Effective Date.
-- A past Expiration Date does not use that toast. Keep the existing warning: The expiration date entered is in the past. Are you sure you want to continue? Yes creates one CVI. No stays on the form.
-- Today or later shows neither the toast nor the warning.
-- A recalled license is unchanged.
+The effective date entered is in the past. Are you sure you want to continue?
+
+Show it for “None of these apply. Add New State License Instead.” and for a practitioner added with Add New Practitioner. Both use the new-license Effective Date. Do not show it for a recalled license.
+
+Yes continues the save. No stays on the form and does not save. This is not a validation error. Do not show “Date must be greater than or equal to today.”
+The Effective Date dialog does not create a CVI.
+If the Expiration Date is also before today, keep its dialog. Yes on that dialog still creates one CVI. Both answers must be Yes before the save. No on either dialog stays on the form.
+Today or later shows no dialog.
 
 Do not change Begin PAF or any RTK. Build the client. git diff --check on touched files. Do not commit. Do not push.
 
-RETURN: the quoted check, the Effective Date rule after the change, and the build result.
+RETURN: where the Effective Date dialog is shown, what Yes and No do, and the build result.
