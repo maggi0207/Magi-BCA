@@ -1,8 +1,18 @@
-Implemented the Field of Licensure match while keeping `@bind-Value`.
+TASK-132643-NEW-LICENSE-WARN — Same past-expiration warning for Add New State License and Add New Practitioner
 
-- **Match:** `"       010"` selects existing value `"10"`: **Physician (MD)**.
-- **Unchanged:** Saves the original Cactus RTK `"       010"`.
-- **Changed:** Saves the selected option’s existing Value. Unmatched or non-digit RTKs display empty.
-- **Validation:** Client build succeeded, behavior checks passed, and `git diff --check` passed on both touched files.
+The warning already runs for a new-license expiration and a recalled license. Confirm it also runs when:
 
-The other five fields, past-expiration warning, and same-key update were left unchanged. No commit or push.
+1. The user selects “None of these apply. Add New State License Instead.”
+2. The practitioner was created with Add New Practitioner and then enters a new state license.
+
+Quote the NppTaskForm check. Both paths must use the new-license expiration date. The message stays: The expiration date entered is in the past. Are you sure you want to continue?
+
+Yes sets ConfirmedExpiredLicense and creates one CVI, type HCA0095563, status UDP0000001.
+No does not save and does not create a CVI.
+Today or later does not warn.
+
+Quote the net-new branch that calls CreateStandardCviRecordsAsync. If Yes on a past date would create a second CVI, keep one CVI only. Do not remove a CVI that a new practitioner already gets when the expiration date is today or later.
+
+Do not change the recalled-license warning, Begin PAF, or any RTK. Build only if you change code. Do not commit. Do not push.
+
+RETURN: quoted form check for both paths, whether a new practitioner gets one CVI or two, and any diff.
