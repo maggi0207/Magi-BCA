@@ -1,10 +1,11 @@
-Commit only the NPP exception-search license like match. Do not push.
+TASK-149100 — NPP Exception Search Reason is a required dropdown
 
-Include NppExceptionSearchPagedQueryBuilder and any test file changed for this comparison. The license predicate is PL.LICENSENUMBER LIKE ('%' + @LicenseNumber + '%'). State, name, and trim filters stay as they are.
+149100. On Exception Search (No NPI Available), Reason is plain text: Practitioner does not have NPI. Replace that text with a dropdown. The only option is Practitioner does not have NPI. The dropdown starts unselected. Search stays disabled until that option is selected, together with the existing First Name and Last Name rules.
 
-Do not stage NppTaskForm, CrudPractitionerLicensesOperation, NppAutoAcceptProcessingRules, SubmitPafStrategy, CactusUpdater, launchSettings, UnityApiLoadBalancer, Background, TestCactusUpdater, or skills.
+Quote the hardcoded Reason on the NPP exception form and the State dropdown beside it. Reuse that Select for Reason. Do not add “Provider currently in training program” or “Unknown”.
 
-Message:
-match a partial NPP exception-search license number
+Do not change First Name, Last Name, the State and License pair, the license like match, NPI search, Begin PAF, Recruitment, or PSG.
 
-Return the hash and git status. Do not push.
+Build the client. git diff --check on touched files. Do not commit. Do not push.
+
+RETURN: the quoted Reason control before and after, what blocks Search, and the build result.
