@@ -1,83 +1,19 @@
-User Story: State License-Specific PSV Upload and Global PSV Sharing
-Title: Enable independent License PSV uploads for each State License and shared/global Sanction PSV and NPI PSV uploads
+TASK-149407 — License PSV follows the selected state license. Sanction and NPI PSV stay shared.
 
-User Story
-As a Credentialing Specialist,
+149407. Quote the three PSV fields on NppTask and the three upload controls on NppTaskForm.
 
-I want to upload a separate License PSV document for each individual state license while maintaining a single shared Sanction PSV and NPI PSV document across all licenses,
+Today one License PSV is stored for the whole task. Change that so each selected license key keeps its own License PSV, including NppTask.NewLicenseOption.
 
-So that license verifications can be managed independently per state while avoiding duplicate uploads for provider-level verifications such as Sanctions and NPI.
+When the user selects a license, show only that license’s License PSV. Switching from Wisconsin to California, or to Florida, shows that license’s file and does not copy it onto the other license. A recalled license and “None of these apply” each keep their own file.
 
-Business Requirement
-Currently, License PSV, Sanction PSV, and NPI PSV are uploaded within the same workflow when adding an NPP provider.
+Sanction PSV and NPI PSV stay one file on the task. They remain on screen when the license selection changes. Uploading a replacement replaces that one file.
 
-The system shall:
+Save stores every license PSV already uploaded, not only the one on screen. Submit still updates the license selected at save. Do not create a Cactus license for a row the user did not select.
 
-Associate License PSV with the selected State License only.
-Allow a unique License PSV document for each State License.
-Treat Sanction PSV as a provider-level document shared across all State Licenses.
-Treat NPI PSV as a provider-level document shared across all State Licenses.
-Automatically display previously uploaded Sanction PSV and NPI PSV documents when users navigate between State Licenses for the same practitioner.
-Acceptance Criteria
-AC1: License PSV is State License specific
-Given a practitioner has multiple state licenses
+Validation uses the existing required-field behavior. The selected license needs its License PSV. Sanction PSV and NPI PSV are required once. VA = Yes and PA = Yes still hides the license section and does not require a License PSV.
 
-When the user selects a State License
+Reuse the existing PafFile upload. Do not add an upload component, an image RTK, or a new audit action. Do not change Begin PAF.
 
-And uploads a License PSV document
+Build the client and the processor if the license image attach must use the selected license’s PSV. git diff --check on touched files. Do not commit. Do not push.
 
-Then the uploaded document shall be associated only with the selected State License
-
-And shall not appear under any other State License.
-
-AC2: Different License PSV documents can be uploaded
-Given a practitioner has licenses in Wisconsin, California, and Florida
-
-When the user uploads a unique License PSV document for each license
-
-Then the system shall save and display the corresponding License PSV document for that specific State License.
-
-AC3: Sanction PSV is shared globally
-Given a Sanction PSV document has been uploaded for the practitioner
-
-When the user switches between State Licenses
-
-Then the same Sanction PSV document shall be displayed across all State Licenses
-
-And the user shall not be required to upload the document again.
-
-AC4: NPI PSV is shared globally
-Given an NPI PSV document has been uploaded for the practitioner
-
-When the user switches between State Licenses
-
-Then the same NPI PSV document shall be displayed across all State Licenses
-
-And the user shall not be required to upload the document again.
-
-AC5: Update shared documents
-Given a shared Sanction PSV or NPI PSV document already exists
-
-When the user uploads a replacement document
-
-Then the new document shall replace the existing shared document
-
-And the updated document shall be reflected across all State Licenses.
-
-AC6: Validation
-Given License PSV is mandatory
-
-When a State License is selected
-
-And no License PSV has been uploaded for that license
-
-Then the system shall display an appropriate validation message preventing submission.
-
-And
-
-Given Sanction PSV and NPI PSV are mandatory
-
-When neither document exists at the provider level
-
-Then the system shall require upload before submission.
-
+RETURN: where each License PSV is stored, what stays on screen when the license changes, and the build result.
