@@ -1,19 +1,50 @@
-TASK-149407 — License PSV follows the selected state license. Sanction and NPI PSV stay shared.
+Implemented per-license License PSV storage.
 
-149407. Quote the three PSV fields on NppTask and the three upload controls on NppTaskForm.
+**Existing Fields**
+The three attachment fields and their validation URL fields remain:
+```csharp
+public PafAttachment LicensePsvAttachment { get; set; }
+public string LicensePsvAttachmentUrl { get; set; }
+public PafAttachment SanctionsPsvAttachment { get; set; }
+public string SanctionsPsvAttachmentUrl { get; set; }
+public PafAttachment NpiPsvAttachment { get; set; }
+public string NpiPsvAttachmentUrl { get; set; }
+```
 
-Today one License PSV is stored for the whole task. Change that so each selected license key keeps its own License PSV, including NppTask.NewLicenseOption.
+**Upload Controls**
+All three still reuse `PafFile` in `NppTaskForm.razor:152`:
+```razor
+<PafFile @key="context.SelectedStateLicenseKey"
+         Context="@context.SelectedStateLicenseKey"
+         Disabled="@(string.IsNullOrWhiteSpace(context.SelectedStateLicenseKey))"
+         Attachment="@context.LicensePsvAttachment"
+         FormType="PractitionerActionFormAttachmentType.Other"
+         TaskId="@StateContainer.PafState.NppTask.TaskId"
+         OnAfterUpload="HandleLicensePsvUpload"
+         OnAfterRemove="HandleLicensePsvRemove" />
 
-When the user selects a license, show only that license’s License PSV. Switching from Wisconsin to California, or to Florida, shows that license’s file and does not copy it onto the other license. A recalled license and “None of these apply” each keep their own file.
+<PafFile Attachment="@context.SanctionsPsvAttachment"
+         FormType="PractitionerActionFormAttachmentType.Other"
+         TaskId="@StateContainer.PafState.NppTask.TaskId"
+         OnAfterUpload="HandleSanctionsPsvUpload"
+         OnAfterRemove="HandleSanctionsPsvRemove" />
 
-Sanction PSV and NPI PSV stay one file on the task. They remain on screen when the license selection changes. Uploading a replacement replaces that one file.
+<PafFile Attachment="@context.NpiPsvAttachment"
+         FormType="PractitionerActionFormAttachmentType.Other"
+         TaskId="@StateContainer.PafState.NppTask.TaskId"
+         OnAfterUpload="HandleNpiPsvUpload"
+         OnAfterRemove="HandleNpiPsvRemove" />
+```
 
-Save stores every license PSV already uploaded, not only the one on screen. Submit still updates the license selected at save. Do not create a Cactus license for a row the user did not select.
+**Storage And Selection**
+- License files persist in `NppTask.LicensePsvAttachments`, with `LicenseKey` and `Attachment` per entry, including `NppTask.NewLicenseOption`.
+- Switching licenses displays only that key’s file. All uploaded entries survive save/reload.
+- Legacy task-wide License PSV is assigned only to its saved selected license.
+- Sanctions and NPI PSV stay visible and task-wide. Their replacement behavior is unchanged.
+- The processor attaches only the selected license’s PSV. Retained entries do not cause other Cactus licenses to be created.
+- Existing required-field behavior remains, including no License PSV requirement for VA = Yes and PA = Yes.
 
-Validation uses the existing required-field behavior. The selected license needs its License PSV. Sanction PSV and NPI PSV are required once. VA = Yes and PA = Yes still hides the license section and does not require a License PSV.
+**Validation**
+Client build passed with **0 warnings and 0 errors**. Processor build succeeded. All **5 focused tests passed**; `git diff --check` passed on touched files.
 
-Reuse the existing PafFile upload. Do not add an upload component, an image RTK, or a new audit action. Do not change Begin PAF.
-
-Build the client and the processor if the license image attach must use the selected license’s PSV. git diff --check on touched files. Do not commit. Do not push.
-
-RETURN: where each License PSV is stored, what stays on screen when the license changes, and the build result.
+No new upload component, image RTK, audit action, or Begin PAF change. No commit or push. Browser switching has not been retested.
