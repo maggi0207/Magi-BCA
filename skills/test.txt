@@ -1,50 +1,10 @@
-Implemented per-license License PSV storage.
+Commit only the per-license NPP License PSV, then push the current branch. Do not force-push.
 
-**Existing Fields**
-The three attachment fields and their validation URL fields remain:
-```csharp
-public PafAttachment LicensePsvAttachment { get; set; }
-public string LicensePsvAttachmentUrl { get; set; }
-public PafAttachment SanctionsPsvAttachment { get; set; }
-public string SanctionsPsvAttachmentUrl { get; set; }
-public PafAttachment NpiPsvAttachment { get; set; }
-public string NpiPsvAttachmentUrl { get; set; }
-```
+Include NppTask, NppTaskForm, the processor attach that uses the selected license’s PSV, and the focused tests. LicensePsvAttachments stores one file per license key. Sanctions and NPI stay task-wide.
 
-**Upload Controls**
-All three still reuse `PafFile` in `NppTaskForm.razor:152`:
-```razor
-<PafFile @key="context.SelectedStateLicenseKey"
-         Context="@context.SelectedStateLicenseKey"
-         Disabled="@(string.IsNullOrWhiteSpace(context.SelectedStateLicenseKey))"
-         Attachment="@context.LicensePsvAttachment"
-         FormType="PractitionerActionFormAttachmentType.Other"
-         TaskId="@StateContainer.PafState.NppTask.TaskId"
-         OnAfterUpload="HandleLicensePsvUpload"
-         OnAfterRemove="HandleLicensePsvRemove" />
+Do not stage PractitionerSearchForm, NppExceptionSearchPagedQueryBuilder, SubmitPafStrategy, launchSettings, UnityApiLoadBalancer, Background, TestCactusUpdater, or skills.
 
-<PafFile Attachment="@context.SanctionsPsvAttachment"
-         FormType="PractitionerActionFormAttachmentType.Other"
-         TaskId="@StateContainer.PafState.NppTask.TaskId"
-         OnAfterUpload="HandleSanctionsPsvUpload"
-         OnAfterRemove="HandleSanctionsPsvRemove" />
+Message:
+store each NPP License PSV on the selected state license
 
-<PafFile Attachment="@context.NpiPsvAttachment"
-         FormType="PractitionerActionFormAttachmentType.Other"
-         TaskId="@StateContainer.PafState.NppTask.TaskId"
-         OnAfterUpload="HandleNpiPsvUpload"
-         OnAfterRemove="HandleNpiPsvRemove" />
-```
-
-**Storage And Selection**
-- License files persist in `NppTask.LicensePsvAttachments`, with `LicenseKey` and `Attachment` per entry, including `NppTask.NewLicenseOption`.
-- Switching licenses displays only that key’s file. All uploaded entries survive save/reload.
-- Legacy task-wide License PSV is assigned only to its saved selected license.
-- Sanctions and NPI PSV stay visible and task-wide. Their replacement behavior is unchanged.
-- The processor attaches only the selected license’s PSV. Retained entries do not cause other Cactus licenses to be created.
-- Existing required-field behavior remains, including no License PSV requirement for VA = Yes and PA = Yes.
-
-**Validation**
-Client build passed with **0 warnings and 0 errors**. Processor build succeeded. All **5 focused tests passed**; `git diff --check` passed on touched files.
-
-No new upload component, image RTK, audit action, or Begin PAF change. No commit or push. Browser switching has not been retested.
+After the commit succeeds, push the current branch to origin. Return the hash, the push result, and git status.
