@@ -1,18 +1,35 @@
-TASK-149418 — Yes on the NPP save-for-later dialog must leave the form without a 400
+Fixed the server-side validation that blocked incomplete NPP saves.
 
-149418. Practitioner TC00023PNK. Open ADD NPP to Facility, leave a required field blank, click Save. The dialog is: One or more required fields are missing. Would you like to save for later?
+**Existing Client Path**
+`CompleteNppTask(false)` already sets the correct status:
+```csharp
+_task.Status = complete
+    ? Hca.Credentialing.Shared.Data.Model.Paf.Form.TaskStatus.Complete
+    : Hca.Credentialing.Shared.Data.Model.Paf.Form.TaskStatus.New;
+_task.StatusDetail.Clear();
+await OnComplete.InvokeAsync(_task);
+```
 
-No stays on the form and shows the field validation. That part works.
-Yes calls NppTaskForm.CompleteNppTask, then PafFormComponent.HandleNppTaskComplete, then UpdateTaskAndSavePafAsync. The client shows Unexpected Error, HTTP 400.
+**400 Body**
+Reproduced using MVC’s actual model validator and automatic response factory, without database writes:
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "NppTask.NpiPsvAttachmentUrl": ["This field is required."],
+    "NppTask.SanctionsPsvAttachmentUrl": ["This field is required."],
+    "NppTask.IsActiveDutyMilitaryOrPracticingAtVa": ["This field is required."]
+  },
+  "traceId": "0HNQ3VLD2EO98"
+}
+```
+This is the reproduced response, not a capture of TC00023PNK’s original request. Its missing-field list may differ.
 
-Quote CompleteNppTask for complete false, and quote the API response body for that 400.
+**After The Change**
+The `PafController.cs:158` now permits NPP required-field errors only for `TaskStatus.New` drafts. Yes can save the incomplete task and follow the existing navigation back to the PAF task page. No remains unchanged.
 
-Yes must save the NPP task as incomplete and return to the PAF task page, the same way another task card saves for later. Use the existing TaskStatus.New save. Do not send the task as complete. Do not show the 400 page.
+Completed saves still validate. Malformed values and unrelated validation errors remain blocked. No questionnaire message was added; License PSV storage, expiration warnings, and Begin PAF were untouched.
 
-The ticket text names “Questionnaire completion required. Please complete the questions for all Facilities.” That sentence belongs to the facility questionnaire. NPP hides that card. Do not add that sentence to NppTaskForm. If the task page already shows it because another card is incomplete, leave that check alone.
-
-A completed save, with every required field filled, still validates and still saves as complete.
-
-Do not change License PSV storage, the expiration warning, or Begin PAF. Build the client and the PAF API if the 400 is server validation. git diff --check on touched files. Do not commit. Do not push.
-
-RETURN: the 400 body, what Yes does after the change, and the build result.
+**Validation:** Client and PAF API builds passed with **0 warnings and 0 errors**. All **4 focused tests passed**; `git diff --check` passed. No commit or push. Browser save/navigation has not been retested.
