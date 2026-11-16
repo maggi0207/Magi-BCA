@@ -1,35 +1,10 @@
-Fixed the server-side validation that blocked incomplete NPP saves.
+Commit only the NPP save-for-later 400 fix. Do not push.
 
-**Existing Client Path**
-`CompleteNppTask(false)` already sets the correct status:
-```csharp
-_task.Status = complete
-    ? Hca.Credentialing.Shared.Data.Model.Paf.Form.TaskStatus.Complete
-    : Hca.Credentialing.Shared.Data.Model.Paf.Form.TaskStatus.New;
-_task.StatusDetail.Clear();
-await OnComplete.InvokeAsync(_task);
-```
+Include PafController and the focused tests. A TaskStatus.New NPP draft may omit the required NPP fields. A completed NPP save still validates those fields.
 
-**400 Body**
-Reproduced using MVC’s actual model validator and automatic response factory, without database writes:
-```json
-{
-  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
-  "title": "One or more validation errors occurred.",
-  "status": 400,
-  "errors": {
-    "NppTask.NpiPsvAttachmentUrl": ["This field is required."],
-    "NppTask.SanctionsPsvAttachmentUrl": ["This field is required."],
-    "NppTask.IsActiveDutyMilitaryOrPracticingAtVa": ["This field is required."]
-  },
-  "traceId": "0HNQ3VLD2EO98"
-}
-```
-This is the reproduced response, not a capture of TC00023PNK’s original request. Its missing-field list may differ.
+Do not stage NppTaskForm, LicensePsvAttachments, PractitionerSearchForm, NppExceptionSearchPagedQueryBuilder, launchSettings, UnityApiLoadBalancer, Background, TestCactusUpdater, or skills.
 
-**After The Change**
-The `PafController.cs:158` now permits NPP required-field errors only for `TaskStatus.New` drafts. Yes can save the incomplete task and follow the existing navigation back to the PAF task page. No remains unchanged.
+Message:
+allow an incomplete NPP task to save for later
 
-Completed saves still validate. Malformed values and unrelated validation errors remain blocked. No questionnaire message was added; License PSV storage, expiration warnings, and Begin PAF were untouched.
-
-**Validation:** Client and PAF API builds passed with **0 warnings and 0 errors**. All **4 focused tests passed**; `git diff --check` passed. No commit or push. Browser save/navigation has not been retested.
+Return the hash and git status. Do not push.
