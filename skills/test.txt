@@ -1,58 +1,83 @@
-**Finding**
-Neither permitted cause was established: I found no existing ADMIN audit write on the normal Add Practitioner to Facility submit path to reuse, and the ADMIN query does not exclude NPP. Stopped without changing code.
+User Story: State License-Specific PSV Upload and Global PSV Sharing
+Title: Enable independent License PSV uploads for each State License and shared/global Sanction PSV and NPI PSV uploads
 
-**Existing Submit Write**
-The normal facility submit records submission metadata in `SubmitPafStrategy.cs:162`:
+User Story
+As a Credentialing Specialist,
 
-```csharp
-FormData.SetStatus(FormData.Status == PafStatus.SavedByMsp
-    ? PafStatus.SubmittedByMsp : PafStatus.ResubmittedByMsp, null);
-// ...
-await FormData.SetSubmitInfoAsync(StrategyContext, _cactusClient);
-```
+I want to upload a separate License PSV document for each individual state license while maintaining a single shared Sanction PSV and NPI PSV document across all licenses,
 
-The shared persistence path writes **PAF history, not ADMIN AuditLog**:
-```csharp
-await StrategyContext.GetPafRepository().CreatePafHistoryAsync(history);
-```
+So that license verifications can be managed independently per state while avoiding duplicate uploads for provider-level verifications such as Sanctions and NPI.
 
-Its user/time fields in `PafExtensions.cs:100` are:
-```csharp
-PractitionerActionFormId = formData.FormId,
-Status = formData.Status,
-UpdatedByName = formData.LastUpdatedBy,
-UpdatedOn = DateTime.UtcNow
-```
+Business Requirement
+Currently, License PSV, Sanction PSV, and NPI PSV are uploaded within the same workflow when adding an NPP provider.
 
-The repository inserts that history with `await conn.InsertAsync(pafHistory)`.
+The system shall:
 
-**ADMIN Filter**
-`AuditLogSearchQueryBuilder.cs:86` reads:
-```sql
-FROM dbo.AuditLog al (NOLOCK)
-LEFT JOIN dbo.AspNetUsers users (NOLOCK) on users.Id = al.UserId
-```
+Associate License PSV with the selected State License only.
+Allow a unique License PSV document for each State License.
+Treat Sanction PSV as a provider-level document shared across all State Licenses.
+Treat NPI PSV as a provider-level document shared across all State Licenses.
+Automatically display previously uploaded Sanction PSV and NPI PSV documents when users navigate between State Licenses for the same practitioner.
+Acceptance Criteria
+AC1: License PSV is State License specific
+Given a practitioner has multiple state licenses
 
-Optional filters cover provider, username, and action. Its date filter is:
-```csharp
-where.Part += "al.LogDate >= @StartDate AND al.LogDate < @EndDateExclusive";
-```
+When the user selects a State License
 
-There is no NPP/task-type filter or PAF-history join.
+And uploads a License PSV document
 
-**NPP Submit**
-The successful NPP branch calls:
-```csharp
-if (pafProcessingResult.Status == PafProcessingResultStatus.Success)
-    await CompleteMspAutoAcceptedSubmitAsync();
-```
+Then the uploaded document shall be associated only with the selected State License
 
-That method also calls:
-```csharp
-await FormData.SetSubmitInfoAsync(StrategyContext, _cactusClient);
-```
+And shall not appear under any other State License.
 
-Thus NPP reaches the shared submission-metadata and history path; no NPP-specific skipped ADMIN write was found.
+AC2: Different License PSV documents can be uploaded
+Given a practitioner has licenses in Wisconsin, California, and Florida
 
-**Diff And Build**
-No diff. No build because no code changed. No backfill, new audit action, authorization changes, auto-accept changes, CVI changes, commit, or push.
+When the user uploads a unique License PSV document for each license
+
+Then the system shall save and display the corresponding License PSV document for that specific State License.
+
+AC3: Sanction PSV is shared globally
+Given a Sanction PSV document has been uploaded for the practitioner
+
+When the user switches between State Licenses
+
+Then the same Sanction PSV document shall be displayed across all State Licenses
+
+And the user shall not be required to upload the document again.
+
+AC4: NPI PSV is shared globally
+Given an NPI PSV document has been uploaded for the practitioner
+
+When the user switches between State Licenses
+
+Then the same NPI PSV document shall be displayed across all State Licenses
+
+And the user shall not be required to upload the document again.
+
+AC5: Update shared documents
+Given a shared Sanction PSV or NPI PSV document already exists
+
+When the user uploads a replacement document
+
+Then the new document shall replace the existing shared document
+
+And the updated document shall be reflected across all State Licenses.
+
+AC6: Validation
+Given License PSV is mandatory
+
+When a State License is selected
+
+And no License PSV has been uploaded for that license
+
+Then the system shall display an appropriate validation message preventing submission.
+
+And
+
+Given Sanction PSV and NPI PSV are mandatory
+
+When neither document exists at the provider level
+
+Then the system shall require upload before submission.
+
