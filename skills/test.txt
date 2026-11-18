@@ -1,13 +1,9 @@
-Add an NPP NPI-search audit log. Do not commit.
+Implemented, not committed.
 
-The no-NPI path already writes AuditAction.NppExceptionPractitionerSearchCriteria with details "Searched NPP practitioner exception using: ...". Leave that path unchanged.
+- **Enum:** `AuditAction.NppPractitionerNpiSearchCriteria`, with Admin label **NPP Practitioner NPI Search Criteria**, in `AuditLog.cs`. Appended after the existing final value to preserve all numeric IDs.
+- **Call site:** `PractitionerRepository.SearchPractitionersAsync`, inside the `Simple` branch in `PractitionerRepository.cs`.
+- **Condition:** `searchParameters.IsNppRequest && !string.IsNullOrWhiteSpace(searchParameters.Npi)`. The client passes `IsNppRequest` on its NPI branch.
 
-Call decision: when an MSP on Begin NPP PAF searches by NPI, write a second audit entry. Begin PAF, Recruitment, PSG, and duplicate-check searches must not write it.
+Details are `Searched NPP practitioner by NPI: {npi}.`, using the exception entry’s user-identity method and existing `QueueAuditLogEntry` → `ConfigConstants.AuditLog` path. The exception path and 180-day retention are unchanged.
 
-Append one enum value after NppExceptionPractitionerSearchCriteria. Do not reorder existing values. Name: NppPractitionerNpiSearchCriteria. Admin Action label: NPP Practitioner NPI Search Criteria.
-
-Details, same style as the exception message: Searched NPP practitioner by NPI: {npi}. Queue it with the same QueueAuditLogEntry / ConfigConstants.AuditLog path and the same user identity the exception entry uses. Retention stays 180 days.
-
-Log it only when the search is the NPP NPI search (IsNppRequest and the Simple/NPI branch, not NppException). If the API cannot tell that Simple search from a Begin PAF Simple search, pass the existing IsNppRequest flag on the search parameters and branch on that. Do not audit every Simple or Recruitment search.
-
-Build the client and the API project that queues the entry. Report the new enum value, the call site, and the condition.
+**Validation:** Client and Cactus API builds passed with 0 warnings/errors. The API used isolated artifacts because its running process locked the normal output. All 17 focused tests passed; `git diff --check` passed.
