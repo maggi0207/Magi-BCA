@@ -1,23 +1,9 @@
-TASK-149407-PSV-SECTIONS — Separate the license section and fix PSV required messages
+NPP Manage Address — hide Back on Enter Address.
 
-Two changes on NppTaskForm. Do not change the task model or the processor.
+Scope: Add Address only, NPP PAF only. IsNppPaf is already passed into PracticeAddressModal, and a new NPP address already sets IsEditingPracticeGroupAddress = "No" so the group step never shows.
 
-1. Sections
-Put the state-license list, the add-new fields, and the License PafFile in one bordered section. The License PafFile stays directly under the selected license and keeps @key="context.SelectedStateLicenseKey". It stays disabled until a license is selected.
-Put the Sanctions PafFile and the NPI PafFile in a second bordered section.
-In the license section use: Each state license requires its own License PSV.
-In the provider section use: Sanctions and NPI are uploaded once for the practitioner.
-VA = Yes and PA = Yes still hides the license section. Only the provider section remains.
-Do not add a table, checkboxes, multi-select, or a Submit button on this form.
+Find the footer on the Enter Address step (EditPracticeAddressStep and/or PracticeAddressModal). When IsNppPaf is true, do not render Back. Keep Cancel and Save, and keep their existing handlers.
 
-2. Required message
-Browser today: “None of these apply” is selected and the form has not been saved. License PSV already shows: This field is required. Sanctions and NPI do not.
-Quote the check that paints that sentence.
-Do not show it when the section opens or when the user selects a license.
-On a Save that completes the task, show that same sentence for an empty License PSV on the selected license, an empty Sanctions PSV, and an empty NPI PSV.
-Yes on “save for later” still saves the TaskStatus.New draft and does not show these messages.
-VA = Yes and PA = Yes still does not require a License PSV. Sanctions and NPI are still required on a completed save.
+Do not hide Back for non-NPP PAFs. Do not change validation, save, or the group-skip logic.
 
-Build the client. git diff --check on touched files. Do not commit. Do not push.
-
-RETURN: the two sections, when each required message appears, and the build result.
+Build Hca.Credentialing.Client. Report the file and the condition you used.
