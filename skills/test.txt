@@ -1,9 +1,13 @@
-NPP Manage Address — hide Back on Enter Address.
+Add an NPP NPI-search audit log. Do not commit.
 
-Scope: Add Address only, NPP PAF only. IsNppPaf is already passed into PracticeAddressModal, and a new NPP address already sets IsEditingPracticeGroupAddress = "No" so the group step never shows.
+The no-NPI path already writes AuditAction.NppExceptionPractitionerSearchCriteria with details "Searched NPP practitioner exception using: ...". Leave that path unchanged.
 
-Find the footer on the Enter Address step (EditPracticeAddressStep and/or PracticeAddressModal). When IsNppPaf is true, do not render Back. Keep Cancel and Save, and keep their existing handlers.
+Call decision: when an MSP on Begin NPP PAF searches by NPI, write a second audit entry. Begin PAF, Recruitment, PSG, and duplicate-check searches must not write it.
 
-Do not hide Back for non-NPP PAFs. Do not change validation, save, or the group-skip logic.
+Append one enum value after NppExceptionPractitionerSearchCriteria. Do not reorder existing values. Name: NppPractitionerNpiSearchCriteria. Admin Action label: NPP Practitioner NPI Search Criteria.
 
-Build Hca.Credentialing.Client. Report the file and the condition you used.
+Details, same style as the exception message: Searched NPP practitioner by NPI: {npi}. Queue it with the same QueueAuditLogEntry / ConfigConstants.AuditLog path and the same user identity the exception entry uses. Retention stays 180 days.
+
+Log it only when the search is the NPP NPI search (IsNppRequest and the Simple/NPI branch, not NppException). If the API cannot tell that Simple search from a Begin PAF Simple search, pass the existing IsNppRequest flag on the search parameters and branch on that. Do not audit every Simple or Recruitment search.
+
+Build the client and the API project that queues the entry. Report the new enum value, the call site, and the condition.
