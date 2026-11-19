@@ -1,9 +1,10 @@
-149751 — Hide Back on NPP Edit Address. Do not commit.
+Updated `PracticeAddressModal.razor:7`.
 
-Add Address on an NPP PAF already hides Back. Edit Address still shows it. Crystal retested 149751: Add is fixed, Edit is not.
+The Enter Address Back-button condition is now:
+```csharp
+_viewState == PracticeAddressModalViewState.AddAddress && !IsNppPaf
+```
 
-On an NPP PAF, Edit Address has no prior step. When IsNppPaf is true, do not render Back on Edit Address. Keep Cancel and Save and their existing handlers.
+This hides Back for both **NPP Add and Edit Address**, while preserving it for Begin PAF and other non-NPP modals. Cancel, Save, their handlers, and validation are unchanged.
 
-Use the same IsNppPaf flag and the same footer change that already hides Back on Add Address. Do not hide Back for Begin PAF or any non-NPP address modal. Do not change validation or save.
-
-Build Hca.Credentialing.Client. Report the file and the condition.
+**Client build passed:** 0 warnings, 0 errors. `git diff --check` passed. No commit made.
