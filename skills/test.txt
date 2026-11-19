@@ -1,13 +1,28 @@
-Implemented, not committed. No backfill.
+Commit the implemented NPP audit and address changes. Do not push. Do not commit anything else.
 
-- **Enum:** `AuditAction.NppPafSubmitted`, appended after the current final value. Admin label: **NPP PAF Submitted** in `AuditLog.cs`.
-- **Call site:** `SubmitPafStrategy.OnAfterExecuteAsync` in `SubmitPafStrategy.cs`, after successful PAF and history persistence.
-- **Condition:** MSP user, `TaskSelected == TaskType.Npp`, submit result `Success`, and status `SubmittedByMsp` or `ResubmittedByMsp`.
+Run git status and git diff --stat first. Skip a commit when its files are not dirty.
 
-Queues one entry through `QueueAuditLogEntry` → `ConfigConstants.AuditLog`, using the submitting user’s account identity and UTC timestamp.
+Commit 1 — NPI search audit, only if dirty:
+AuditLog.cs (NppPractitionerNpiSearchCriteria), PractitionerRepository.cs, and the client file that passes IsNppRequest on the NPI branch.
+The Simple branch logs only when IsNppRequest is set and Npi is present.
 
-Details: `Submitted ADD NPP PAF. Practitioner Id: {id}. PAF Id: {pafId}.`
+Message:
+log an NPP practitioner search by NPI
 
-Add Practitioner, PAF history, and 180-day retention are unchanged. Failed and returned-to-MSP submits do not log.
+Commit 2 — address Back button, only if dirty:
+PracticeAddressModal.razor. Back renders only when the view is AddAddress and IsNppPaf is false.
 
-**Validation:** PAF API build passed; all 10 new focused tests passed; `git diff --check` passed.
+Message:
+hide Back on NPP Add and Edit Address
+
+Commit 3 — NPP submit audit:
+AuditLog.cs (NppPafSubmitted) and SubmitPafStrategy.cs, plus the new focused tests.
+OnAfterExecuteAsync queues one entry only when the user is MSP, TaskSelected is Npp, the result is Success, and the status is SubmittedByMsp or ResubmittedByMsp.
+Details: Submitted ADD NPP PAF. Practitioner Id: {id}. PAF Id: {pafId}.
+
+Message:
+log a successful ADD NPP PAF submit
+
+Do not stage NppTask, NppTaskForm, processor PSV files, launchSettings, UnityApiLoadBalancer, Background, TestCactusUpdater, or skills. Do not backfill. Add Practitioner and PAF history stay unchanged.
+
+Return each hash and git status. Do not push.
