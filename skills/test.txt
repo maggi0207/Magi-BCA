@@ -1,13 +1,13 @@
-149235 — Write an Admin audit row when an ADD NPP PAF submit succeeds. Do not commit. Do not backfill old PAFs.
+Implemented, not committed. No backfill.
 
-Crystal retested: the practitioner search is already in the Admin Audit Log. The PAF submission is not. 131729 AC6 requires the submitting user and the timestamp for a successful submit.
+- **Enum:** `AuditAction.NppPafSubmitted`, appended after the current final value. Admin label: **NPP PAF Submitted** in `AuditLog.cs`.
+- **Call site:** `SubmitPafStrategy.OnAfterExecuteAsync` in `SubmitPafStrategy.cs`, after successful PAF and history persistence.
+- **Condition:** MSP user, `TaskSelected == TaskType.Npp`, submit result `Success`, and status `SubmittedByMsp` or `ResubmittedByMsp`.
 
-Prior inspect: Admin Audit Log reads dbo.AuditLog only. Submit records the user and time through SetSubmitInfoAsync and CreatePafHistoryAsync. That path does not write dbo.AuditLog for NPP or for Add Practitioner. Leave Add Practitioner unchanged. Leave PAF history unchanged.
+Queues one entry through `QueueAuditLogEntry` → `ConfigConstants.AuditLog`, using the submitting user’s account identity and UTC timestamp.
 
-Append one AuditAction after the current final value. Do not reorder existing values. Name: NppPafSubmitted. Admin label: NPP PAF Submitted.
+Details: `Submitted ADD NPP PAF. Practitioner Id: {id}. PAF Id: {pafId}.`
 
-On a successful NPP submit only, queue one entry with the existing QueueAuditLogEntry → ConfigConstants.AuditLog path and the submitting user's identity, same as the NPP search audit. Details: Submitted ADD NPP PAF. Practitioner Id: {id}. Include the PAF id if the success path already has it.
+Add Practitioner, PAF history, and 180-day retention are unchanged. Failed and returned-to-MSP submits do not log.
 
-Log once. If both the MSP submit path and the NPP auto-accept path can succeed, call the log from the one shared success point. If that shared method also runs for non-NPP PAFs, branch on NPP and do not log the others. Do not log a failed or returned-to-MSP submit. Retention stays 180 days.
-
-Build the API project that queues the entry. Report the enum value, the call site, and the condition.
+**Validation:** PAF API build passed; all 10 new focused tests passed; `git diff --check` passed.
