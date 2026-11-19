@@ -1,10 +1,13 @@
-Updated `PracticeAddressModal.razor:7`.
+149235 — Write an Admin audit row when an ADD NPP PAF submit succeeds. Do not commit. Do not backfill old PAFs.
 
-The Enter Address Back-button condition is now:
-```csharp
-_viewState == PracticeAddressModalViewState.AddAddress && !IsNppPaf
-```
+Crystal retested: the practitioner search is already in the Admin Audit Log. The PAF submission is not. 131729 AC6 requires the submitting user and the timestamp for a successful submit.
 
-This hides Back for both **NPP Add and Edit Address**, while preserving it for Begin PAF and other non-NPP modals. Cancel, Save, their handlers, and validation are unchanged.
+Prior inspect: Admin Audit Log reads dbo.AuditLog only. Submit records the user and time through SetSubmitInfoAsync and CreatePafHistoryAsync. That path does not write dbo.AuditLog for NPP or for Add Practitioner. Leave Add Practitioner unchanged. Leave PAF history unchanged.
 
-**Client build passed:** 0 warnings, 0 errors. `git diff --check` passed. No commit made.
+Append one AuditAction after the current final value. Do not reorder existing values. Name: NppPafSubmitted. Admin label: NPP PAF Submitted.
+
+On a successful NPP submit only, queue one entry with the existing QueueAuditLogEntry → ConfigConstants.AuditLog path and the submitting user's identity, same as the NPP search audit. Details: Submitted ADD NPP PAF. Practitioner Id: {id}. Include the PAF id if the success path already has it.
+
+Log once. If both the MSP submit path and the NPP auto-accept path can succeed, call the log from the one shared success point. If that shared method also runs for non-NPP PAFs, branch on NPP and do not log the others. Do not log a failed or returned-to-MSP submit. Retention stays 180 days.
+
+Build the API project that queues the entry. Report the enum value, the call site, and the condition.
