@@ -1,9 +1,9 @@
-Implemented, not committed.
+149751 — Hide Back on NPP Edit Address. Do not commit.
 
-- **Enum:** `AuditAction.NppPractitionerNpiSearchCriteria`, with Admin label **NPP Practitioner NPI Search Criteria**, in `AuditLog.cs`. Appended after the existing final value to preserve all numeric IDs.
-- **Call site:** `PractitionerRepository.SearchPractitionersAsync`, inside the `Simple` branch in `PractitionerRepository.cs`.
-- **Condition:** `searchParameters.IsNppRequest && !string.IsNullOrWhiteSpace(searchParameters.Npi)`. The client passes `IsNppRequest` on its NPI branch.
+Add Address on an NPP PAF already hides Back. Edit Address still shows it. Crystal retested 149751: Add is fixed, Edit is not.
 
-Details are `Searched NPP practitioner by NPI: {npi}.`, using the exception entry’s user-identity method and existing `QueueAuditLogEntry` → `ConfigConstants.AuditLog` path. The exception path and 180-day retention are unchanged.
+On an NPP PAF, Edit Address has no prior step. When IsNppPaf is true, do not render Back on Edit Address. Keep Cancel and Save and their existing handlers.
 
-**Validation:** Client and Cactus API builds passed with 0 warnings/errors. The API used isolated artifacts because its running process locked the normal output. All 17 focused tests passed; `git diff --check` passed.
+Use the same IsNppPaf flag and the same footer change that already hides Back on Add Address. Do not hide Back for Begin PAF or any non-NPP address modal. Do not change validation or save.
+
+Build Hca.Credentialing.Client. Report the file and the condition.
