@@ -1,162 +1,322 @@
-# Fix EmployerDetails Update and Delete APIs – Minimal Payload and Existing WorkEdge Pattern
-
-## Current Situation
-
-In the WorkEdge Employer service:
-
-- Insert EmployerDetails is working successfully.
-- Update EmployerDetails is failing.
-- Delete EmployerDetails is failing.
-- Swagger currently generates request payloads containing every EmployerDetails field, including unnecessary placeholder values.
-
-Existing endpoints:
-
-```text
-POST /Employer/EmployerDetails/InsertEmployerDetails
-
-POST /Employer/EmployerDetails/UpdateEmployerDetails
-
-POST /Employer/EmployerDetails/DeleteEmployerDetails
-```
-
-The database table is:
-
-```text
-customer.employer_details
-```
-
-Primary key:
-
-```text
-employer_id
-```
+# Wire EmployerDetails CRUD APIs into Existing WorkEdge POC UI
 
 ## Objective
 
-Fix the Update and Delete EmployerDetails operations.
+Integrate the existing EmployerDetails backend APIs into the frontend UI under the existing **POC → EmployerDetails** feature.
 
-The implementation must:
+The backend CRUD APIs are already implemented and Insert is working. Update and Delete are also available but must be integrated according to their existing API contracts.
 
-1. Accept only the required request fields.
-2. Follow the existing WorkEdge and FACTS framework patterns.
-3. Use the existing Controller and BusinessLogic structure.
-4. Preserve the working Insert functionality.
-5. Correctly update and delete database records.
+Before writing any frontend code, thoroughly analyse the existing DSM workflow diagram and follow the current WorkEdge UI implementation pattern.
 
-## Step 1 – Analyse Existing Implementation
+Do not create a new UI architecture or implement the feature independently.
 
-Before modifying code, inspect:
+---
 
-- Employer service controller
-- EmployerDetails request DTOs
-- EmployerDetails BusinessLogic
-- DbContext and entity mapping
-- Existing Insert implementation
-- Existing Update/Delete implementations from similar WorkEdge services
-- Swagger request and response configuration
+## 1. First Analyse the Existing DSM Diagram
 
-Identify the exact reason why Update and Delete are failing.
+Locate and inspect the existing DSM file:
 
-Do not assume the issue is caused by the HTTP method.
-
-## Step 2 – Update Request Payload
-
-Inspect the existing Update request model.
-
-Ensure Swagger does not require unnecessary fields when the operation only needs:
-
-- employerId
-- Fields being updated
-
-For example, if the existing contract supports updating only the employer name:
-
-```json
-{
-  "employerId": 468,
-  "name": "Updated Employer Name"
-}
+```text
+POC/EmployerDetails.dsm
 ```
 
-Use the actual DTO and validation rules as the source of truth.
+This diagram is the primary reference for understanding the EmployerDetails workflow.
 
-Do not invent new fields or remove genuinely required fields.
+Analyse:
 
-## Step 3 – Fix Update BusinessLogic
+- Start and initial navigation flow
+- FetchEmployers operation
+- EmployerDetails screen or component
+- Insert Employer flow
+- Update Employer flow
+- Delete Employer flow
+- Next transitions and navigation paths
+- Existing machine states and event handling
+- How the diagram connects to the UI implementation
 
-Follow the existing WorkEdge BusinessLogic pattern.
+Understand the complete workflow before modifying the UI.
+
+Do not assume the diagram is only documentation. Identify how it is used by the existing application.
+
+---
+
+## 2. Study Existing WorkEdge UI Patterns
+
+Before implementing EmployerDetails, inspect similar working UI features in the WorkEdge application.
+
+Refer to existing implementations under:
+
+```text
+workedge-web
+```
+
+Explore the following areas:
+
+```text
+Views/POC
+Machines/POC
+ViewModels
+Utility
+```
+
+Also inspect relevant existing UI implementations under:
+
+```text
+workedge-ui-businessrule
+workedge-ui-claims
+workedge-ui-intake
+workedge-ui-workflow
+```
+
+Identify the closest existing CRUD screen and follow its implementation pattern.
+
+Understand how the existing UI handles:
+
+- DSM machine integration
+- Razor Views
+- ViewModels
+- API/service proxy calls
+- Request and response models
+- Loading indicators
+- Toast notifications
+- Validation messages
+- Error handling
+- Data binding
+- Modal or popup handling
+- Navigation and screen transitions
+
+Reuse existing components, utilities, and conventions wherever possible.
+
+---
+
+## 3. Analyse the Existing EmployerDetails UI
+
+The EmployerDetails feature already exists under the POC section.
+
+Inspect all related files before modifying them.
+
+Identify:
+
+- Existing EmployerDetails Razor View
+- Existing EmployerDetails DSM
+- Existing ViewModel
+- Existing controller or machine integration
+- Existing table or grid implementation
+- Existing Insert functionality
+- Existing form fields and validation
+- Existing navigation and workflow behaviour
+
+Preserve the current UI structure and styling.
+
+Do not recreate the EmployerDetails page from scratch.
+
+---
+
+## 4. Integrate the Existing Backend APIs
+
+Use the existing Employer API endpoints.
+
+### Fetch Employer Details
+
+```text
+POST /Employer/GetEmployerDetails
+```
+
+Use this endpoint to load EmployerDetails records into the existing UI.
+
+### Insert Employer Details
+
+```text
+POST /Employer/EmployerDetails/InsertEmployerDetails
+```
+
+Integrate with the existing Insert form.
+
+The Insert operation is already working. Preserve its current functionality and avoid unnecessary changes.
+
+### Update Employer Details
+
+```text
+POST /Employer/EmployerDetails/UpdateEmployerDetails
+```
+
+Integrate the Update operation into the existing EmployerDetails UI.
 
 Requirements:
 
-- Retrieve the existing record using employerId.
-- Return the standard not-found response if the record does not exist.
-- Update only the permitted fields.
-- Preserve create_date and create_user.
-- Update modification_date and modification_user using existing audit conventions.
-- Maintain modification_number according to the existing pattern.
-- Save changes using the existing DbContext.
-- Return the standard response model.
+- Select an existing employer record.
+- Populate the existing form with the selected record.
+- Allow the user to modify editable fields.
+- Submit the correct Update request model.
+- Refresh the grid or list after successful update.
+- Display the existing standard success or error toast.
 
-Avoid overwriting existing values with default or placeholder values.
+### Delete Employer Details
 
-## Step 4 – Fix Delete Request
-
-Inspect the existing Delete DTO and endpoint.
-
-If deletion requires only the primary key, the payload should be:
-
-```json
-{
-  "employerId": 468
-}
+```text
+POST /Employer/EmployerDetails/DeleteEmployerDetails
 ```
+
+Integrate Delete functionality into the existing UI.
 
 Requirements:
 
-- Validate employerId.
-- Retrieve the existing record if required by the existing pattern.
-- Follow the project's physical-delete or soft-delete convention.
-- Respect existing business rules and relationships.
-- Handle missing records correctly.
-- Return the standard response model.
+- Allow the user to select an employer record.
+- Display the existing confirmation dialog or modal pattern.
+- Submit the correct Delete request model.
+- Refresh the grid after successful deletion.
+- Display the standard success or error notification.
 
-## Step 5 – Verify HTTP Methods
+---
 
-Inspect the existing WorkEdge CRUD implementation and FACTS framework conventions.
+## 5. Use the Correct API Payloads
 
-Determine whether the project uses:
+Do not send unnecessary fields or placeholder values.
 
-- POST for all service operations
-- PUT for complete updates
-- PATCH for partial updates
-- DELETE for deletion
+Inspect the actual backend request DTOs and Swagger definitions before implementing the frontend payloads.
 
-Do not change the HTTP method simply because Update or Delete is failing.
+For Update:
 
-If the current framework convention uses POST, retain the existing endpoint contract.
+- Include employerId.
+- Include only the fields required by the existing Update contract.
+- Do not send `"string"`, default dates, or unrelated fields.
 
-If the project requires REST-standard methods, update the controller attributes, route, Swagger definition, and client proxy consistently.
+For Delete:
 
-## Step 6 – Swagger Validation
+- Include only the required employer identifier and any mandatory context fields.
+- Do not send the entire EmployerDetails object unless the backend contract requires it.
+
+Use the existing request and response models wherever available.
+
+Do not invent new API contracts.
+
+---
+
+## 6. Follow the Existing UI Architecture
+
+Follow the existing flow:
+
+```text
+EmployerDetails.dsm
+        |
+        v
+Existing POC UI
+        |
+        v
+Razor View
+        |
+        v
+ViewModel / Machine
+        |
+        v
+Existing API Service / Proxy
+        |
+        v
+Employer Backend API
+        |
+        v
+Database
+```
+
+This is a conceptual integration flow. Verify the actual implementation path from the existing DSM and source code.
+
+Do not bypass the existing machine, ViewModel, or service-proxy architecture.
+
+Do not call backend APIs directly from the Razor View if the project uses a centralized service or machine pattern.
+
+---
+
+## 7. UI Behaviour Requirements
+
+Implement the complete EmployerDetails CRUD experience using the existing WorkEdge UI conventions.
+
+The UI should support:
+
+- Load EmployerDetails records
+- Display records in the existing table/grid
+- Insert a new employer
+- Select an employer for editing
+- Update employer information
+- Delete an employer with confirmation
+- Refresh data after successful operations
+- Display loading indicators during API calls
+- Display toast notifications immediately
+- Handle API failures gracefully
+- Prevent duplicate submissions during ongoing API requests
+
+Reuse the existing common loading indicator, toaster, modal, and table components.
+
+Do not introduce new styling or components if equivalent shared components already exist.
+
+---
+
+## 8. DSM Workflow Integration
+
+Update the existing DSM only if required to complete the workflow.
+
+Ensure:
+
+- Existing navigation remains functional.
+- FetchEmployers loads the employer list.
+- Insert transitions correctly.
+- Update transitions correctly.
+- Delete transitions correctly.
+- Successful operations return to the appropriate state.
+- API failures do not break the machine workflow.
+
+Follow the existing DSM event names, state transitions, and machine conventions.
+
+Do not redesign the workflow unless the existing diagram or implementation requires a correction.
+
+---
+
+## 9. Testing and Validation
 
 After implementation:
 
-- Verify the Update request shows only required fields.
-- Verify the Delete request shows only required fields.
-- Confirm the correct request content type.
-- Confirm all required FACTS context headers are present.
-- Execute Insert, Update, and Delete.
-- Confirm that the database record is updated or deleted correctly.
-- Confirm Insert remains unaffected.
+1. Build the WorkEdge.Web project.
+2. Verify the EmployerDetails POC page loads.
+3. Verify FetchEmployers displays data.
+4. Verify Insert continues working.
+5. Verify Update modifies the selected record.
+6. Verify Delete removes the selected record.
+7. Verify the correct minimal payload is sent.
+8. Verify loading indicators and toast notifications.
+9. Verify error handling.
+10. Verify DSM navigation and state transitions.
+11. Confirm no unrelated UI functionality is affected.
 
-## Final Report
+Do not claim successful testing unless the operations were actually executed.
 
-Provide:
+---
 
-- Root cause of Update failure
-- Root cause of Delete failure
-- Required payload for each operation
-- HTTP methods retained or changed, with reason
-- Controller and BusinessLogic files modified
-- Build and test results
+## 10. Final Deliverables
 
-Make the smallest possible change and follow the existing WorkEdge pattern exactly.
+Provide a concise implementation report containing:
+
+- DSM workflow analysed
+- Existing UI pattern identified
+- Files inspected
+- Files created or modified
+- API endpoints integrated
+- Request payloads used
+- DSM changes made
+- Build status
+- CRUD validation results
+- Remaining issues
+
+## Critical Instructions
+
+- Analyse first, implement second.
+- Follow the existing DSM diagram and UI pattern.
+- Work inside the existing POC EmployerDetails feature.
+- Reuse existing ViewModels, machines, service proxies, and shared UI components.
+- Preserve the working Insert functionality.
+- Do not create a separate EmployerDetails application or page.
+- Do not introduce a new frontend architecture.
+- Do not hardcode API URLs if the project uses configured service endpoints.
+- Do not modify backend code unless a frontend integration issue requires it and is clearly identified.
+- Do not change unrelated files.
+- Make the smallest clean implementation consistent with the existing WorkEdge codebase.
+
+**Expected outcome:** EmployerDetails CRUD is fully wired into the existing POC UI, following the original DSM workflow and established WorkEdge frontend architecture.
