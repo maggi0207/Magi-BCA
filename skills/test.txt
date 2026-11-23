@@ -1,263 +1,267 @@
-# Project Architecture & Codebase Deep Analysis – Facts Consultation MVC Application
+# Implement EmployerDetails CRUD – Follow Existing WorkEdge Architecture
 
 ## Objective
 
-Perform a comprehensive, evidence-based analysis of the existing Facts Consultation application. Understand the complete application architecture, business functionality, technical implementation, data flow, and dependencies.
+Implement complete CRUD operations for the **EmployerDetails** feature in the existing WorkEdge application.
 
-The goal is to document the project in a way that allows any developer, architect, or new team member to understand how the application works without requiring extensive guidance from the original developers.
+The functionality must support:
 
-## 1. Repository and Project Structure Analysis
+- Create Employer Details
+- Update Employer Details
+- Delete Employer Details
+- Retrieve Employer Details, if required by the existing workflow
 
-- Explore the complete repository and identify all projects, folders, modules, and major components.
-- Identify the application entry points, configuration files, controllers, models, views, services, repositories, and utilities.
-- Explain the purpose of each major folder and project.
-- Identify the MVC implementation and how responsibilities are separated.
-- Highlight any legacy components, unused files, duplicate implementations, or tightly coupled modules.
+The implementation must strictly follow the existing code structure, naming conventions, architectural patterns, and coding standards used throughout the WorkEdge repositories.
 
-## 2. Application Overview and Business Purpose
+Do not introduce a new architecture or unnecessary abstractions.
 
-- Explain the primary business purpose of the Facts Consultation application.
-- Identify the major business capabilities and workflows supported by the application.
-- Explain how users interact with the system.
-- Identify the different user roles, permissions, and access levels, if implemented.
-- Describe the application's role within the broader business or technical ecosystem.
+## 1. First Analyse the Existing Codebase
 
-## 3. MVC Architecture – Detailed Analysis
+Before making any changes, inspect the existing Employer-related implementation.
 
-Analyse the implementation of the Model-View-Controller architecture.
+Explore the following:
 
-Explain:
+- `workedge-customer`
+- `workedge-shared`
+- `workedge-web`
+- Relevant service and UI repositories
+- Existing Employer controller and BusinessLogic classes
+- Existing database entities and DbContext
+- Existing generated service controllers and service proxies
+- Existing CRUD implementations for similar entities
 
-- **Model:** Business entities, data models, validation rules, and data transformations.
-- **View:** UI pages, Razor views, layouts, partial views, and rendering mechanisms.
-- **Controller:** Request handling, routing, business orchestration, and response generation.
-- **Service Layer:** Business logic, domain operations, and reusable functionality.
-- **Repository/Data Access Layer:** Database interactions, queries, stored procedures, and persistence logic.
+Use the existing Employer functionality as the primary reference.
 
-Explain whether the application follows a clean MVC separation or contains business logic directly inside controllers or views.
-
-## 4. Request Lifecycle and End-to-End Execution Flow
-
-Trace the complete lifecycle of a typical user request.
-
-Explain the flow from:
-
-1. User interaction in the browser.
-2. HTTP request generation.
-3. Routing and controller selection.
-4. Controller action execution.
-5. Model binding and validation.
-6. Service-layer invocation.
-7. Repository or database access.
-8. Business logic execution.
-9. Response generation.
-10. View rendering or API response.
-11. Final response displayed to the user.
-
-Use actual code references to demonstrate the flow.
-
-## 5. Facts Consultation Business Workflow
-
-Identify and document the complete Facts Consultation workflow.
-
-- What triggers a facts consultation request?
-- What information does the user provide?
-- How is the request validated?
-- How is consultation data retrieved or processed?
-- Which business rules are applied?
-- How are consultation results generated?
-- How are results displayed, stored, updated, or exported?
-- What happens when data is missing, invalid, or unavailable?
-
-Trace at least one important business workflow from the UI to the database and back.
-
-## 6. Database and Data Model Analysis
-
-- Identify the database technology and connection configuration.
-- Analyse entities, tables, relationships, and data models.
-- Identify primary keys, foreign keys, and important business fields.
-- Explain how the application reads, inserts, updates, and deletes data.
-- Identify stored procedures, views, functions, and complex queries.
-- Explain transaction handling and data consistency.
-- Highlight performance concerns in database access.
-
-## 7. API and External System Integration
-
-- Identify all internal APIs and external service integrations.
-- Document API endpoints, HTTP methods, request models, and response models.
-- Explain authentication and authorization mechanisms.
-- Identify external dependencies and integration points.
-- Explain how errors, timeouts, retries, and failures are handled.
-- Trace how external data enters and flows through the application.
-
-## 8. Authentication, Authorization, and Security
-
-- Analyse authentication and authorization implementation.
-- Identify role-based access control and permission checks.
-- Review session management, cookies, and token handling.
-- Identify sensitive data handling and logging practices.
-- Highlight potential security vulnerabilities and areas requiring improvement.
-
-## 9. Configuration and Environment Management
-
-- Analyse configuration files such as appsettings, web.config, environment variables, and deployment settings.
-- Identify development, testing, staging, and production configurations.
-- Explain dependency injection and service registration.
-- Identify feature flags, environment-specific behaviour, and configurable business rules.
-- Highlight hardcoded values and configuration risks.
-
-## 10. Error Handling, Logging, and Monitoring
-
-- Identify exception-handling mechanisms.
-- Explain global and local error handling.
-- Analyse logging frameworks and log locations.
-- Identify how application failures are reported.
-- Explain whether the application supports monitoring, diagnostics, and tracing.
-- Highlight missing observability and troubleshooting capabilities.
-
-## 11. Dependencies and Technology Stack
-
-- Identify the programming languages, frameworks, libraries, and packages used.
-- Explain the purpose of important dependencies.
-- Identify framework versions and compatibility concerns.
-- Highlight outdated packages, deprecated APIs, and potential upgrade risks.
-- Explain how the application is built and executed.
-
-## 12. Testing and Code Quality
-
-- Identify unit tests, integration tests, and end-to-end tests.
-- Analyse test coverage and important untested business workflows.
-- Identify code duplication, large classes, complex methods, and tightly coupled components.
-- Review adherence to SOLID principles and common design patterns.
-- Highlight maintainability and scalability concerns.
-
-## 13. Deployment and Runtime Architecture
-
-- Explain how the application is built, packaged, and deployed.
-- Identify hosting infrastructure, web servers, runtime requirements, and deployment pipelines.
-- Explain how the application communicates with databases and external services at runtime.
-- Identify environment dependencies and operational requirements.
-- Document the complete runtime architecture.
-
-## 14. Technical Findings and Improvement Recommendations
-
-Provide a structured assessment of:
-
-- Existing architectural strengths.
-- Architectural weaknesses.
-- Business logic and data-flow risks.
-- Performance bottlenecks.
-- Security concerns.
-- Maintainability issues.
-- Scalability limitations.
-- Recommended refactoring opportunities.
-
-Prioritize recommendations as:
-
-- **High:** Critical functional, security, or architectural risks.
-- **Medium:** Significant maintainability or performance improvements.
-- **Low:** Optional optimizations and future enhancements.
-
-Every recommendation must be supported by actual code evidence.
-
-## 15. Final Technical Documentation and Architecture Diagram
-
-Produce a comprehensive project documentation report containing:
-
-- Executive summary.
-- Business functionality overview.
-- Project structure explanation.
-- MVC architecture breakdown.
-- Important classes and their responsibilities.
-- End-to-end request flow.
-- Facts Consultation business workflow.
-- Database and integration architecture.
-- Configuration and deployment overview.
-- Technical findings and recommendations.
-
-Create one **master ASCII architecture diagram** that explains the complete application architecture.
-
-The diagram should include:
-
-- User / Browser.
-- UI Views.
-- MVC Controller.
-- Model and Validation.
-- Service Layer.
-- Repository / Data Access Layer.
-- Database.
-- External APIs or integrations.
-- Authentication and authorization.
-- Logging and error handling.
-
-Also create smaller ASCII diagrams for important workflows where necessary.
-
-Example format:
+Identify and understand these existing endpoints:
 
 ```text
-                 +----------------------+
-                 |     User / Browser   |
-                 +----------+-----------+
-                            |
-                            v
-                 +----------------------+
-                 |     MVC Routing     |
-                 +----------+-----------+
-                            |
-                            v
-                 +----------------------+
-                 |      Controller     |
-                 |  Request Handling   |
-                 +----------+-----------+
-                            |
-                            v
-                 +----------------------+
-                 |   Model Validation  |
-                 +----------+-----------+
-                            |
-                            v
-                 +----------------------+
-                 |    Service Layer    |
-                 |   Business Logic    |
-                 +----------+-----------+
-                            |
-                            v
-                 +----------------------+
-                 | Repository / DAL    |
-                 +----------+-----------+
-                            |
-                            v
-                 +----------------------+
-                 |      Database       |
-                 +----------------------+
+POST /Employer/GetEmployerDetails
+
+POST /Employer/GetEmployerDetailsByFein
+
+POST /Employer/SearchEmployersForStaff
+
+POST /Employer/EmployerDetails/InsertEmployerDetails
+
+POST /Employer/EmployerDetails/UpdateEmployerDetails
+
+POST /Employer/EmployerDetails/DeleteEmployerDetails
 ```
 
-## Analysis Rules
+Also analyse the existing Employer workflow diagram and understand how the operations are connected.
 
-1. Read the actual source code before making conclusions.
-2. Do not assume the architecture based only on folder names.
-3. Trace important functionality across multiple files.
-4. Reference actual file paths, class names, method names, and relevant code sections.
-5. Clearly distinguish implemented functionality from inferred behaviour.
-6. Do not invent business rules, APIs, database tables, or architectural components.
-7. Identify areas where the source code does not provide enough information.
-8. Avoid generic documentation that could apply to any MVC application.
-9. Explain technical concepts in clear language while maintaining technical accuracy.
-10. Keep the documentation detailed, structured, and useful for onboarding, debugging, and future development.
+## 2. Follow the Existing Project Structure
 
-## Expected Output
+Implement the functionality using the same structure already present in the relevant WorkEdge service.
 
-Create a Markdown document named:
+Follow the existing pattern for:
 
-`FACTS_CONSULTATION_PROJECT_ANALYSIS.md`
+- Service Controller / API Endpoint
+- BusinessLogic
+- Data Access Layer
+- Models / Request DTOs / Response DTOs
+- DbContext and database entities
+- Shared service contracts and proxies
+- Unit tests
 
-The document must be technically accurate, comprehensive, and based entirely on the actual repository.
+Do not create new folders or layers unless the existing project pattern requires them.
 
-The final result should allow a developer to understand:
+## 3. Database and Entity Analysis
 
-- What the Facts Consultation application does.
-- How its MVC architecture is implemented.
-- How the complete request and business workflows operate.
-- How the application interacts with its database and external systems.
-- Where the important code resides.
-- How to troubleshoot, maintain, and extend the application.
+Inspect the existing database table:
+
+```text
+customer.employer_details
+```
+
+Analyse the existing columns, data types, primary key, constraints, and audit fields.
+
+Important fields visible in the existing database include:
+
+- employer_id
+- legal_name
+- dba_name
+- create_date
+- modification_date
+- create_user
+- modification_user
+- modification_number
+- modification_process
+- fein
+- business_email
+- account_id
+- ean
+
+Use the actual database schema and existing entity mappings as the source of truth.
+
+Do not modify the database schema unless it is necessary and explicitly supported by the existing implementation.
+
+## 4. Implement Create Employer Details
+
+Implement the Insert Employer Details operation.
+
+Requirements:
+
+- Follow the existing insert pattern used in similar BusinessLogic classes.
+- Validate the incoming request using existing validation conventions.
+- Map the request model to the appropriate entity.
+- Populate required audit fields according to existing project standards.
+- Persist the record using the existing DbContext.
+- Use the existing SaveChangesAsync pattern.
+- Return the standard response model used by the project.
+- Handle validation failures and database errors consistently.
+
+Endpoint:
+
+```text
+POST /Employer/EmployerDetails/InsertEmployerDetails
+```
+
+## 5. Implement Update Employer Details
+
+Implement the Update Employer Details operation.
+
+Requirements:
+
+- Retrieve the existing EmployerDetails record using its primary key.
+- Handle the case where the record does not exist.
+- Update only the fields allowed by the existing business rules.
+- Preserve original creation audit fields.
+- Update modification audit fields using the existing pattern.
+- Maintain modification_number according to the existing implementation.
+- Persist changes using the existing DbContext.
+- Return the standard response model.
+
+Endpoint:
+
+```text
+POST /Employer/EmployerDetails/UpdateEmployerDetails
+```
+
+## 6. Implement Delete Employer Details
+
+Implement the Delete Employer Details operation.
+
+Requirements:
+
+- Retrieve the existing record before deletion.
+- Validate the employer identifier.
+- Follow the existing deletion pattern used in the project.
+- Check whether the project uses physical deletion or soft deletion.
+- Respect existing business rules and relationships.
+- Handle records that do not exist.
+- Return the standard response model.
+- Do not introduce cascade deletion or new deletion behaviour without evidence from the existing codebase.
+
+Endpoint:
+
+```text
+POST /Employer/EmployerDetails/DeleteEmployerDetails
+```
+
+## 7. Controller and BusinessLogic Implementation
+
+Implement the controller and BusinessLogic using the existing WorkEdge pattern.
+
+Controller responsibilities:
+
+- Accept the request.
+- Perform existing model binding and validation.
+- Invoke the corresponding BusinessLogic method.
+- Return the standard service response.
+
+BusinessLogic responsibilities:
+
+- Execute the business operation.
+- Validate business conditions.
+- Access DbContext and entities.
+- Perform create, update, or delete operations.
+- Handle persistence and return results.
+
+Keep the controller thin and avoid placing database operations directly inside the controller.
+
+## 8. Follow Existing Naming and Coding Conventions
+
+Before creating new methods, inspect similar implementations.
+
+Follow existing naming conventions such as:
+
+```text
+InsertEmployerDetails
+UpdateEmployerDetails
+DeleteEmployerDetails
+```
+
+Use the same conventions for:
+
+- Method names
+- Request and response models
+- Dependency injection
+- Logging
+- Exception handling
+- Async methods
+- Database access
+- Service response types
+
+Do not rename existing methods or change existing endpoint contracts unnecessarily.
+
+## 9. Workflow and API Integration
+
+Ensure the new operations are integrated into the existing Employer workflow.
+
+Verify:
+
+- Controller endpoint registration
+- BusinessLogic method invocation
+- Request and response model mapping
+- Service proxy integration, where applicable
+- Existing API route conventions
+- Swagger endpoint visibility
+
+Use the existing Swagger configuration and conventions.
+
+Do not create duplicate endpoints if the required endpoints already exist.
+
+## 10. Testing and Validation
+
+After implementation:
+
+- Build the affected solution.
+- Run existing unit tests.
+- Add or update tests following the existing test structure.
+- Verify create, update, and delete operations.
+- Verify invalid request handling.
+- Verify record-not-found behaviour.
+- Verify database persistence.
+- Verify audit fields are maintained correctly.
+
+Do not claim that tests passed unless they were actually executed.
+
+## 11. Final Deliverables
+
+Provide a summary of:
+
+1. Files analysed.
+2. Existing implementation pattern identified.
+3. Files created or modified.
+4. Controller methods implemented.
+5. BusinessLogic methods implemented.
+6. Database operations performed.
+7. API endpoints verified.
+8. Tests added or executed.
+9. Build status.
+10. Any remaining issues or assumptions.
+
+## Critical Rules
+
+- Follow the existing WorkEdge code pattern exactly.
+- Reuse existing entities, DTOs, DbContext, and response models wherever possible.
+- Do not introduce unnecessary abstractions.
+- Do not change unrelated functionality.
+- Do not modify existing Employer endpoints unless required.
+- Do not invent database columns or business rules.
+- Inspect actual source code before implementation.
+- If an existing pattern is unclear, identify the closest working CRUD implementation and follow it.
+- Make the changes directly in the existing repository and report the exact files modified.
+
+**Expected outcome:** Complete EmployerDetails CRUD functionality implemented consistently with the existing WorkEdge architecture, without disrupting existing Employer workflows.
