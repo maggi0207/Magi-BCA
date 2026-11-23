@@ -1,90 +1,162 @@
-# Fix FACTS Framework ContextHeader – Employer API 500 Error
+# Fix EmployerDetails Update and Delete APIs – Minimal Payload and Existing WorkEdge Pattern
 
-## Problem
+## Current Situation
 
-When executing Employer API endpoints through Swagger at:
+In the WorkEdge Employer service:
 
-`http://localhost:8007/swagger/index.html?urls.primaryName=Employer`
+- Insert EmployerDetails is working successfully.
+- Update EmployerDetails is failing.
+- Delete EmployerDetails is failing.
+- Swagger currently generates request payloads containing every EmployerDetails field, including unnecessary placeholder values.
 
-The API returns HTTP 500.
-
-Error:
+Existing endpoints:
 
 ```text
-System.ArgumentException:
-Requested value 'employer' was not found.
+POST /Employer/EmployerDetails/InsertEmployerDetails
+
+POST /Employer/EmployerDetails/UpdateEmployerDetails
+
+POST /Employer/EmployerDetails/DeleteEmployerDetails
 ```
 
-Stack trace indicates the failure occurs in:
+The database table is:
 
 ```text
-FACTS.Framework.Service.Middleware.ContextHeader.GetContext(...)
-FACTS.Framework.Service.Middleware.ContextHeader.InvokeAsync(...)
+customer.employer_details
 ```
 
-The exception is related to enum parsing:
+Primary key:
 
 ```text
-System.Enum.Parse(...)
-Requested value 'employer' was not found.
+employer_id
 ```
 
 ## Objective
 
-Investigate and fix the FACTS framework request-context configuration issue without modifying unrelated Employer CRUD functionality.
+Fix the Update and Delete EmployerDetails operations.
 
-## Investigation Steps
+The implementation must:
 
-1. Inspect the Employer service startup and middleware configuration.
-2. Identify how `ContextHeader` is registered and invoked.
-3. Find the request header or configuration value containing `employer`.
-4. Locate the `TStorage` enum or equivalent framework enum used by `ContextHeader`.
-5. Identify the valid enum values from the actual source code or framework metadata.
-6. Compare the current Employer API request headers with those used by working services.
-7. Inspect Swagger configuration and any custom header configuration.
-8. Check whether the Employer service is using an incorrect storage/context value.
-9. Determine whether the issue is caused by:
-   - Incorrect request header
-   - Incorrect service configuration
-   - Invalid enum value
-   - Framework version mismatch
-   - Middleware registration or initialization
+1. Accept only the required request fields.
+2. Follow the existing WorkEdge and FACTS framework patterns.
+3. Use the existing Controller and BusinessLogic structure.
+4. Preserve the working Insert functionality.
+5. Correctly update and delete database records.
 
-## Fix Requirements
+## Step 1 – Analyse Existing Implementation
 
-- Follow the existing FACTS framework configuration pattern.
-- Compare with a working service such as Customer, Claims, or another relevant service.
-- Use the actual supported `TStorage` enum value.
-- Do not guess enum values.
-- Do not remove ContextHeader middleware as a workaround.
-- Do not disable authentication, authorization, or request-context validation.
-- Do not modify Employer BusinessLogic or database operations unless the investigation proves they are involved.
-- Preserve existing API contracts and CRUD functionality.
+Before modifying code, inspect:
 
-## Validation
+- Employer service controller
+- EmployerDetails request DTOs
+- EmployerDetails BusinessLogic
+- DbContext and entity mapping
+- Existing Insert implementation
+- Existing Update/Delete implementations from similar WorkEdge services
+- Swagger request and response configuration
 
-After applying the fix:
+Identify the exact reason why Update and Delete are failing.
 
-1. Restart the Employer service.
-2. Open Swagger.
-3. Execute `GetEmployerDetails`.
-4. Execute `InsertEmployerDetails`.
-5. Execute `UpdateEmployerDetails`.
-6. Execute `DeleteEmployerDetails`.
-7. Confirm that the ContextHeader exception no longer occurs.
-8. Confirm that the requests reach the appropriate controller and BusinessLogic.
-9. Verify that database operations work correctly.
+Do not assume the issue is caused by the HTTP method.
+
+## Step 2 – Update Request Payload
+
+Inspect the existing Update request model.
+
+Ensure Swagger does not require unnecessary fields when the operation only needs:
+
+- employerId
+- Fields being updated
+
+For example, if the existing contract supports updating only the employer name:
+
+```json
+{
+  "employerId": 468,
+  "name": "Updated Employer Name"
+}
+```
+
+Use the actual DTO and validation rules as the source of truth.
+
+Do not invent new fields or remove genuinely required fields.
+
+## Step 3 – Fix Update BusinessLogic
+
+Follow the existing WorkEdge BusinessLogic pattern.
+
+Requirements:
+
+- Retrieve the existing record using employerId.
+- Return the standard not-found response if the record does not exist.
+- Update only the permitted fields.
+- Preserve create_date and create_user.
+- Update modification_date and modification_user using existing audit conventions.
+- Maintain modification_number according to the existing pattern.
+- Save changes using the existing DbContext.
+- Return the standard response model.
+
+Avoid overwriting existing values with default or placeholder values.
+
+## Step 4 – Fix Delete Request
+
+Inspect the existing Delete DTO and endpoint.
+
+If deletion requires only the primary key, the payload should be:
+
+```json
+{
+  "employerId": 468
+}
+```
+
+Requirements:
+
+- Validate employerId.
+- Retrieve the existing record if required by the existing pattern.
+- Follow the project's physical-delete or soft-delete convention.
+- Respect existing business rules and relationships.
+- Handle missing records correctly.
+- Return the standard response model.
+
+## Step 5 – Verify HTTP Methods
+
+Inspect the existing WorkEdge CRUD implementation and FACTS framework conventions.
+
+Determine whether the project uses:
+
+- POST for all service operations
+- PUT for complete updates
+- PATCH for partial updates
+- DELETE for deletion
+
+Do not change the HTTP method simply because Update or Delete is failing.
+
+If the current framework convention uses POST, retain the existing endpoint contract.
+
+If the project requires REST-standard methods, update the controller attributes, route, Swagger definition, and client proxy consistently.
+
+## Step 6 – Swagger Validation
+
+After implementation:
+
+- Verify the Update request shows only required fields.
+- Verify the Delete request shows only required fields.
+- Confirm the correct request content type.
+- Confirm all required FACTS context headers are present.
+- Execute Insert, Update, and Delete.
+- Confirm that the database record is updated or deleted correctly.
+- Confirm Insert remains unaffected.
 
 ## Final Report
 
-Explain:
+Provide:
 
-- Root cause
-- Exact header or configuration value causing the error
-- Expected enum values
-- Files modified
-- Fix applied
+- Root cause of Update failure
+- Root cause of Delete failure
+- Required payload for each operation
+- HTTP methods retained or changed, with reason
+- Controller and BusinessLogic files modified
 - Build and test results
-- Any remaining issues
 
-Make the smallest possible change and follow the existing WorkEdge implementation pattern.
+Make the smallest possible change and follow the existing WorkEdge pattern exactly.
