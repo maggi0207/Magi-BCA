@@ -1,5 +1,12 @@
-Updated `GetMissingFacilityStateLicenses` in `NppTaskForm.razor.cs`.
+Commit only the 149997 missing-license warnings. Do not push.
 
-The NV warning comes from `facility.State`: `OnSaveClicked` copies it from the selected `Facility.State` into `FacilityValue.State`. I didn’t find a Florida-to-NV remapping in that path. The validator now builds its state list from every selected facility’s nonblank `State`, trims and uppercases the values, and deduplicates them. It checks each state against existing and entered licenses, then puts the existing sentence for every uncovered state in one toast. No states are hardcoded.
+Stage only NppTaskForm.razor.cs. GetMissingFacilityStateLicenses warns once for each distinct selected facility state that no existing or entered license covers.
 
-The VA = Yes / PA = Yes bypass and license-save behavior remain unchanged. Client build succeeded with 0 warnings and 0 errors; `git diff --check` passed. No commit made.
+Do not stage StartPafFrom, the PAF API project file, AuditLog.cs, SubmitPafStrategy.cs, PracticeAddressModal.razor, PractitionerRepository.cs, or skills.
+
+If any other file is in the diff, stop and report it.
+
+Message:
+warn once for each facility state that has no NPP license
+
+Return the hash and git status. Do not push.
