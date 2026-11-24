@@ -1,12 +1,9 @@
-Commit only the 149997 missing-license warnings. Do not push.
+150099 — Activate Begin NPP PAF from the keyboard. Do not commit.
 
-Stage only NppTaskForm.razor.cs. GetMissingFacilityStateLicenses warns once for each distinct selected facility state that no existing or entered license covers.
+MSP Dashboard: Tab reaches Begin NPP PAF. Enter does not open the practitioner search. Space does not either. Begin PAF, next to it, opens the search on Enter and on Space.
 
-Do not stage StartPafFrom, the PAF API project file, AuditLog.cs, SubmitPafStrategy.cs, PracticeAddressModal.razor, PractitionerRepository.cs, or skills.
+Quote both controls before editing. The NPP control is the dashboard action from 136873, not the ADD NPP PAF task radio.
 
-If any other file is in the diff, stop and report it.
+Make Begin NPP PAF use the same element type as Begin PAF so the browser activates it on Enter and Space. Keep the existing click route to the NPP practitioner search. Do not add a separate key handler if the Begin PAF element already supplies the keys. Do not change who sees the button, the tooltip, the tab order, or Begin PAF.
 
-Message:
-warn once for each facility state that has no NPP license
-
-Return the hash and git status. Do not push.
+Build Hca.Credentialing.Client. Report the element you changed.
