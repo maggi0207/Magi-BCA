@@ -1,9 +1,13 @@
-Implemented without committing.
+149998 — NPP Work crashes on the license checkbox. Do not commit.
 
-`NppTask.IncludedStateLicenses` now stores each included existing or new license with its own fields. Each license’s image remains in the existing `LicensePsvAttachments` collection, keyed by its license key. Legacy single-license PAF data is migrated into the new collection when opened.
+Clicking Work on ADD NPP throws, and the task does not open:
 
-The form supports multiple existing selections and multiple new licenses, validates fields and image independently, and names incomplete licenses by state/license number. Removing or deselecting a license also removes its keyed PSV. Save/reload preserves included licenses and images. The processor handles each included license; existing facility DEA/CDS and packet paths were not changed. The VA = Yes / PA = Yes exemption remains.
+System.InvalidOperationException: Please use @bind-Value (or @bind-Values for selected components) in the control with generic type 'System.Boolean'.
+at AntDesign.Checkbox.OnInitialized()
+at AntDesign.FormItem.AddControl
 
-**Validation:** Client and processor builds passed with 0 warnings and 0 errors; the PAF API built successfully with isolated artifacts. Focused processor tests passed (28/28), and focused PAF API tests passed (13/13). `git diff --check` passed. CACTUS database integration tests were not run.
+The new multi-select Checkbox is inside a FormItem and is not bound with @bind-Value. Bind that Checkbox with @bind-Value to the included-license flag. Keep it inside the FormItem. Do not switch it to @bind-Checked. Do not remove the multi-select.
 
-Changes are uncommitted and unstaged. The pre-existing staged changes remain untouched.
+Do not change IncludedStateLicenses, LicensePsvAttachments, validation, or the processor. "No PAF ID, setting defaults" is not this bug.
+
+Build Hca.Credentialing.Client. Report the checkbox line.
