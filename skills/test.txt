@@ -1,13 +1,13 @@
-149998 — NPP Work crashes on the license checkbox. Do not commit.
+149998 — NPP Work still crashes on the license checkbox. Do not commit.
 
-Clicking Work on ADD NPP throws, and the task does not open:
+Clicking Work throws, and the task does not open:
 
-System.InvalidOperationException: Please use @bind-Value (or @bind-Values for selected components) in the control with generic type 'System.Boolean'.
-at AntDesign.Checkbox.OnInitialized()
-at AntDesign.FormItem.AddControl
+System.ArgumentException: The provided expression contains a InstanceMethodCallExpression1 which is not supported. FieldIdentifier only supports simple member accessors (fields, properties) of an object.
+at FieldIdentifier.ParseAccessor
+at AntDesign.AntInputComponentBase.SetParametersAsync
 
-The new multi-select Checkbox is inside a FormItem and is not bound with @bind-Value. Bind that Checkbox with @bind-Value to the included-license flag. Keep it inside the FormItem. Do not switch it to @bind-Checked. Do not remove the multi-select.
+The Checkbox @bind-Value points at a method call. Bind it to a bool property on the license row, such as license.Selected. Do not bind a method, a lambda, or a Contains call.
 
-Do not change IncludedStateLicenses, LicensePsvAttachments, validation, or the processor. "No PAF ID, setting defaults" is not this bug.
+Keep the Checkbox inside the FormItem. Selecting the checkbox adds that license to IncludedStateLicenses. Clearing it removes that license and its keyed PSV. Do not change validation or the processor.
 
-Build Hca.Credentialing.Client. Report the checkbox line.
+Build Hca.Credentialing.Client. Report the checkbox binding.
