@@ -1,3 +1,17 @@
-The initializer now uses `if (!string.IsNullOrWhiteSpace(emailOverride))` after copying the CACTUS email. A nonblank override therefore replaces the CACTUS value, whether it was blank or already populated.
+Commit only the 149834 blank-email capture. Do not push.
 
-The client build passed with **0 warnings and 0 errors**. `git diff --check` passed. I did not stage or commit anything. The initializer file currently has no Git diff; the PAF API project file remains staged as it was before this change.
+Run git status and git diff --stat first.
+
+Stage only the file that contains StartPafFrom. The change stores PractitionerEmailOverride when the summary email is blank and the typed email is nonblank.
+
+Do not stage:
+- InitializeFromPractitioner (no diff expected; it already applies any nonblank override)
+- the PAF API project file that removes the Hca.Credentialing.Api.Shared reference
+- AuditLog.cs, SubmitPafStrategy.cs, PracticeAddressModal.razor, PractitionerRepository.cs, NppTask, NppTaskForm, launchSettings, UnityApiLoadBalancer, Background, TestCactusUpdater, or skills
+
+If the diff contains any other change, stop and report it.
+
+Message:
+keep an email typed for a practitioner who has none
+
+Return the hash and git status. Do not push.
