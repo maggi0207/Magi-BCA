@@ -1,16 +1,5 @@
-149997 — Show one state-license warning for every missing facility state. Do not commit.
+Updated `GetMissingFacilityStateLicenses` in `NppTaskForm.razor.cs`.
 
-Repro: NPP provider H2000068451 has a GA license only. Selected facilities include Bayonet Point Surgery and Endoscopy Center, Countryside Surgery Center, ENT Surgery Center, and Lincoln Surgery Center. Bayonet Point's entity address state is FL. Submit shows only: A state license in the state of 'NV' is required for PAF submission. No FL warning.
+The NV warning comes from `facility.State`: `OnSaveClicked` copies it from the selected `Facility.State` into `FacilityValue.State`. I didn’t find a Florida-to-NV remapping in that path. The validator now builds its state list from every selected facility’s nonblank `State`, trims and uppercases the values, and deduplicates them. It checks each state against existing and entered licenses, then puts the existing sentence for every uncovered state in one toast. No states are hardcoded.
 
-Quote GetMissingFacilityStateLicense and the toast in NppTaskForm.SaveNppTask before editing.
-
-Required behavior:
-- Read the state of every selected facility.
-- A state is covered when the provider's existing license or the new license being entered is in that state.
-- For each distinct uncovered state, show the existing sentence once: A state license in the state of '{state}' is required for PAF submission.
-- Do not stop after the first missing state.
-- Quote the field that produced 'NV' for this selection. Bayonet Point's entity address state is FL. If a Florida facility is resolved as NV, fix that state source. Do not hardcode FL or NV.
-
-VA = Yes and PA = Yes still skips the license check. Do not change license save, PSV, or the warning text.
-
-Build the project you change. Report the method and how the state list is built.
+The VA = Yes / PA = Yes bypass and license-save behavior remain unchanged. Client build succeeded with 0 warnings and 0 errors; `git diff --check` passed. No commit made.
