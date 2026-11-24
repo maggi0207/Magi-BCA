@@ -1,9 +1,3 @@
-149834 follow-up — restore a corrected email. Do not commit.
+The initializer now uses `if (!string.IsNullOrWhiteSpace(emailOverride))` after copying the CACTUS email. A nonblank override therefore replaces the CACTUS value, whether it was blank or already populated.
 
-Keep the new StartPafFrom capture: when the summary email is blank and the typed email is nonblank, store PractitionerEmailOverride.
-
-Put InitializeFromPractitioner back to its previous apply: copy the CACTUS email, then if the override is nonblank, use the override. That covers both a blank CACTUS email and a corrected email on Begin PAF and Recruitment.
-
-Do not change email validation, required-field rules, or the Verify modal. Do not stage the csproj that removes the Hca.Credentialing.Api.Shared reference.
-
-Build the client. Report the initializer condition.
+The client build passed with **0 warnings and 0 errors**. `git diff --check` passed. I did not stage or commit anything. The initializer file currently has no Git diff; the PAF API project file remains staged as it was before this change.
