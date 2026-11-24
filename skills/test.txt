@@ -1,21 +1,9 @@
-149998 — Select and add more than one NPP state license. Do not commit.
+Implemented without committing.
 
-The State License section is one radio: one existing license, or one new license on "None of these apply. Add New State License Instead." Quote SelectedStateLicenseKey and the single NewLicense* fields on NppTask before editing.
+`NppTask.IncludedStateLicenses` now stores each included existing or new license with its own fields. Each license’s image remains in the existing `LicensePsvAttachments` collection, keyed by its license key. Legacy single-license PAF data is migrated into the new collection when opened.
 
-AC1. When state licenses are required, the user can select more than one existing state license. Every selected license is included in the PAF.
+The form supports multiple existing selections and multiple new licenses, validates fields and image independently, and names incomplete licenses by state/license number. Removing or deselecting a license also removes its keyed PSV. Save/reload preserves included licenses and images. The processor handles each included license; existing facility DEA/CDS and packet paths were not changed. The VA = Yes / PA = Yes exemption remains.
 
-AC2. The user can add a license that is not in the existing list, and can add more than one new license. The same PAF can contain selected existing licenses and new licenses together.
+**Validation:** Client and processor builds passed with 0 warnings and 0 errors; the PAF API built successfully with isolated artifacts. Focused processor tests passed (28/28), and focused PAF API tests passed (13/13). `git diff --check` passed. CACTUS database integration tests were not run.
 
-AC3. Each included license is its own record. Required fields stay the fields the single license uses now: State, Effective Date, License Number, Status, Expiration Date, Field of Licensure. Validate each license on its own. A missing field on one license does not clear the others. The user cannot proceed until every included license has those fields.
-
-AC4. Each included license has its own License PSV image. Reuse LicensePsvAttachments. Do not add a second attachment list. One image does not cover a second license. The user cannot proceed while any included license has no image. Sanctions PSV and NPI PSV stay one file for the task.
-
-AC5. On save, name each incomplete license in the validation message, by state and license number when those values exist. Say whether the gap is a required field or the missing image. The user can correct that license and save again. Save stays blocked until every included license has its required fields and its image.
-
-AC6. Save and reload keep every included license, its field values, and its image. Returning to the State License section shows that same set. An existing license the user does not select is not updated and is not given an image. A PAF already saved with one selected license still opens with that license included.
-
-AC7. When ShouldShowStateLicenses is false (VA = Yes and PA = Yes), do not require licenses, fields, or images because of this change.
-
-The facility-state check must treat every included license as coverage, not only the old single NewLicenseState. Do not create a packet or a DEA row in this change. Do not change Begin PAF or Recruitment.
-
-Build the client and the processor. Report the collection that replaced the single selection, and where each license's image is stored.
+Changes are uncommitted and unstaged. The pre-existing staged changes remain untouched.
