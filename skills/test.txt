@@ -1,15 +1,18 @@
-149834 — Keep the email entered on Verify Practitioner Information. Do not commit.
+Implemented without committing.
 
-AC5: an email entered for an existing practitioner with no email is still there on the Demographic task.
+**Before the edit, the two ends were:**
 
-Repro: Begin NPP PAF → search (First Name Mi, Last Name Mo) → Start on a practitioner with no email → on Verify Practitioner Information, under Update Email Address, type an email → Start PAF → ADD NPP → Demographic Work. The Email field is blank.
+`StartPafFrom` only stored the override when the practitioner’s summary email was already nonblank:
+```csharp
+if (!string.IsNullOrWhiteSpace(practitioner.EmailAddress))
+{
+    if (!practitioner.EmailAddress.Equals(updatedEmailAddress, StringComparison.InvariantCultureIgnoreCase))
+        StateContainer.PafStartingState.PractitionerEmailOverride = updatedEmailAddress;
+}
+```
 
-Quote both ends before editing:
-- StartPafFrom stores the typed value on PafStartingState.PractitionerEmailOverride.
-- StartExistingPractitionerPafStrategy fills PractitionerDemographicTask through InitializeFromPractitioner from the CACTUS practitioner. A blank CACTUS email stays blank.
+The shared existing-practitioner start passed `_emailOverride` to `InitializeFromPractitioner` for both recruitment and non-recruitment starts. The initializer copied the CACTUS email, then unconditionally replaced it with a nonblank override.
 
-If nothing copies PractitionerEmailOverride onto the demographic email, that is the gap. When the override is non-blank and the practitioner email is blank, set the demographic email from the override at existing-practitioner PAF start. Do not replace a CACTUS email that already has a value. Do not make Email required. Do not change the Verify modal, ExtendedEmailAddress, or Begin PAF field rules.
+Now `StartPafFrom` captures a nonblank typed value when the summary email is blank, and the initializer applies it only when the loaded CACTUS email is blank. Existing CACTUS email is preserved. Email validation and required-field rules were not changed.
 
-If Begin PAF uses the same start and already keeps a typed email, change only the NPP path. If it uses the same start and also drops the email, fix the one shared apply.
-
-Build the project you change. Report the file and the condition.
+**Builds:** The client build succeeded with 0 warnings and 0 errors. The PAF API build was blocked by the currently staged project-file change removing its `Hca.Credentialing.Api.Shared` project reference; the resulting missing namespace/dependency errors are unrelated to the edited source. The editor reports no errors in either changed file.
