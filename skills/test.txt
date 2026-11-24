@@ -1,3 +1,12 @@
-Changed the Begin NPP PAF control in `PafQueueSearchCriteria.razor` to a native `<button type="button">` with the existing Ant button classes and `NavigateToStartNppPaf` click route. Its visibility, tooltip, and position in the tab order are unchanged.
+Commit only the 150099 Begin NPP PAF keyboard change. Do not push.
 
-Client build passed with **0 warnings and 0 errors**. `git diff --check` passed. No commit made.
+Stage only PafQueueSearchCriteria.razor. Begin NPP PAF is a native button type="button" with the existing Ant classes, and the click still calls NavigateToStartNppPaf.
+
+Do not stage NppTaskForm.razor.cs, StartPafFrom, the PAF API project file, AuditLog.cs, SubmitPafStrategy.cs, PracticeAddressModal.razor, PractitionerRepository.cs, or skills.
+
+If any other file is in the diff, stop and report it.
+
+Message:
+activate Begin NPP PAF with Enter and Space
+
+Return the hash and git status. Do not push.
