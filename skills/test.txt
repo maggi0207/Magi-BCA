@@ -1,17 +1,16 @@
-Commit only the 149834 blank-email capture. Do not push.
+149997 — Show one state-license warning for every missing facility state. Do not commit.
 
-Run git status and git diff --stat first.
+Repro: NPP provider H2000068451 has a GA license only. Selected facilities include Bayonet Point Surgery and Endoscopy Center, Countryside Surgery Center, ENT Surgery Center, and Lincoln Surgery Center. Bayonet Point's entity address state is FL. Submit shows only: A state license in the state of 'NV' is required for PAF submission. No FL warning.
 
-Stage only the file that contains StartPafFrom. The change stores PractitionerEmailOverride when the summary email is blank and the typed email is nonblank.
+Quote GetMissingFacilityStateLicense and the toast in NppTaskForm.SaveNppTask before editing.
 
-Do not stage:
-- InitializeFromPractitioner (no diff expected; it already applies any nonblank override)
-- the PAF API project file that removes the Hca.Credentialing.Api.Shared reference
-- AuditLog.cs, SubmitPafStrategy.cs, PracticeAddressModal.razor, PractitionerRepository.cs, NppTask, NppTaskForm, launchSettings, UnityApiLoadBalancer, Background, TestCactusUpdater, or skills
+Required behavior:
+- Read the state of every selected facility.
+- A state is covered when the provider's existing license or the new license being entered is in that state.
+- For each distinct uncovered state, show the existing sentence once: A state license in the state of '{state}' is required for PAF submission.
+- Do not stop after the first missing state.
+- Quote the field that produced 'NV' for this selection. Bayonet Point's entity address state is FL. If a Florida facility is resolved as NV, fix that state source. Do not hardcode FL or NV.
 
-If the diff contains any other change, stop and report it.
+VA = Yes and PA = Yes still skips the license check. Do not change license save, PSV, or the warning text.
 
-Message:
-keep an email typed for a practitioner who has none
-
-Return the hash and git status. Do not push.
+Build the project you change. Report the method and how the state list is built.
