@@ -1,13 +1,13 @@
-149998 — NPP Work still crashes on the license checkbox. Do not commit.
+149998 — Hide Add New until it is chosen, and fill the existing license. Do not commit.
 
-Clicking Work throws, and the task does not open:
+Two problems on the State License section. Existing licenses stay checkboxes. Work must still open.
 
-System.ArgumentException: The provided expression contains a InstanceMethodCallExpression1 which is not supported. FieldIdentifier only supports simple member accessors (fields, properties) of an object.
-at FieldIdentifier.ParseAccessor
-at AntDesign.AntInputComponentBase.SetParametersAsync
+1. Add New State License is always visible. That is wrong. Hide that block until the user chooses "None of these apply. Add New State License Instead." Choosing it adds one new license row, and choosing it again adds another. Selecting CA, WI, or FL must not show the add block. An existing selection and a new license can still be in the same PAF.
 
-The Checkbox @bind-Value points at a method call. Bind it to a bool property on the license row, such as license.Selected. Do not bind a method, a lambda, or a Contains call.
+2. Selecting an existing license fills State, Effective Date, License Number, Status, and Expiration Date, but Field of Licensure is blank and Upload License PSV has no file. For FL ME41976, quote the recalled FieldOfLicensureRtk and the dropdown option values. A padded RTK such as "       010" must match the existing option instead of leaving the dropdown blank. Do not invent a new RTK.
 
-Keep the Checkbox inside the FormItem. Selecting the checkbox adds that license to IncludedStateLicenses. Clearing it removes that license and its keyed PSV. Do not change validation or the processor.
+Quote the existing license image already stored for that provider license. If that image exists, show it on that license's Upload License PSV and keep it in LicensePsvAttachments. If no image exists, leave the upload empty. Do not require a second upload when the existing image is shown.
 
-Build Hca.Credentialing.Client. Report the checkbox binding.
+Do not change the processor, the VA = Yes / PA = Yes skip, or Sanctions and NPI.
+
+Build Hca.Credentialing.Client. Report when the add block is shown, and where the existing image is read.
