@@ -1,83 +1,21 @@
-ADO User Story: NPP PAF – Multi-Select and Add State Licenses with Required Documentation
-Work Item Type: User Story
-Application: NPP
-Feature: PAF – State License Selection and Entry
+149998 — Select and add more than one NPP state license. Do not commit.
 
-User Story
-As an NPP user completing a Practitioner Application Form (PAF),
+The State License section is one radio: one existing license, or one new license on "None of these apply. Add New State License Instead." Quote SelectedStateLicenseKey and the single NewLicense* fields on NppTask before editing.
 
-I want the ability to select multiple existing state licenses and add new state licenses when the workflow requires state license information,
+AC1. When state licenses are required, the user can select more than one existing state license. Every selected license is included in the PAF.
 
-So that I can provide all applicable state licenses, complete the required information for each license, and attach the supporting license image for each selected or newly added license.
+AC2. The user can add a license that is not in the existing list, and can add more than one new license. The same PAF can contain selected existing licenses and new licenses together.
 
-Description / Business Requirements
-When the NPP PAF workflow requires a user to provide state license information, the application must support multi-selection of existing state licenses as well as the ability to add new licenses.
+AC3. Each included license is its own record. Required fields stay the fields the single license uses now: State, Effective Date, License Number, Status, Expiration Date, Field of Licensure. Validate each license on its own. A missing field on one license does not clear the others. The user cannot proceed until every included license has those fields.
 
-Each selected or newly added state license must be treated as an individual license record, requiring completion of all mandatory fields and attachment of its corresponding license image.
+AC4. Each included license has its own License PSV image. Reuse LicensePsvAttachments. Do not add a second attachment list. One image does not cover a second license. The user cannot proceed while any included license has no image. Sanctions PSV and NPI PSV stay one file for the task.
 
-The application must validate each license independently before allowing the user to proceed.
+AC5. On save, name each incomplete license in the validation message, by state and license number when those values exist. Say whether the gap is a required field or the missing image. The user can correct that license and save again. Save stays blocked until every included license has its required fields and its image.
 
-Acceptance Criteria
-AC1 – Multi-Select Existing State Licenses
-Given the NPP PAF workflow requires state license information,
-When the user navigates to the State License section,
-Then the user must be able to select multiple existing state licenses,
-And all selected licenses must be included in the PAF.
+AC6. Save and reload keep every included license, its field values, and its image. Returning to the State License section shows that same set. An existing license the user does not select is not updated and is not given an image. A PAF already saved with one selected license still opens with that license included.
 
-AC2 – Add New State Licenses
-Given the user is completing the State License section,
-When the user needs to provide a license that is not available in the existing license list,
-Then the user must be able to add a new state license,
-And the user must be able to add multiple new licenses as needed,
-And the user must be able to select existing licenses and add new licenses within the same PAF workflow.
+AC7. When ShouldShowStateLicenses is false (VA = Yes and PA = Yes), do not require licenses, fields, or images because of this change.
 
-AC3 – Required Fields for Each License
-Given the user has selected an existing state license or added a new state license,
-When the license is included in the PAF,
-Then all required fields must be completed for that individual license,
-And validation must be performed separately for each license,
-And missing required information must prevent the user from proceeding until corrected.
+The facility-state check must treat every included license as coverage, not only the old single NewLicenseState. Do not create a packet or a DEA row in this change. Do not change Begin PAF or Recruitment.
 
-AC4 – Mandatory License Image Attachment
-Given the user has selected or added one or more state licenses,
-When the user completes the required license information,
-Then an image of the corresponding state license must be attached to each individual license record,
-And each selected or newly added license must have its own associated attachment,
-And the application must not allow the user to proceed if any license is missing its required image.
-
-AC5 – Validation and Error Messaging
-Given the user attempts to proceed with incomplete state license information,
-When one or more selected or newly added licenses have missing required fields or attachments,
-Then the application must display validation messages identifying the incomplete license records,
-And the user must be able to correct the missing information,
-And the user must not be allowed to proceed until all required information and attachments are provided for every license.
-
-AC6 – Save and Retain License Information
-Given the user has completed the required fields and attached images for multiple state licenses,
-When the user saves the PAF or proceeds to the next step,
-Then all selected and newly added licenses must be retained,
-And each license must retain its associated required field values and image attachment,
-And the information must be available when the user returns to the State License section.
-
-AC7 – Workflow Applicability
-Given the NPP PAF workflow does not require state license information,
-When the user completes the PAF,
-Then the mandatory state license validation must not be triggered solely by this enhancement.
-
-Definition of Done
-Users can multi-select existing state licenses.
-
-Users can add one or more new state licenses.
-
-Existing and new licenses can be included in the same PAF.
-
-All mandatory fields are validated individually for each license.
-
-A corresponding license image is required for each license.
-
-Users cannot proceed when required license information or images are missing.
-
-All license information and attachments are saved and retained correctly.
-
-Functionality is tested for single-license, multiple-license, and mixed existing/new license scenarios.
-
+Build the client and the processor. Report the collection that replaced the single selection, and where each license's image is stored.
