@@ -1,9 +1,3 @@
-150099 — Activate Begin NPP PAF from the keyboard. Do not commit.
+Changed the Begin NPP PAF control in `PafQueueSearchCriteria.razor` to a native `<button type="button">` with the existing Ant button classes and `NavigateToStartNppPaf` click route. Its visibility, tooltip, and position in the tab order are unchanged.
 
-MSP Dashboard: Tab reaches Begin NPP PAF. Enter does not open the practitioner search. Space does not either. Begin PAF, next to it, opens the search on Enter and on Space.
-
-Quote both controls before editing. The NPP control is the dashboard action from 136873, not the ADD NPP PAF task radio.
-
-Make Begin NPP PAF use the same element type as Begin PAF so the browser activates it on Enter and Space. Keep the existing click route to the NPP practitioner search. Do not add a separate key handler if the Begin PAF element already supplies the keys. Do not change who sees the button, the tooltip, the tab order, or Begin PAF.
-
-Build Hca.Credentialing.Client. Report the element you changed.
+Client build passed with **0 warnings and 0 errors**. `git diff --check` passed. No commit made.
