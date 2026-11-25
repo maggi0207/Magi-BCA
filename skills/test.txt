@@ -1,21 +1,8 @@
-150211 — No packet, no DEA, one NPI license on NPP submit. Do not commit.
+Implemented the NPP-only processor changes; **no commit was made**.
 
-Quote the NPP branch in CactusUpdater before editing. Change only that branch. Begin PAF, Recruitment, and other PAF types stay as they are.
+- **NPP call site:** `CactusUpdater` invokes `CrudPractitionerLicensesOperation` in its completed-NPP branch. That operation still processes sanctions, every included state license, and their images.
+- **DEA:** The DEA insert/lookup/update subsection is skipped for NPP only; the surrounding shared flow and CDS handling remain intact.
+- **NPI:** Before the existing NPI image handler, `EnsureNppNpiLicenseAsync` calls `GetExistingLicensesAsync("D2R0045OCI")`. That query is scoped to `PROVIDER_K = PractitionerKey` and the NPI RTK. It inserts with Recruitment’s existing `InsertLicenseAsync` shape only when no row exists, so reruns do not add another row.
+- **Packet:** NPP packet calculation explicitly leaves `ShouldGeneratePacket` and `ShouldUpdatePacketCvis` false. It also clears the delegate-change packet trigger, so the processor does not enqueue packet work for NPP. Other PAF packet calculations are unchanged.
 
-AC1. An NPP PAF must not create a packet. Leave ShouldGeneratePacket and ShouldUpdatePacketCvis false for NPP. Do not enqueue packet-processing. Do not delete an existing packet.
-
-AC2. An NPP PAF must not create a DEA license. SavePractitionerLicensesAsync is the path that adds DEA per facility state. Do not call that DEA insert for NPP. Do not add a DEA row to PROVIDERLICENSES.
-
-AC3. When the provider has no PROVIDERLICENSES row with LICENSE_RTK D2R0045OCI, create one. Use the same insert shape as CreateOrUpdateRecruitmentLicenses and set the provider key. Do not invent a new RTK or new column defaults.
-
-AC4. When that NPI row already exists for the provider, keep it. Do not insert another.
-
-AC8. Processing the same NPP PAF again must find the existing D2R0045OCI row and must not insert a second one.
-
-AC5. Keep creating and updating each license in IncludedStateLicenses. An existing license the user did not include is not updated.
-
-AC6. Keep the sanctions check. It must run without a packet and without a DEA row.
-
-AC7. Keep routing each included license image. Skipping packet and DEA must not skip the image. A PAF upload remains type D2B50K69Z8. An existing license image already resolved on the form stays with that license.
-
-Build the PAF Processor and run the focused license tests. Report the NPP call site, the existing-NPI lookup, and the packet flags that stay false.
+**Validation:** PAF Processor build succeeded. Focused NPP unit tests passed **28/28**. Two CACTUS integration tests could not initialize because the database rejected the current Windows login; they did not reach test assertions. No whitespace errors or editor diagnostics were reported.
