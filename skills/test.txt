@@ -1,98 +1,21 @@
-ADO User Story: NPP PAF – Prevent Unnecessary Packet and DEA Record Creation and Ensure NPI License Record Exists
-Work Item Type: User Story
-Application: NPP
-Feature: PAF – Provider License Record Creation
-Database Reference: PROVIDERLICENSES_PROVLICNxx (D2R0045OCI)
+150211 — No packet, no DEA, one NPI license on NPP submit. Do not commit.
 
-User Story
-As a Credentialing user processing an NPP Practitioner Application Form (PAF),
+Quote the NPP branch in CactusUpdater before editing. Change only that branch. Begin PAF, Recruitment, and other PAF types stay as they are.
 
-I want the NPP PAF workflow to create only the required provider license records and reuse an existing NPI license record when available,
+AC1. An NPP PAF must not create a packet. Leave ShouldGeneratePacket and ShouldUpdatePacketCvis false for NPP. Do not enqueue packet-processing. Do not delete an existing packet.
 
-So that unnecessary packet and DEA records are not created, duplicate NPI license records are prevented, and the required provider information is maintained accurately.
+AC2. An NPP PAF must not create a DEA license. SavePractitionerLicensesAsync is the path that adds DEA per facility state. Do not call that DEA insert for NPP. Do not add a DEA row to PROVIDERLICENSES.
 
-Description / Business Requirements
-The NPP PAF workflow must not create a packet record or DEA record as part of this process.
+AC3. When the provider has no PROVIDERLICENSES row with LICENSE_RTK D2R0045OCI, create one. Use the same insert shape as CreateOrUpdateRecruitmentLicenses and set the provider key. Do not invent a new RTK or new column defaults.
 
-The workflow must ensure that an NPI license record exists in PROVIDERLICENSES_PROVLICNxx (D2R0045OCI).
+AC4. When that NPI row already exists for the provider, keep it. Do not insert another.
 
-If an NPI license record does not exist for the provider, the system must create a new NPI license record.
+AC8. Processing the same NPP PAF again must find the existing D2R0045OCI row and must not insert a second one.
 
-If an NPI license record already exists for the provider, the system must use the existing record without creating a duplicate.
+AC5. Keep creating and updating each license in IncludedStateLicenses. An existing license the user did not include is not updated.
 
-State license records must continue to be created or maintained as required by the PAF workflow.
+AC6. Keep the sanctions check. It must run without a packet and without a DEA row.
 
-The sanctions check must continue to be supported.
+AC7. Keep routing each included license image. Skipping packet and DEA must not skip the image. A PAF upload remains type D2B50K69Z8. An existing license image already resolved on the form stays with that license.
 
-License images must continue to be routed to the appropriate location.
-
-Acceptance Criteria
-AC1 – Do Not Create Packet Record
-Given an NPP PAF is being processed,
-When the workflow processes the provider's information,
-Then the system must not create a new packet record as part of the NPP PAF process.
-
-AC2 – Do Not Create DEA Record
-Given an NPP PAF is being processed,
-When the workflow processes provider license information,
-Then the system must not automatically create a DEA record as part of the NPP PAF process.
-
-AC3 – Create NPI License Record When One Does Not Exist
-Given an NPP PAF is being processed,
-And the provider does not have an existing NPI license record in PROVIDERLICENSES_PROVLICNxx (D2R0045OCI),
-When the workflow processes the provider's license information,
-Then the system must create an NPI license record for the provider,
-And the record must be associated with the correct provider.
-
-AC4 – Prevent Duplicate NPI License Records
-Given an NPP PAF is being processed,
-And an NPI license record already exists for the provider in PROVIDERLICENSES_PROVLICNxx (D2R0045OCI),
-When the workflow processes the provider's license information,
-Then the system must recognize the existing NPI license record,
-And must not create an additional NPI license record,
-And must retain the existing record.
-
-AC5 – Maintain Required State License Records
-Given an NPP PAF requires state license information,
-When the workflow processes the provider's selected or newly added state licenses,
-Then the system must continue to create or maintain the applicable state license records,
-And the records must be associated with the correct provider.
-
-AC6 – Preserve Sanctions Check Functionality
-Given an NPP PAF is being processed,
-When the workflow reaches the sanctions check process,
-Then the required sanctions check functionality must continue to execute without requiring the creation of a packet or DEA record.
-
-AC7 – Preserve License Image Routing
-Given license images are submitted through the NPP PAF workflow,
-When the license records are processed,
-Then the images must continue to be routed to the appropriate destination,
-And the removal of packet and DEA record creation must not interfere with existing image routing functionality.
-
-AC8 – Prevent Duplicate NPI Records During Reprocessing
-Given an NPP PAF has previously been processed and an NPI license record exists,
-When the PAF is processed again,
-Then the system must identify the existing NPI license record,
-And must not create a duplicate NPI license record.
-
-Definition of Done
-NPP PAF does not create a packet record.
-
-NPP PAF does not create a DEA record.
-
-An NPI license record is created when one does not exist.
-
-Existing NPI license records are recognized and reused.
-
-Duplicate NPI license records are not created.
-
-Required state license record processing continues to function.
-
-Sanctions check functionality is preserved.
-
-Existing license image routing continues to function.
-
-QA validates scenarios where an NPI record exists and where one does not exist.
-
-QA confirms that reprocessing a PAF does not create duplicate NPI records.
-
+Build the PAF Processor and run the focused license tests. Report the NPP call site, the existing-NPI lookup, and the packet flags that stay false.
