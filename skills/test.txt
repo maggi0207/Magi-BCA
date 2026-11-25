@@ -1,8 +1,6 @@
-Implemented the NPP-only processor changes; **no commit was made**.
-
-- **NPP call site:** `CactusUpdater` invokes `CrudPractitionerLicensesOperation` in its completed-NPP branch. That operation still processes sanctions, every included state license, and their images.
-- **DEA:** The DEA insert/lookup/update subsection is skipped for NPP only; the surrounding shared flow and CDS handling remain intact.
-- **NPI:** Before the existing NPI image handler, `EnsureNppNpiLicenseAsync` calls `GetExistingLicensesAsync("D2R0045OCI")`. That query is scoped to `PROVIDER_K = PractitionerKey` and the NPI RTK. It inserts with Recruitment’s existing `InsertLicenseAsync` shape only when no row exists, so reruns do not add another row.
-- **Packet:** NPP packet calculation explicitly leaves `ShouldGeneratePacket` and `ShouldUpdatePacketCvis` false. It also clears the delegate-change packet trigger, so the processor does not enqueue packet work for NPP. Other PAF packet calculations are unchanged.
-
-**Validation:** PAF Processor build succeeded. Focused NPP unit tests passed **28/28**. Two CACTUS integration tests could not initialize because the database rejected the current Windows login; they did not reach test assertions. No whitespace errors or editor diagnostics were reported.
+Commit only the 150211 NPP processor change. Do not push.
+Stage CactusUpdater, CrudPractitionerLicensesOperation, EnsureNppNpiLicenseAsync, and the focused NPP tests. NPP leaves ShouldGeneratePacket and ShouldUpdatePacketCvis false, skips the DEA insert, and inserts LICENSE_RTK D2R0045OCI only when that provider has no such row.
+Do not stage the PAF API project file, NppTaskForm, AuditLog.cs, SubmitPafStrategy.cs, PracticeAddressModal.razor, StartPafFrom, or skills. If any other file is in the diff, stop and report it.
+Message:
+skip packet and DEA on NPP submit and keep a single NPI license
+Return the hash and git status. Do not push.
