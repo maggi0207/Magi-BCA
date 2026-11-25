@@ -1,9 +1,11 @@
-Remove the NPP facility-state license warning. Do not commit.
+150254 — Show the add-new license card when the provider has no licenses. Do not commit.
 
-Save on ADD NPP shows: A state license in the state of 'AK' is required for PAF submission. The same sentence repeats for CO and TX. The included license is Wisconsin. A license in one state is enough for a facility in any state.
+The empty State License section now hides "None of these apply. Add New State License Instead." It then shows only "No state licenses found." The user cannot add a license.
 
-Find GetMissingFacilityStateLicenses in NppTaskForm and the toast in SaveNppTask. Stop calling it. Do not compare selected facility states to license states. Do not show that sentence. Save must not be blocked because the facility state differs from the license state.
+When the existing-license list is empty, do not show "No state licenses found." Show one empty new-license card, with its required fields and its own Upload License PSV. Add another license adds one more card.
 
-Keep the per-license required fields and the per-license image check. Keep the VA = Yes / PA = Yes skip. Do not change the processor.
+When the list has one or more licenses, keep the current checkboxes and None of these apply behavior. Do not show the empty-list card in that case.
 
-Build Hca.Credentialing.Client. Report the call you removed.
+Do not change image lookup, Sanctions PSV, NPI PSV, or the VA = Yes / PA = Yes skip.
+
+Build Hca.Credentialing.Client. Report the condition that shows the new-license card.
