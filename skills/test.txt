@@ -1,11 +1,11 @@
-150254 — Show the add-new license card when the provider has no licenses. Do not commit.
+150254 — Open one new-license card when the provider has no licenses. Do not commit.
 
-The empty State License section now hides "None of these apply. Add New State License Instead." It then shows only "No state licenses found." The user cannot add a license.
+The State License section correctly hides "None of these apply" and "No state licenses found." It then shows only the Add another license button. The empty card is missing.
 
-When the existing-license list is empty, do not show "No state licenses found." Show one empty new-license card, with its required fields and its own Upload License PSV. Add another license adds one more card.
+When the existing-license list is empty, render one empty new-license card on open, before any click. The card includes State, Effective Date, License Number, Status, Expiration Date, Field of Licensure, and Upload License PSV. Add another license adds one more card.
 
-When the list has one or more licenses, keep the current checkboxes and None of these apply behavior. Do not show the empty-list card in that case.
+When the provider already has licenses, do not show this card until None of these apply is checked.
 
 Do not change image lookup, Sanctions PSV, NPI PSV, or the VA = Yes / PA = Yes skip.
 
-Build Hca.Credentialing.Client. Report the condition that shows the new-license card.
+Build Hca.Credentialing.Client. Report the condition that renders the first card.
