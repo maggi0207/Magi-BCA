@@ -1,11 +1,14 @@
-**1. Checkbox and PSV path**
+149998 — Show the existing license image for a selected license. Do not commit.
 
-The existing-license checkbox binds to `license.Selected` in `NppTaskForm.razor:71`. Its setter calls `ToggleStateLicense`; image metadata is loaded earlier during form initialization with `GetImagesByImageTypeAsync`, filtered by provider, provider-license parent, active status, and image type in `NppTaskForm.razor.cs:136`. When a license is selected, the code reads image content only if a matching image was found for that license key.
+CA | A26206 is provider license D2SU0LWR6M. CACTUS has an active License Detail Image, type LICMIMG001. The NPP lookup in NppTaskForm.razor.cs requests only active type D2B50K69Z8, which this license does not have, so Upload License PSV is empty and shows "License PSV image is missing."
 
-The `PafFile` itself receives `context.GetLicensePsvAttachment(license.LicenseKey)` from this PAF’s `LicensePsvAttachments` collection in `NppTaskForm.razor:151`. It does not independently read CACTUS images.
+When an existing license is selected, resolve the image for that provider-license key in this order:
+- An active D2B50K69Z8 image, if one exists.
+- Otherwise the active LICMIMG001 License Detail Image.
+- Do not use an inactive image. Do not use State Sanctions Verification D2B6140K5P.
 
-**2. CACTUS image for CA A26206**
+Show that image on the license card and keep it in LicensePsvAttachments for that license key. If the user has already uploaded a file on this PAF for that key, keep the uploaded file. If neither image exists and the user has not uploaded one, keep the missing-image message.
 
-The read-only query matched the supplied dates and “Not Required” status to provider-license key `D2SU0LWR6M`. CACTUS has associated image rows, including an **active** `License Detail Image` (`LICMIMG001`) and an **inactive** `State License` (`D2B6140JWI`). It also has an active `State Sanctions Verification` (`D2B6140K5P`).
+Do not change new-license upload behavior. A file uploaded on the PAF is still stored as D2B50K69Z8. Do not change Sanctions PSV or NPI PSV.
 
-The NPP lookup requests active images of type `D2B50K69Z8` (labeled “Medical License” in the processor), and that type did not appear for this license. So CACTUS has associated images, but the query did not find an active image of the type NPP currently looks for; that can leave the PAF attachment empty and show “License PSV image is missing.”
+Build Hca.Credentialing.Client. Report the type chosen for D2SU0LWR6M.
