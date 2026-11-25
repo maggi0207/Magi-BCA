@@ -1,10 +1,11 @@
-Commit the NPP state-license selection that is working. Do not push.
+150254 — Hide "None of these apply" when the provider has no state licenses. Do not commit.
 
-Stage the NPP form, NppTask, and the image lookup that shows an existing license image. Checking an existing license opens one filled card. None of these apply clears those licenses, disables their checkboxes, and adds a new license card. An existing image is the active Medical License image, or the active License Detail Image when that type is absent.
+Aaron Brown has no existing state licenses. The State License section still shows "None of these apply. Add New State License Instead." and marks it required.
 
-Do not stage the PAF API project file, AuditLog.cs, SubmitPafStrategy.cs, PracticeAddressModal.razor, StartPafFrom, or skills. If any other file is in the diff, stop and report it.
+When the existing-license list is empty, do not render that option. Show the add-new state license card directly, with its required fields and its own Upload License PSV. Add another license still adds one more new card.
 
-Message:
-select each NPP state license and show the license image already on file
+When the list has one or more licenses, keep the current behavior: checkboxes, and checking None of these apply clears those selections, disables those checkboxes, and opens one new card.
 
-Return the hash and git status. Do not push.
+Do not change image lookup, Sanctions PSV, NPI PSV, or the VA = Yes / PA = Yes skip.
+
+Build Hca.Credentialing.Client. Report the condition that hides the option.
