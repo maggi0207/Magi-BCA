@@ -1,14 +1,10 @@
-149998 — Show the existing license image for a selected license. Do not commit.
+Commit the NPP state-license selection that is working. Do not push.
 
-CA | A26206 is provider license D2SU0LWR6M. CACTUS has an active License Detail Image, type LICMIMG001. The NPP lookup in NppTaskForm.razor.cs requests only active type D2B50K69Z8, which this license does not have, so Upload License PSV is empty and shows "License PSV image is missing."
+Stage the NPP form, NppTask, and the image lookup that shows an existing license image. Checking an existing license opens one filled card. None of these apply clears those licenses, disables their checkboxes, and adds a new license card. An existing image is the active Medical License image, or the active License Detail Image when that type is absent.
 
-When an existing license is selected, resolve the image for that provider-license key in this order:
-- An active D2B50K69Z8 image, if one exists.
-- Otherwise the active LICMIMG001 License Detail Image.
-- Do not use an inactive image. Do not use State Sanctions Verification D2B6140K5P.
+Do not stage the PAF API project file, AuditLog.cs, SubmitPafStrategy.cs, PracticeAddressModal.razor, StartPafFrom, or skills. If any other file is in the diff, stop and report it.
 
-Show that image on the license card and keep it in LicensePsvAttachments for that license key. If the user has already uploaded a file on this PAF for that key, keep the uploaded file. If neither image exists and the user has not uploaded one, keep the missing-image message.
+Message:
+select each NPP state license and show the license image already on file
 
-Do not change new-license upload behavior. A file uploaded on the PAF is still stored as D2B50K69Z8. Do not change Sanctions PSV or NPI PSV.
-
-Build Hca.Credentialing.Client. Report the type chosen for D2SU0LWR6M.
+Return the hash and git status. Do not push.
