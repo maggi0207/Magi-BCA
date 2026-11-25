@@ -1,11 +1,9 @@
-150254 — Hide "None of these apply" when the provider has no state licenses. Do not commit.
+Remove the NPP facility-state license warning. Do not commit.
 
-Aaron Brown has no existing state licenses. The State License section still shows "None of these apply. Add New State License Instead." and marks it required.
+Save on ADD NPP shows: A state license in the state of 'AK' is required for PAF submission. The same sentence repeats for CO and TX. The included license is Wisconsin. A license in one state is enough for a facility in any state.
 
-When the existing-license list is empty, do not render that option. Show the add-new state license card directly, with its required fields and its own Upload License PSV. Add another license still adds one more new card.
+Find GetMissingFacilityStateLicenses in NppTaskForm and the toast in SaveNppTask. Stop calling it. Do not compare selected facility states to license states. Do not show that sentence. Save must not be blocked because the facility state differs from the license state.
 
-When the list has one or more licenses, keep the current behavior: checkboxes, and checking None of these apply clears those selections, disables those checkboxes, and opens one new card.
+Keep the per-license required fields and the per-license image check. Keep the VA = Yes / PA = Yes skip. Do not change the processor.
 
-Do not change image lookup, Sanctions PSV, NPI PSV, or the VA = Yes / PA = Yes skip.
-
-Build Hca.Credentialing.Client. Report the condition that hides the option.
+Build Hca.Credentialing.Client. Report the call you removed.
