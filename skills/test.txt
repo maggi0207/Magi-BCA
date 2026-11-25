@@ -1,7 +1,11 @@
-Read only. Do not edit. Do not commit.
+**1. Checkbox and PSV path**
 
-Practitioner license CA | A26206, effective 09/04/1974, status Not Required, expiration 05/31/2014. The NPP State License card shows "License PSV image is missing."
+The existing-license checkbox binds to `license.Selected` in `NppTaskForm.razor:71`. Its setter calls `ToggleStateLicense`; image metadata is loaded earlier during form initialization with `GetImagesByImageTypeAsync`, filtered by provider, provider-license parent, active status, and image type in `NppTaskForm.razor.cs:136`. When a license is selected, the code reads image content only if a matching image was found for that license key.
 
-Quote the NPP checkbox path. Does selecting an existing license call GetImagesByImageType, or any image read, for that provider license key? Or does Upload License PSV read only LicensePsvAttachments for this PAF?
+The `PafFile` itself receives `context.GetLicensePsvAttachment(license.LicenseKey)` from this PAF’s `LicensePsvAttachments` collection in `NppTaskForm.razor:151`. It does not independently read CACTUS images.
 
-Then quote whether provider license A26206 already has an image in CACTUS, including the image type. Report the two answers. Do not change code.
+**2. CACTUS image for CA A26206**
+
+The read-only query matched the supplied dates and “Not Required” status to provider-license key `D2SU0LWR6M`. CACTUS has associated image rows, including an **active** `License Detail Image` (`LICMIMG001`) and an **inactive** `State License` (`D2B6140JWI`). It also has an active `State Sanctions Verification` (`D2B6140K5P`).
+
+The NPP lookup requests active images of type `D2B50K69Z8` (labeled “Medical License” in the processor), and that type did not appear for this license. So CACTUS has associated images, but the query did not find an active image of the type NPP currently looks for; that can leave the PAF attachment empty and show “License PSV image is missing.”
