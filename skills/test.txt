@@ -1,13 +1,21 @@
-149998 — Hide Add New until it is chosen, and fill the existing license. Do not commit.
+149998 — One card per checked license. None of these apply clears and disables the others. Do not commit.
 
-Two problems on the State License section. Existing licenses stay checkboxes. Work must still open.
+Quote NppTaskForm and IncludedStateLicenses before editing. Keep the collection. Fix what is rendered.
 
-1. Add New State License is always visible. That is wrong. Hide that block until the user chooses "None of these apply. Add New State License Instead." Choosing it adds one new license row, and choosing it again adds another. Selecting CA, WI, or FL must not show the add block. An existing selection and a new license can still be in the same PAF.
+Observed:
+- Karan Gupta, NV | 18348 checked: the State license card is blank. A second empty card is also present.
+- Roger Passmore, TN | 32048 checked: one card is filled. Upload License PSV is empty. Scrolled under it: two more empty State license cards while None of these apply is not checked.
+- None of these apply. Add New State License Instead. is only a checkbox. No Add another license action appears after it is checked.
 
-2. Selecting an existing license fills State, Effective Date, License Number, Status, and Expiration Date, but Field of Licensure is blank and Upload License PSV has no file. For FL ME41976, quote the recalled FieldOfLicensureRtk and the dropdown option values. A padded RTK such as "       010" must match the existing option instead of leaving the dropdown blank. Do not invent a new RTK.
+Required behavior:
 
-Quote the existing license image already stored for that provider license. If that image exists, show it on that license's Upload License PSV and keep it in LicensePsvAttachments. If no image exists, leave the upload empty. Do not require a second upload when the existing image is shown.
+1. Existing licenses remain checkboxes. More than one can be checked while None of these apply is unchecked.
+2. A checked existing license renders exactly one card, bound to that license key. Fill State, Effective Date, License Number, Status, Expiration Date, and Field of Licensure from that license. If a padded FieldOfLicensureRtk does not equal a dropdown value, match the existing option by its significant characters. If that license already has an image, show it in Upload License PSV and keep it in LicensePsvAttachments. If it has no image, leave the upload empty.
+3. Uncheck or Remove on an existing license removes that one card and its keyed image.
+4. None of these apply. Add New State License Instead. stays on the list. Checking it clears every selected existing license, removes those cards and their images, and disables the existing-license checkboxes. It adds one empty new-license card.
+5. That new card shows Add another license. Each use adds one more empty new-license card. Unchecking None of these apply removes only the new cards and enables the existing-license checkboxes again.
+6. Render a card only for a checked existing license, or for a new license added while None of these apply is checked. On open, drop empty placeholder rows. Do not show an empty card under a filled existing license.
+7. Bind every checkbox with @bind-Value to a bool property. Do not bind a method. Work must open.
+8. VA = Yes and PA = Yes still hides this section. Sanctions PSV and NPI PSV stay one file for the task. Do not change the processor.
 
-Do not change the processor, the VA = Yes / PA = Yes skip, or Sanctions and NPI.
-
-Build Hca.Credentialing.Client. Report when the add block is shown, and where the existing image is read.
+Build Hca.Credentialing.Client. Report which rows render a card, and what checking None of these apply clears and disables.
