@@ -1,21 +1,7 @@
-149998 — One card per checked license. None of these apply clears and disables the others. Do not commit.
+Read only. Do not edit. Do not commit.
 
-Quote NppTaskForm and IncludedStateLicenses before editing. Keep the collection. Fix what is rendered.
+Practitioner license CA | A26206, effective 09/04/1974, status Not Required, expiration 05/31/2014. The NPP State License card shows "License PSV image is missing."
 
-Observed:
-- Karan Gupta, NV | 18348 checked: the State license card is blank. A second empty card is also present.
-- Roger Passmore, TN | 32048 checked: one card is filled. Upload License PSV is empty. Scrolled under it: two more empty State license cards while None of these apply is not checked.
-- None of these apply. Add New State License Instead. is only a checkbox. No Add another license action appears after it is checked.
+Quote the NPP checkbox path. Does selecting an existing license call GetImagesByImageType, or any image read, for that provider license key? Or does Upload License PSV read only LicensePsvAttachments for this PAF?
 
-Required behavior:
-
-1. Existing licenses remain checkboxes. More than one can be checked while None of these apply is unchecked.
-2. A checked existing license renders exactly one card, bound to that license key. Fill State, Effective Date, License Number, Status, Expiration Date, and Field of Licensure from that license. If a padded FieldOfLicensureRtk does not equal a dropdown value, match the existing option by its significant characters. If that license already has an image, show it in Upload License PSV and keep it in LicensePsvAttachments. If it has no image, leave the upload empty.
-3. Uncheck or Remove on an existing license removes that one card and its keyed image.
-4. None of these apply. Add New State License Instead. stays on the list. Checking it clears every selected existing license, removes those cards and their images, and disables the existing-license checkboxes. It adds one empty new-license card.
-5. That new card shows Add another license. Each use adds one more empty new-license card. Unchecking None of these apply removes only the new cards and enables the existing-license checkboxes again.
-6. Render a card only for a checked existing license, or for a new license added while None of these apply is checked. On open, drop empty placeholder rows. Do not show an empty card under a filled existing license.
-7. Bind every checkbox with @bind-Value to a bool property. Do not bind a method. Work must open.
-8. VA = Yes and PA = Yes still hides this section. Sanctions PSV and NPI PSV stay one file for the task. Do not change the processor.
-
-Build Hca.Credentialing.Client. Report which rows render a card, and what checking None of these apply clears and disables.
+Then quote whether provider license A26206 already has an image in CACTUS, including the image type. Report the two answers. Do not change code.
